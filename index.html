@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CRM Entrenados</title>
+<meta name="theme-color" content="#2148B8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icono-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<div id="login" class="login" hidden>
+  <form id="login-form" class="card">
+    <h1>CRM <span>Entrenados</span></h1>
+    <p class="hint">Entrá con el mail y la contraseña de tu usuario de Supabase.</p>
+    <input id="login-email" type="email" autocomplete="username" placeholder="Mail" required>
+    <input id="login-pass" type="password" autocomplete="current-password" placeholder="Contraseña" required>
+    <div id="login-msg" class="banner" hidden></div>
+    <button class="btn pri" type="submit">Entrar</button>
+  </form>
+</div>
+<div id="app" hidden>
+
+
+<header class="top"><div class="wrap">
+  <div class="brand">CRM <span>Entrenados</span></div>
+  <nav class="tabs" aria-label="Secciones">
+    <button data-view="panel" aria-current="page">Panel</button>
+    <button data-view="lista">Entrenados</button>
+    <button data-view="rutinas">Rutinas</button>
+    <button data-view="ajustes">Ajustes</button>
+  </nav>
+  <div class="date" id="today"></div>
+  <div class="user"><span id="user-mail"></span><button id="logout" type="button">Salir</button></div>
+</div></header>
+
+<main class="wrap">
+  <div id="banner" class="banner" hidden></div>
+  <section id="v-panel"></section>
+  <section id="v-lista" hidden></section>
+  <section id="v-rutinas" hidden></section>
+  <section id="v-ajustes" hidden></section>
+</main>
+<button class="fab" id="fab">+ Nuevo entrenado</button>
+<div id="overlay" class="overlay" hidden></div>
+<div id="toast" class="toast" hidden></div>
+
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
