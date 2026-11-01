@@ -805,9 +805,9 @@ function editorHTML(){
   <div class="form card pad">
     <label>Título de la sección<input data-p="${P}" data-f="titulo" value="${esc(s.titulo||'')}" placeholder="Semana 1 y 3" ${ro?'readonly':''}></label>
     <label>Posición (equipos)<select data-p="${P}" data-f="posicion" ${ro?'disabled':''}><option value="">Todas</option>${(S.cfg.posiciones||[]).map(x=>`<option ${keyN(x)===keyN(s.posicion)?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
-    ${ro?'':`<div class="full actions"><button class="btn" type="button" data-act="dupSec">Duplicar sección</button><button class="btn" type="button" data-act="addDia">+ Día</button>${R.secciones.length>1?'<button class="btn danger" type="button" data-act="delSec">Quitar sección</button>':''}</div>`}
+    ${ro?'':`<div class="full actions"><button class="btn" type="button" data-act="dupSec">Duplicar sección</button><button class="btn" type="button" data-act="addDia">+ Día</button><button class="btn" type="button" data-act="clearSec">Vaciar sección</button>${R.secciones.length>1?'<button class="btn danger" type="button" data-act="delSec">Quitar sección</button>':''}</div>`}
   </div>
-  ${s.dias.map((dia,d)=>`<div class="card dia"><div class="dia-h"><input class="dia-n" data-p="${P},${d}" data-f="nombre" value="${esc(dia.nombre)}" ${ro?'readonly':''}>${ro?'':`<button type="button" class="btn" data-act="addBloque" data-p="${P},${d}">+ Bloque</button><button type="button" class="btn danger" data-act="delDia" data-p="${P},${d}">Quitar día</button>`}</div>
+  ${s.dias.map((dia,d)=>`<div class="card dia"><div class="dia-h"><input class="dia-n" data-p="${P},${d}" data-f="nombre" value="${esc(dia.nombre)}" ${ro?'readonly':''}>${ro?'':`<button type="button" class="btn" data-act="addBloque" data-p="${P},${d}">+ Bloque</button><button type="button" class="btn" data-act="clearDia" data-p="${P},${d}">Vaciar día</button><button type="button" class="btn danger" data-act="delDia" data-p="${P},${d}">Quitar día</button>`}</div>
     ${dia.bloques.map((bl,b)=>`<div class="bl"><div class="bl-h"><input list="dl-bl" class="bl-n" data-p="${P},${d},${b}" data-f="nombre" value="${esc(bl.nombre)}" ${ro?'readonly':''}><label>Series<input data-p="${P},${d},${b}" data-f="series" value="${esc(bl.series)}" style="width:56px" ${ro?'readonly':''}></label>${ro?'':`<button type="button" class="x-sm" data-act="delBloque" data-p="${P},${d},${b}" aria-label="Quitar bloque">Quitar</button>`}</div>
       ${items(d,b,bl)}${ro?'':`<button type="button" class="add-it" data-act="addItem" data-p="${P},${d},${b}">+ Ejercicio</button>`}</div>`).join('')}
   </div>`).join('')}
@@ -833,6 +833,11 @@ function bindEditor(){
     if(act==='del'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Tocá de nuevo para eliminar';return}
       if(await write(()=>S.db.collection(E.col).doc(E.id).delete())){toast('Eliminada');closeSheet()}return}
     if(act==='dupPlant'){const d=clone(R);d.nombre=(d.nombre||'')+' (copia)';if(await write(()=>S.db.collection('plantillas').add(d))){toast('Plantilla duplicada');closeSheet()}return}
+    if(act==='clearDia'||act==='clearSec'){
+      if(!b.classList.contains('armed')){b.classList.add('armed','danger');b.textContent=act==='clearDia'?'Tocá de nuevo para vaciar el día':'Tocá de nuevo para vaciar toda la sección';setTimeout(()=>{if(b.isConnected){b.classList.remove('armed','danger');b.textContent=act==='clearDia'?'Vaciar día':'Vaciar sección'}},4000);return}
+      const dias=act==='clearDia'?[getPath(R,p)]:S0.dias;
+      dias.forEach(d=>d.bloques.forEach(bl=>{bl.items=[newItem()]}));
+      E.dirty=true;rerenderEditor();toast(act==='clearDia'?'Día vaciado. Guardá para confirmar':'Sección vaciada. Guardá para confirmar');return}
     E.dirty=true;
     if(act==='addSec'){R.secciones.push(newSeccion(Math.max(1,S0?.dias.length||3)));R.secciones.at(-1).titulo='Sección '+R.secciones.length;E.sec=R.secciones.length-1}
     else if(act==='dupSec'){const c=clone(S0);c.uid=ruid();c.titulo=(c.titulo||'')+' (copia)';c.dias.forEach(d=>{d.uid=ruid();d.bloques.forEach(b=>{b.uid=ruid();b.items.forEach(i=>i.uid=ruid())})});R.secciones.splice(E.sec+1,0,c);E.sec++}
