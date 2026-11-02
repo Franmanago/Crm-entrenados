@@ -631,7 +631,7 @@ function entregasCard(){
   return `<div class="card"><div class="pad" style="padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px"><b>Rutinas para entregar</b><button class="btn" style="padding:5px 10px;font-size:13px" data-goto="rutinas">Ver tablero</button></div>
     ${listas.length?`<ul class="alist">${listas.slice(0,8).map(r=>`<li><button class="nm" data-open="${esc(r.entrenadoId)}">${esc(name(S.ents[r.entrenadoId]))}</button><span class="meta">${esc(r.nombre||'Rutina')}</span><button class="wa" data-entregar="${esc(r._id)}">Entregar</button></li>`).join('')}</ul>`:'<div class="empty">No hay rutinas listas para entregar.</div>'}</div>`;
 }
-const SUBS=[['entregas','Entregas'],['plantillas','Plantillas'],['biblioteca','Biblioteca de videos']];
+const SUBS=[['entregas','Entregas'],['plantillas','Plantillas'],['imprimir','Imprimir'],['biblioteca','Biblioteca de videos']];
 function renderRutinas(){
   const el=$('#v-rutinas');
   if(!S.loaded){el.innerHTML='<div class="card empty">Cargando…</div>';return}
@@ -649,6 +649,8 @@ function renderRutinas(){
       <div class="card"><div class="pad" style="padding-bottom:6px"><b>Sin próxima planificada</b> <span class="pill p-mute">${sinProx.length}</span><p class="hint">Ordenados por la rutina más vieja.</p></div>
         ${sinProx.length?`<ul class="alist">${sinProx.map(({e,a})=>`<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}<br><span class="hint">${a?esc(a.nombre||'Rutina')+' · desde '+fmtShort(a.fechaEntrega):'Sin rutina en la app'+(e.ultRutina?' · últ. '+fmtShort(e.ultRutina):'')}</span></button><button class="btn" style="padding:5px 8px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Planificar</button></li>`).join('')}</ul>`:'<div class="empty">Todos tienen la próxima en cola.</div>'}</div>
     </div>`;
+  }else if(S.rsub==='imprimir'){
+    body=imprimirHTML();
   }else if(S.rsub==='plantillas'){
     const pl=Object.entries(S.plantillas).sort((a,b)=>(a[1].nombre||'').localeCompare(b[1].nombre||''));
     body=`<div class="actions" style="margin-bottom:12px"><button class="btn pri" data-newplant="1">Nueva plantilla</button></div>
@@ -662,6 +664,7 @@ function renderRutinas(){
     <div class="card"><ul class="alist">${list.map(([id,e])=>`<li><button class="nm" data-editej="${esc(id)}">${esc(e.nombre)}</button><span class="meta">${e.rm?`<span class="pill p-lv">RM ${esc(e.rm)}</span> `:''}${uso[id]?uso[id]+' usos':''}</span>${e.video?`<a class="wa" style="color:var(--accent)" target="_blank" rel="noopener" href="${esc(e.video)}">▶ Video</a>`:'<span class="pill p-bad">Sin video</span>'}</li>`).join('')}</ul></div>`;
   }
   el.innerHTML=`<div class="chips" style="margin-bottom:14px">${SUBS.map(([k,l])=>`<button class="chip" data-rsub="${k}" aria-pressed="${k===S.rsub}">${l}</button>`).join('')}</div>${body}`;
+  el.onchange=null;el.onclick=null;if(S.rsub==='imprimir')bindImprimir();
   const bq=$('#bq');if(bq){bq.addEventListener('input',()=>{S.bq=bq.value;const p=bq.selectionStart;renderRutinas();const n=$('#bq');n.focus();n.setSelectionRange(p,p)})}
 }
 
@@ -676,8 +679,8 @@ function fichaRutinasHTML(e){
     <div class="pad" style="padding-bottom:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><b>Rutinas</b>
       <span class="actions"><button class="btn" style="padding:5px 10px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Desde plantilla</button><button class="btn" style="padding:5px 10px;font-size:13px" data-copiarde="${esc(e.id)}">De otro entrenado</button><button class="btn" style="padding:5px 10px;font-size:13px" data-newrut="${esc(e.id)}">Vacía</button>${a?`<button class="btn" style="padding:5px 10px;font-size:13px" data-duprut="${esc(a._id)}">Duplicar actual</button>`:''}</span></div>
     <ul class="alist">
-      ${a?`<li><span class="nm" style="white-space:normal"><span class="pill p-ok">Activa</span> <b>${esc(a.nombre||'Rutina')}</b>${warn(a)}<br><span class="hint">Entregada ${fmtD(a.fechaEntrega)} · semana ${semanaActual(a)+1} de ${a.duracionSemanas||'?'}</span></span><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(a._id)}">Abrir</button></li>`:'<li><span class="nm hint">Sin rutina activa en la app.</span></li>'}
-      ${c.map(r=>`<li><span class="nm" style="white-space:normal"><span class="pill p-warn">En cola</span> <b>${esc(r.nombre||'Rutina')}</b>${warn(r)}<br><span class="hint">Entrega sugerida ${fmtD(r.fechaSugerida)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button></span></li>`).join('')}
+      ${a?`<li><span class="nm" style="white-space:normal"><span class="pill p-ok">Activa</span> <b>${esc(a.nombre||'Rutina')}</b>${warn(a)}<br><span class="hint">Entregada ${fmtD(a.fechaEntrega)} · semana ${semanaActual(a)+1} de ${a.duracionSemanas||'?'}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(a._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(a._id)}">Abrir</button></span></li>`:'<li><span class="nm hint">Sin rutina activa en la app.</span></li>'}
+      ${c.map(r=>`<li><span class="nm" style="white-space:normal"><span class="pill p-warn">En cola</span> <b>${esc(r.nombre||'Rutina')}</b>${warn(r)}<br><span class="hint">Entrega sugerida ${fmtD(r.fechaSugerida)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(r._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button></span></li>`).join('')}
       ${fin.map(r=>`<li><span class="nm hint" style="white-space:normal"><span class="pill p-mute">Finalizada</span> ${esc(r.nombre||'Rutina')} · ${fmtShort(r.fechaEntrega)} a ${fmtShort(r.fechaFin)}</span><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Ver</button></li>`).join('')}
     </ul>
     <div class="pad" style="border-top:1px solid var(--line)"><div class="kpi" style="padding:0"><div class="lbl">Link personal del entrenado</div></div>
@@ -762,11 +765,53 @@ function bindAsignar(arg){
       const secs=clone(p.secciones||[]).filter(s=>!s.posicion||!e.posicion||keyN(s.posicion)===keyN(e.posicion));
       const doc={entrenadoId:id,nombre:arg.nom||p.nombre,estado:'cola',fechaSugerida:arg.f||iso(today()),duracionSemanas:p.duracionSemanas||4,
         secciones:secs.length?secs:clone(p.secciones||[]),plantillaId:arg.pid||'',notas:p.notas||'',creada:Date.now()};
-      const rot=rotacion(diasDe(doc),Number(e.estimulos),doc.duracionSemanas);if(rot)doc.distribucion=rot;
+      if(p.distribucion&&p.distribucion.length)doc.distribucion=clone(p.distribucion);else{const rot=rotacion(diasDe(doc),Number(e.estimulos),doc.duracionSemanas);if(rot)doc.distribucion=rot}
       if(await write(()=>S.db.collection('rutinas').add(doc)))n++;
     }
     toast(`${plural(n,'rutina puesta','rutinas puestas')} en cola`);closeSheet();
   });
+}
+
+/* ----- PDF para imprimir ----- */
+function pdfDe(r){const e=S.ents[r.entrenadoId];return {name:RutinaPDF.fileName(e,r),data:RutinaPDF.build(r,e,it=>kgItem(it,e).txt)}}
+function descargarPDFs(ids){
+  const rs=ids.map(id=>S.rutinas.find(x=>x._id===id)).filter(r=>r&&S.ents[r.entrenadoId]);
+  if(!rs.length){toast('Elegí al menos una rutina');return}
+  try{
+    if(rs.length===1){const f=pdfDe(rs[0]);RutinaPDF.download(f.data,f.name,'application/pdf');toast('PDF descargado');return}
+    const files=[];const used={};
+    for(const r of rs){const f=pdfDe(r);let n=f.name;if(used[n]){used[n]++;n=n.replace(/\.pdf$/,` (${used[n]}).pdf`)}else used[n]=1;files.push({name:n,data:f.data})}
+    RutinaPDF.download(RutinaPDF.zip(files),`Rutinas para imprimir ${fmtD(iso(today())).replace(/\//g,'-')}.zip`,'application/zip');
+    toast(`${rs.length} PDF descargados en un .zip`);
+  }catch(err){console.error(err);toast('No se pudo generar el PDF')}
+}
+function imprimirHTML(){
+  const P=S.pr=S.pr||{sel:new Set(),f:'activa',g:'',q:''};
+  const grupos=[...new Set(Object.values(S.ents).map(e=>e.grupo).filter(Boolean))].sort();
+  const q=keyN(P.q);
+  const list=S.rutinas.filter(r=>(r.estado==='activa'||r.estado==='cola')&&S.ents[r.entrenadoId]&&isAct(S.ents[r.entrenadoId]))
+    .filter(r=>P.f==='todas'||r.estado===P.f).filter(r=>!P.g||S.ents[r.entrenadoId].grupo===P.g)
+    .filter(r=>!q||keyN(S.ents[r.entrenadoId].nombre).includes(q)||keyN(r.nombre).includes(q))
+    .sort((a,b)=>name(S.ents[a.entrenadoId]).localeCompare(name(S.ents[b.entrenadoId]),'es'));
+  S._prList=list.map(r=>r._id);
+  const n=[...P.sel].filter(id=>S.rutinas.some(r=>r._id===id)).length;
+  return `<p class="hint" style="margin:0 0 10px">Cada rutina sale en un PDF propio, en hoja A4, sin videos y con el teléfono del entrenado. Si elegís varias, se descargan juntas en un .zip.</p>
+  <div class="toolbar"><input id="pr-q" class="search" type="search" placeholder="Buscar entrenado o rutina" value="${esc(P.q)}" autocomplete="off">
+    <div class="chips">${[['activa','Activas'],['cola','En cola'],['todas','Todas']].map(([k,l])=>`<button class="chip" data-prf="${k}" aria-pressed="${P.f===k}">${l}</button>`).join('')}</div>
+    ${grupos.length?`<select id="pr-g" class="search" style="flex:0 1 200px"><option value="">Todos los grupos</option>${grupos.map(g=>`<option ${g===P.g?'selected':''}>${esc(g)}</option>`).join('')}</select>`:''}</div>
+  <div class="actions" style="margin-bottom:10px;align-items:center"><button class="btn" data-prall="1">Seleccionar las ${list.length}</button><button class="btn" data-prnone="1">Ninguna</button><button class="btn pri" data-prgo="1" ${n?'':'disabled'} style="margin-left:auto">Descargar PDF (${n})</button></div>
+  <div class="card">${list.length?`<ul class="alist">${list.map(r=>{const e=S.ents[r.entrenadoId];return `<li><label style="display:flex;gap:10px;align-items:center;flex:1;min-width:0;cursor:pointer"><input type="checkbox" data-prsel="${esc(r._id)}" ${P.sel.has(r._id)?'checked':''}><span style="min-width:0"><b>${esc(name(e))}</b> <span class="pill ${r.estado==='activa'?'p-ok':'p-warn'}">${r.estado==='activa'?'Activa':'En cola'}</span><br><span class="hint">${esc(r.nombre||'Rutina')} · ${diasDe(r)} días${e.grupo?' · '+esc(e.grupo):''}</span></span></label><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(r._id)}">PDF</button></li>`}).join('')}</ul>`:'<div class="empty">No hay rutinas con ese filtro.</div>'}</div>`;
+}
+function bindImprimir(){
+  const P=S.pr,el=$('#v-rutinas');
+  const q=$('#pr-q');q.addEventListener('input',()=>{P.q=q.value;const c=q.selectionStart;renderRutinas();const n=$('#pr-q');n.focus();n.setSelectionRange(c,c)});
+  const g=$('#pr-g');if(g)g.addEventListener('change',()=>{P.g=g.value;renderRutinas()});
+  el.onchange=ev=>{const c=ev.target.closest('[data-prsel]');if(!c)return;c.checked?P.sel.add(c.dataset.prsel):P.sel.delete(c.dataset.prsel);const b=el.querySelector('[data-prgo]');const n=P.sel.size;b.textContent=`Descargar PDF (${n})`;b.disabled=!n};
+  el.onclick=ev=>{let b;
+    if(b=ev.target.closest('[data-prf]')){P.f=b.dataset.prf;renderRutinas()}
+    else if(ev.target.closest('[data-prall]')){(S._prList||[]).forEach(id=>P.sel.add(id));renderRutinas()}
+    else if(ev.target.closest('[data-prnone]')){P.sel.clear();renderRutinas()}
+    else if(ev.target.closest('[data-prgo]')){descargarPDFs([...P.sel])}};
 }
 
 /* ----- copiar rutina de otro entrenado ----- */
@@ -829,7 +874,9 @@ function editorHTML(){
     <label class="full">Nombre<input data-h="nombre" value="${esc(R.nombre||'')}" ${ro?'readonly':''}></label>
     ${isRut?`<label>Entrega sugerida<input type="date" data-h="fechaSugerida" value="${esc(R.fechaSugerida||'')}" ${ro||R.estado!=='cola'?'readonly':''}></label>`:`<label>Tipo<select data-h="tipo"><option value="individual" ${R.tipo!=='equipo'?'selected':''}>Individual</option><option value="equipo" ${R.tipo==='equipo'?'selected':''}>Equipo</option></select></label>`}
     <label>Duración (semanas)<input type="number" min="1" max="16" data-h="duracionSemanas" value="${esc(R.duracionSemanas||4)}" ${ro?'readonly':''}></label>
-    <label class="full">Notas para el entrenado<input data-h="notas" value="${esc(R.notas||'')}" placeholder="Ej: entrada en calor 10' antes" ${ro?'readonly':''}></label>
+    <div class="full plan-box"><b>Indicaciones para el entrenado</b><p class="hint">Aparecen arriba de todo en su link y en el PDF.</p>
+      <textarea data-h="notas" rows="2" placeholder="Ej: entrada en calor 10' antes: movilidad de cadera y hombros" ${ro?'readonly':''}>${esc(R.notas||'')}</textarea>
+      ${planHTML(R,e,ro)}</div>
   </div>
   <div class="chips">${R.secciones.map((x,i)=>`<button class="chip" type="button" data-sec="${i}" aria-pressed="${i===E.sec}">${esc(x.titulo||'Sección '+(i+1))}${x.posicion?' · '+esc(x.posicion):''}</button>`).join('')}${ro?'':'<button class="chip" type="button" data-act="addSec">+ Sección</button>'}</div>
   <div class="form card pad">
@@ -848,6 +895,21 @@ function editorHTML(){
     ${E.id?`<button class="btn danger" type="button" data-act="del" style="margin-left:auto">Eliminar</button>`:''}
     <button class="btn" type="button" data-close>Cerrar</button></div>`;
 }
+function planNorm(R,e){
+  if(!R.distribucion)return;
+  const n=Math.max(1,Number(R.duracionSemanas)||4),nd=Math.max(1,(R.secciones?.[0]?.dias||[]).length);
+  R.distribucion=R.distribucion.map(w=>(w||[]).filter(x=>x<nd));
+  if(R.distribucion.length>n)R.distribucion=R.distribucion.slice(0,n);
+  if(R.distribucion.length<n){const base=rotacion(nd,Number(e?.estimulos)||nd,n)||Array.from({length:n},()=>Array.from({length:nd},(_,i)=>i));for(let i=R.distribucion.length;i<n;i++)R.distribucion.push(base[i])}
+}
+function planHTML(R,e,ro){
+  planNorm(R,e);
+  const dias=(R.secciones?.[0]?.dias||[]),est=Number(e?.estimulos)||0,on=!!R.distribucion;
+  let h=`<div class="plan-h"><b>Qué día hacer cada semana</b><label class="plan-on"><input type="checkbox" data-planon ${on?'checked':''} ${ro?'disabled':''}> Mostrar al entrenado</label>${on&&!ro&&est?`<button type="button" class="x-sm" data-act="planSug">Sugerir para ${est} por semana</button>`:''}</div>`;
+  if(!on)return h+`<p class="hint">Activalo si el entrenado no hace todos los días cada semana${est&&dias.length>est?` (paga ${est} y la rutina tiene ${dias.length} días)`:''}.</p>`;
+  h+=`<div class="tbl-wrap"><table class="plan-t"><thead><tr><th></th>${dias.map(d=>`<th>${esc(d.nombre)}</th>`).join('')}<th></th></tr></thead><tbody>${R.distribucion.map((w,i)=>`<tr><td><b>Sem ${i+1}</b></td>${dias.map((d,j)=>`<td><input type="checkbox" data-plan="${i},${j}" ${w.includes(j)?'checked':''} ${ro?'disabled':''} aria-label="Semana ${i+1}, ${esc(d.nombre)}"></td>`).join('')}<td>${est&&w.length!==est?`<span class="pill p-warn">${w.length} de ${est}</span>`:''}</td></tr>`).join('')}</tbody></table></div>`;
+  return h;
+}
 function getPath(R,p){const a=p.split(',').map(Number);let o=R.secciones[a[0]];if(a.length>1)o=o.dias[a[1]];if(a.length>2)o=o.bloques[a[2]];if(a.length>3)o=o.items[a[3]];return o}
 function rerenderEditor(){const sh=$('.sheet');const st=sh?sh.scrollTop:0;renderSheet();const n=$('.sheet');if(n)n.scrollTop=st}
 function bindEditor(){
@@ -861,6 +923,7 @@ function bindEditor(){
     const act=b.dataset.act,p=b.dataset.p;
     const S0=R.secciones[E.sec];
     if(act==='save'){saveEditor();return}
+    if(act==='planSug'){const en=S.ents[R.entrenadoId];const nd=(R.secciones?.[0]?.dias||[]).length;R.distribucion=rotacion(nd,Number(en?.estimulos)||nd,R.duracionSemanas)||Array.from({length:R.duracionSemanas||4},()=>Array.from({length:nd},(_,i)=>i));E.dirty=true;rerenderEditor();return}
     if(act==='del'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Tocá de nuevo para eliminar';return}
       if(await write(()=>S.db.collection(E.col).doc(E.id).delete())){toast('Eliminada');closeSheet()}return}
     if(act==='toPlant'){const en=S.ents[R.entrenadoId];const d={nombre:(R.nombre||'Rutina')+(en?' (de '+firstName(en)+')':''),tipo:'individual',duracionSemanas:R.duracionSemanas||4,notas:R.notas||'',
@@ -891,6 +954,10 @@ function bindEditor(){
     const o=getPath(R,t.dataset.p);o[t.dataset.f]=t.value;E.dirty=true;
   };
   ov.onchange=ev=>{
+    const en=S.ents[R.entrenadoId];
+    if(ev.target.matches('[data-planon]')){const nd=(R.secciones?.[0]?.dias||[]).length;R.distribucion=ev.target.checked?(rotacion(nd,Number(en?.estimulos)||nd,R.duracionSemanas)||Array.from({length:R.duracionSemanas||4},()=>Array.from({length:nd},(_,i)=>i))):null;E.dirty=true;rerenderEditor();return}
+    const pl=ev.target.closest('[data-plan]');if(pl){const [w,d]=pl.dataset.plan.split(',').map(Number);const a=new Set(R.distribucion[w]);pl.checked?a.add(d):a.delete(d);R.distribucion[w]=[...a].sort((x,y)=>x-y);E.dirty=true;rerenderEditor();return}
+    if(ev.target.matches('[data-h=duracionSemanas]')){rerenderEditor();return}
     const t=ev.target.closest('[data-p][data-f]');if(!t)return;
     const o=getPath(R,t.dataset.p),f=t.dataset.f;
     if(f==='nombre'&&'ej' in o){const id=ejByName()[keyN(o.nombre)]||'';o.ej=id;if(id)o.nombre=S.ejs[id].nombre;if(o.pct&&!o.rm&&id)o.rm=S.ejs[id].rm||'';rerenderEditor()}
@@ -901,7 +968,7 @@ function bindEditor(){
 async function saveEditor(silent){
   const E=S.edit,R=E.data;
   R.secciones.forEach(s=>s.dias.forEach(d=>d.bloques.forEach(b=>{b.items=b.items.filter(i=>(i.nombre||'').trim())})));
-  if(E.col==='rutinas'){const e=S.ents[R.entrenadoId];const rot=rotacion(diasDe(R),Number(e?.estimulos),R.duracionSemanas);if(rot)R.distribucion=rot;else delete R.distribucion}
+  if(R.distribucion){planNorm(R,S.ents[R.entrenadoId]);if(!R.distribucion.some(w=>w.length))R.distribucion=null}
   let ok;
   if(E.id)ok=await write(()=>S.db.collection(E.col).doc(E.id).set(R));
   else{try{const ref=await S.db.collection(E.col).add(R);E.id=ref.id;ok=true}catch(err){toast('No se pudo guardar');ok=false}}
@@ -966,6 +1033,7 @@ function handleRut(e){
   if(b=g('data-newplant')){openEditor('plantillas',null,{nombre:'Nueva plantilla',tipo:'individual',duracionSemanas:4,secciones:[newSeccion(3)]});return true}
   if(b=g('data-editej')){openEjSheet(b.dataset.editej);return true}
   if(b=g('data-newej')){openEjSheet(null,{nombre:S.bq||''});return true}
+  if(b=g('data-pdf')){descargarPDFs([b.dataset.pdf]);return true}
   if(b=g('data-rsub')){S.rsub=b.dataset.rsub;renderRutinas();return true}
   if(b=g('data-goto')){location.hash=b.dataset.goto;return true}
   return false;
