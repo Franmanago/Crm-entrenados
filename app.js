@@ -323,6 +323,7 @@ function renderSheet(){
   if(openId==='__bulk'){ov.innerHTML=shell('Envío de mensajes',bulkHTML());bindBulk();return}
   if(openId==='__rut'){const R=S.edit.data;ov.innerHTML=shell(S.edit.col==='plantillas'?(S.edit.id?'Plantilla':'Nueva plantilla'):(R.nombre||'Rutina'),editorHTML());ov.querySelector('.sheet').classList.add('wide');bindEditor();return}
   if(openId==='__ej'){ov.innerHTML=shell(S.ejEdit.id?'Ejercicio':'Nuevo ejercicio',ejHTML());bindEj();return}
+  if(openId==='__copiar'){ov.innerHTML=shell('Copiar rutina de otro entrenado',copiarHTML(sheetArg));bindCopiar(sheetArg);return}
   if(openId==='__asig'){ov.innerHTML=shell('Asignar plantilla',asignarHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};bindAsignar(sheetArg);return}
   if(openId==='__posp'){const r=S.rutinas.find(x=>x._id===sheetArg);if(!r){closeSheet();return}ov.innerHTML=shell('Posponer entrega',posponerHTML(r));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};bindPosponer(r);return}
   const isNew=openId==='__new';
@@ -673,7 +674,7 @@ function fichaRutinasHTML(e){
   const warn=r=>{const n=diasDe(r),est=Number(e.estimulos)||0;return n&&est&&n!==est?` <span class="pill p-warn">${n} días · paga ${est}</span>`:''};
   return `<div class="card">
     <div class="pad" style="padding-bottom:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><b>Rutinas</b>
-      <span class="actions"><button class="btn" style="padding:5px 10px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Desde plantilla</button><button class="btn" style="padding:5px 10px;font-size:13px" data-newrut="${esc(e.id)}">Vacía</button>${a?`<button class="btn" style="padding:5px 10px;font-size:13px" data-duprut="${esc(a._id)}">Duplicar actual</button>`:''}</span></div>
+      <span class="actions"><button class="btn" style="padding:5px 10px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Desde plantilla</button><button class="btn" style="padding:5px 10px;font-size:13px" data-copiarde="${esc(e.id)}">De otro entrenado</button><button class="btn" style="padding:5px 10px;font-size:13px" data-newrut="${esc(e.id)}">Vacía</button>${a?`<button class="btn" style="padding:5px 10px;font-size:13px" data-duprut="${esc(a._id)}">Duplicar actual</button>`:''}</span></div>
     <ul class="alist">
       ${a?`<li><span class="nm" style="white-space:normal"><span class="pill p-ok">Activa</span> <b>${esc(a.nombre||'Rutina')}</b>${warn(a)}<br><span class="hint">Entregada ${fmtD(a.fechaEntrega)} · semana ${semanaActual(a)+1} de ${a.duracionSemanas||'?'}</span></span><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(a._id)}">Abrir</button></li>`:'<li><span class="nm hint">Sin rutina activa en la app.</span></li>'}
       ${c.map(r=>`<li><span class="nm" style="white-space:normal"><span class="pill p-warn">En cola</span> <b>${esc(r.nombre||'Rutina')}</b>${warn(r)}<br><span class="hint">Entrega sugerida ${fmtD(r.fechaSugerida)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button></span></li>`).join('')}
@@ -768,6 +769,35 @@ function bindAsignar(arg){
   });
 }
 
+/* ----- copiar rutina de otro entrenado ----- */
+function reuid(secs){const c=clone(secs||[]);c.forEach(s=>{s.uid=ruid();(s.dias||[]).forEach(d=>{d.uid=ruid();(d.bloques||[]).forEach(b=>{b.uid=ruid();(b.items||[]).forEach(i=>i.uid=ruid())})})});return c}
+function copiarHTML(arg){
+  const dest=S.ents[arg.para];const q=keyN(arg.q||'');
+  const ord={activa:0,cola:1,finalizada:2};
+  const list=S.rutinas.filter(r=>r.entrenadoId!==arg.para&&S.ents[r.entrenadoId])
+    .filter(r=>!q||keyN(S.ents[r.entrenadoId].nombre).includes(q)||keyN(r.nombre).includes(q))
+    .sort((a,b)=>(ord[a.estado]??3)-(ord[b.estado]??3)||(b.fechaEntrega||b.fechaSugerida||'').localeCompare(a.fechaEntrega||a.fechaSugerida||''))
+    .slice(0,80);
+  const lbl={activa:['Activa','p-ok'],cola:['En cola','p-warn'],finalizada:['Finalizada','p-mute']};
+  return `<p class="hint">Elegí la rutina que querés copiar para <b>${esc(name(dest))}</b>. Se crea una copia nueva en su cola: la rutina original no se modifica.</p>
+  <input id="cp-q" class="search" placeholder="Buscar por entrenado o nombre de rutina" value="${esc(arg.q||'')}" autocomplete="off">
+  <div class="card">${list.length?`<ul class="alist">${list.map(r=>{const e=S.ents[r.entrenadoId];const l=lbl[r.estado]||[r.estado,'p-mute'];return `<li><span class="nm" style="white-space:normal"><b>${esc(name(e))}</b> <span class="pill ${l[1]}">${l[0]}</span><br><span class="hint">${esc(r.nombre||'Rutina')} · ${diasDe(r)} días · ${plural((r.secciones||[]).length,'sección','secciones')}${r.fechaEntrega?' · '+fmtShort(r.fechaEntrega):''}</span></span><button class="btn pri" style="padding:5px 10px;font-size:13px" data-usar="${esc(r._id)}">Usar esta</button></li>`}).join('')}</ul>`:`<div class="empty">${S.rutinas.length?'No hay rutinas que coincidan.':'Todavía no hay rutinas de otros entrenados.'}</div>`}</div>
+  <div class="actions"><button class="btn" type="button" data-close>Cancelar</button></div>`;
+}
+function bindCopiar(arg){
+  const ov=$('#overlay');
+  ov.onclick=ev=>{
+    if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
+    const u=ev.target.closest('[data-usar]');if(!u)return;
+    const src=S.rutinas.find(x=>x._id===u.dataset.usar);const dest=S.ents[arg.para];if(!src||!dest)return;
+    const d={entrenadoId:dest.id,nombre:src.nombre||'Rutina',estado:'cola',fechaSugerida:iso(today()),duracionSemanas:src.duracionSemanas||4,
+      secciones:reuid(src.secciones),notas:src.notas||'',copiadaDe:{entrenadoId:src.entrenadoId,rutinaId:src._id},creada:Date.now()};
+    openEditor('rutinas',null,d);
+    toast('Copia lista para editar. Guardá para ponerla en la cola de '+firstName(dest));
+  };
+  const q=$('#cp-q');q.addEventListener('input',()=>{arg.q=q.value;const p=q.selectionStart;renderSheet();const n=$('#cp-q');n.focus();n.setSelectionRange(p,p)});
+}
+
 /* ----- editor de rutinas y plantillas ----- */
 function newSeccion(n){return {uid:ruid(),titulo:'Semana 1',posicion:'',dias:Array.from({length:n||3},(_,i)=>newDia(i))}}
 function newDia(i){return {uid:ruid(),nombre:'Día '+(i+1),bloques:(S.cfg.bloques||['FUERZA 1']).map(b=>({uid:ruid(),nombre:b,series:'3',items:[newItem()]}))}}
@@ -814,6 +844,7 @@ function editorHTML(){
   <div class="actions sticky-save">${ro?'':`<button class="btn pri" type="button" data-act="save">Guardar</button>`}
     ${isRut&&R.estado==='cola'&&E.id?`<button class="wa" type="button" data-entregar="${esc(E.id)}">Entregar ahora</button>`:''}
     ${!isRut&&E.id?`<button class="btn" type="button" data-act="dupPlant">Duplicar plantilla</button>`:''}
+    ${isRut?`<button class="btn" type="button" data-act="toPlant">Guardar como plantilla</button>`:''}
     ${E.id?`<button class="btn danger" type="button" data-act="del" style="margin-left:auto">Eliminar</button>`:''}
     <button class="btn" type="button" data-close>Cerrar</button></div>`;
 }
@@ -832,6 +863,9 @@ function bindEditor(){
     if(act==='save'){saveEditor();return}
     if(act==='del'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Tocá de nuevo para eliminar';return}
       if(await write(()=>S.db.collection(E.col).doc(E.id).delete())){toast('Eliminada');closeSheet()}return}
+    if(act==='toPlant'){const en=S.ents[R.entrenadoId];const d={nombre:(R.nombre||'Rutina')+(en?' (de '+firstName(en)+')':''),tipo:'individual',duracionSemanas:R.duracionSemanas||4,notas:R.notas||'',
+        secciones:reuid(R.secciones).map(s=>({...s,dias:s.dias.map(dd=>({...dd,bloques:dd.bloques.map(bb=>({...bb,items:bb.items.filter(i=>(i.nombre||'').trim())}))}))}))};
+      if(await write(()=>S.db.collection('plantillas').add(d)))toast('Guardada en Plantillas como “'+d.nombre+'”');return}
     if(act==='dupPlant'){const d=clone(R);d.nombre=(d.nombre||'')+' (copia)';if(await write(()=>S.db.collection('plantillas').add(d))){toast('Plantilla duplicada');closeSheet()}return}
     if(act==='clearDia'||act==='clearSec'){
       if(!b.classList.contains('armed')){b.classList.add('armed','danger');b.textContent=act==='clearDia'?'Tocá de nuevo para vaciar el día':'Tocá de nuevo para vaciar toda la sección';setTimeout(()=>{if(b.isConnected){b.classList.remove('armed','danger');b.textContent=act==='clearDia'?'Vaciar día':'Vaciar sección'}},4000);return}
@@ -926,6 +960,7 @@ function handleRut(e){
   if(b=g('data-editrut')){const r=S.rutinas.find(x=>x._id===b.dataset.editrut);if(r){const{_id,...d}=r;openEditor('rutinas',_id,d)}return true}
   if(b=g('data-newrut')){const e2=S.ents[b.dataset.newrut];openEditor('rutinas',null,{entrenadoId:e2.id,nombre:'Rutina '+mesLbl(curMes()),estado:'cola',fechaSugerida:iso(today()),duracionSemanas:4,secciones:[newSeccion(Number(e2.estimulos)||3)],creada:Date.now()});return true}
   if(b=g('data-duprut')){const r=S.rutinas.find(x=>x._id===b.dataset.duprut);if(r){const{_id,...d}=clone(r);Object.assign(d,{estado:'cola',fechaSugerida:iso(today()),fechaEntrega:'',fechaFin:'',pospuesta:null,nombre:(d.nombre||'Rutina')+' (nueva)',creada:Date.now()});openEditor('rutinas',null,d)}return true}
+  if(b=g('data-copiarde')){openSheet('__copiar','edit',{para:b.dataset.copiarde,q:''});return true}
   if(b=g('data-asignar')){const sel=new Set();if(b.dataset.para)sel.add(b.dataset.para);openSheet('__asig','edit',{pid:b.dataset.asignar||'',sel});return true}
   if(b=g('data-editplant')){openEditor('plantillas',b.dataset.editplant,S.plantillas[b.dataset.editplant]);return true}
   if(b=g('data-newplant')){openEditor('plantillas',null,{nombre:'Nueva plantilla',tipo:'individual',duracionSemanas:4,secciones:[newSeccion(3)]});return true}
@@ -936,7 +971,7 @@ function handleRut(e){
   return false;
 }
 document.addEventListener('click',e=>{
-  if(e.target.closest('#overlay')&&['__rut','__ej','__asig','__posp'].includes(openId))return;
+  if(e.target.closest('#overlay')&&['__rut','__ej','__asig','__posp','__copiar'].includes(openId))return;
   if(handleRut(e))return;
   if(e.target.closest('#overlay'))return;
   const m=e.target.closest('[data-msg]');if(m){openSheet(m.dataset.msg,'wa',m.dataset.kind);return}
