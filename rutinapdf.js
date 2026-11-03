@@ -194,12 +194,13 @@ function resumen(e,D){
   y+=ah+10;
   // fuerza
   if(D.kg.length){const rows=D.kg.slice(0,8);const kh=44+rows.length*19;
-    const d3=card(M,y,CW,kh,two?'Progreso de fuerza · kg máximo de cada mes':'Progreso de fuerza en el mes',two?'El kg más alto que anotaste en cada ejercicio en cada mes. Si sube, tu fuerza está mejorando; por eso es clave anotar siempre lo que usás.':'Tu primer registro del mes contra el máximo que alcanzaste. Si sube, tu fuerza está mejorando; por eso es clave anotar siempre lo que usás.');
-    const x0=M+130,bw=CW-130-90,mx=Math.max(...rows.map(k=>Math.max(k.a,k.b)))*1.05;let yy=y+30+d3;
+    const d3=card(M,y,CW,kh,two?'Progreso de fuerza · kg máximo de cada mes':'Progreso de fuerza en el mes',two?'El kg más alto (con sus reps) de cada ejercicio en cada mes. Cuenta los kg de tu rutina los días que tildaste el ejercicio o marcaste el día como hecho, y los que cambiaste vos. Si sube, tu fuerza está mejorando.':'Tu primer día del mes contra el mejor que hiciste (kg × reps). Cuenta los kg de tu rutina los días que tildaste el ejercicio o marcaste el día como hecho, y los que cambiaste vos. Si sube, tu fuerza está mejorando.');
+    const x0=M+130,bw=CW-130-130,mx=Math.max(...rows.map(k=>Math.max(k.a,k.b)))*1.05;let yy=y+30+d3;
     if(!two){[[D.kgLbls[0],C.p1],[D.kgLbls[1],C.p2]].forEach(([l,c],i)=>{const lx=M+CW-230+i*112;p.rect(lx,y+10,8,8,c,null);T(lx+11,y+17,l,7.2,false,C.muted)})}
+    const xr=r=>r?' × '+String(r).slice(0,10):'';
     rows.forEach(k=>{const n=fit(k.nombre,115,8.8,true,6);T(M+12,yy+12,n.s,n.z,true);
-      p.rect(x0,yy+1,bw*k.a/mx,7,C.p1,null);T(x0+bw*k.a/mx+4,yy+7.5,k.a+' kg',7,false,C.muted);
-      p.rect(x0,yy+9.5,bw*k.b/mx,8,C.p2,null);T(x0+bw*k.b/mx+4,yy+16.5,k.b+' kg',7.4,true);
+      p.rect(x0,yy+1,bw*k.a/mx,7,C.p1,null);T(x0+bw*k.a/mx+4,yy+7.5,k.a+' kg'+xr(k.ar),7,false,C.muted);
+      p.rect(x0,yy+9.5,bw*k.b/mx,8,C.p2,null);T(x0+bw*k.b/mx+4,yy+16.5,k.b+' kg'+xr(k.br),7.4,true);
       const d=+(k.b-k.a).toFixed(1);const t=(d>0?'+':'')+d+' kg';const w2=tw(t,8.4,true)+12;p.rect(M+CW-12-w2,yy+2,w2,15,d>0?C.okS:d<0?C.badS:C.soft,null);T(M+CW-6-w2,yy+13,t,8.4,true,d>0?C.ok:d<0?C.bad:C.muted);yy+=19});
     y+=kh+10}
   // carga + rpe

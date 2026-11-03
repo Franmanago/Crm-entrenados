@@ -112,6 +112,26 @@ main{padding-block:14px 60px;display:flex;flex-direction:column;gap:12px}
 .bien input{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:16px;width:110px}
 .aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600}
 details summary{cursor:pointer;font-weight:600}
+/* series grandes y ejercicio con kg/reps editables en el lugar */
+.series{display:flex;align-items:baseline;gap:5px;font-size:15px;color:var(--muted);font-weight:600;background:var(--surface-2);border-radius:8px;padding:3px 10px}
+.series b{font-family:var(--display);font-size:26px;line-height:1;color:var(--ink)}
+.ej.hecho{background:var(--ok-soft)}
+.ej-top{align-items:center}
+.chk{flex:0 0 auto;width:40px;height:40px;border-radius:50%;border:2px solid var(--line);background:var(--surface);color:transparent;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0;transition:background .15s,border-color .15s}
+.chk:hover{border-color:var(--ok);color:var(--ok)}
+.chk[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.ej.hecho .ej-n{color:var(--ok)}
+.campos{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.campo{display:flex;flex-direction:column;gap:2px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.campo input{width:96px;max-width:100%;padding:6px 8px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);font-family:var(--display);font-size:30px;font-weight:700;line-height:1.1;text-align:center;color:var(--ink)}
+.campo input:focus{border-color:var(--accent);outline:none}
+.campo input.mod{border-color:var(--warn);color:var(--warn)}
+.campos .x{font-family:var(--display);font-size:26px;color:var(--muted);padding-bottom:8px}
+.campos .pc{font-size:13px;color:var(--muted);padding-bottom:12px}
+.tag-mod{font-size:12px;font-weight:700;color:var(--warn);background:var(--warn-soft);border-radius:6px;padding:2px 7px;align-self:center}
+.ej-pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.mas{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:13.5px;padding:0}
+.guardando{font-size:13px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -170,8 +190,14 @@ function renderProgreso(){
   const g={};for(const r of D.registros||[]){if(/^(asis|carga|bien):/.test(String(r.item||'')))continue;const v=parseFloat(String(r.kg||'').replace(',','.'));if(!(v>0))continue;
     const it=findItem(r.item);const key=r.ej||it?.ej||r.nombre||it?.nombre||r.item;const nom=r.nombre||it?.nombre||'Ejercicio';
     (g[key]=g[key]||{nom,pts:{}});g[key].pts[r.fecha]=Math.max(g[key].pts[r.fecha]||0,v)}
+  // los días marcados como hechos cuentan con los kg de la rutina en los ejercicios que no se anotaron
+  const anot=new Set((D.registros||[]).map(r=>r.item+'|'+r.fecha));
+  for(const a of asisRegs()){if(!D.rutina||a.rutinaId!==D.rutina.id)continue;const du=a.item.slice(5);
+    for(const s2 of D.rutina.secciones||[])for(const d of s2.dias||[])if(d.uid===du)for(const b of d.bloques||[])for(const it of b.items||[]){
+      if(!it.nombre||anot.has(it.uid+'|'+a.fecha))continue;const v=parseFloat(String(kg(it)||'').replace(',','.'));if(!(v>0))continue;
+      const key=it.ej||it.nombre;(g[key]=g[key]||{nom:it.nombre,pts:{}});g[key].pts[a.fecha]=Math.max(g[key].pts[a.fecha]||0,v)}}
   const keys=Object.keys(g).sort((x,y)=>Object.keys(g[y].pts).length-Object.keys(g[x].pts).length);
-  if(!keys.length){h+=`<section class="card msg"><h2>Todavía no hay kg anotados</h2><p class="hint">Cuando anotes los kg en tus ejercicios, acá vas a ver cómo vas progresando.</p></section>`;$('#main').innerHTML=h;return}
+  if(!keys.length){h+=`<section class="card msg"><h2>Todavía no hay kg anotados</h2><p class="hint">Cuando tildes tus ejercicios, acá vas a ver cómo vas progresando.</p></section>`;$('#main').innerHTML=h;return}
   if(!progEj||!g[progEj])progEj=keys[0];
   const P=Object.entries(g[progEj].pts).sort((x,y)=>x[0].localeCompare(y[0]));
   h+=`<section class="card pad"><div class="p-h"><b>Mis kg</b></div><div class="tabs" style="margin:8px 0">${keys.map(k=>`<button class="tab" data-pej="${esc(k)}" aria-pressed="${k===progEj}">${esc(g[k].nom)}</button>`).join('')}</div>${chart(P)}
@@ -192,7 +218,8 @@ function chart(P){
   </svg>`;
 }
 const regHoy=(item)=>(D.registros||[]).find(r=>r.item===item&&r.fecha===iso(today()));
-let editB=false,editC={};
+let editB=false,editC={},draft={};
+const anchoIn=v=>{const n=String(v||'').length;return n>4?`width:calc(${Math.min(n,12)}ch + 30px);font-size:${n>7?22:26}px`:''};
 function bienHTML(){
   const r=regHoy('bien:');const d=r?.datos||{};
   if(r&&!editB)return `<div class="card pad bien si"><span>Bienestar de hoy: sueño <b>${d.sueno}</b> · cuerpo <b>${d.cuerpo}</b> · ánimo <b>${d.animo}</b></span><button class="link" data-editb="1">Cambiar</button></div>`;
@@ -241,17 +268,19 @@ function render(){
   if(!dia){h+='<div class="card msg"><p class="hint">Esta sección no tiene días cargados.</p></div>'}
   else for(const b of dia.bloques||[]){
     if(!(b.items||[]).length)continue;
-    h+=`<section class="card"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span>${b.series?`<span class="series">${esc(b.series)} series</span>`:''}</div>`;
+    h+=`<section class="card"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span>${b.series?`<span class="series"><b>${esc(b.series)}</b> series</span>`:''}</div>`;
     for(const it of b.items){
       const v=D.videos[it.ej],yt=ytId(v),k=kg(it),last=regsFor(it.uid),hoyReg=last.find(r=>r.fecha===iso(today()));
       const o=open[it.uid]||{};
-      h+=`<div class="ej" data-uid="${esc(it.uid)}">
-        <div class="ej-top"><div class="ej-n">${esc(it.nombre)}</div>${v?`<button class="vbtn" data-video="${esc(it.uid)}" aria-expanded="${!!o.video}">${o.video?'Cerrar':'▶ Video'}</button>`:''}</div>
-        <div class="datos">${it.reps?`<span class="d">Reps <b>${esc(it.reps)}</b></span>`:''}${k?`<span class="d">Kg <b>${esc(k)}</b>${it.pct?` <span class="hint" style="display:inline">(${esc(it.pct)}%)</span>`:''}</span>`:(it.pct?`<span class="d">${esc(it.pct)}% de tu máximo</span>`:'')}</div>
+      const dr=draft[it.uid]||{};const vk=dr.kg??(hoyReg?(hoyReg.kg||''):k),vr=dr.reps??(hoyReg?(hoyReg.reps||''):(it.reps||''));
+      const mK=String(vk)!==String(k||''),mR=String(vr)!==String(it.reps||''),ok=!!hoyReg;
+      h+=`<div class="ej${ok?' hecho':''}" data-uid="${esc(it.uid)}">
+        <div class="ej-top"><button class="chk" data-chk="${esc(it.uid)}" aria-pressed="${ok}" aria-label="${ok?'Hecho. Tocá para desmarcar':'Marcar como hecho'}" title="${ok?'Hecho':'Marcar como hecho'}">✓</button><div class="ej-n">${esc(it.nombre)}</div>${v?`<button class="vbtn" data-video="${esc(it.uid)}" aria-expanded="${!!o.video}">${o.video?'Cerrar':'▶ Video'}</button>`:''}</div>
+        <div class="campos"><label class="campo">Kg<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label><span class="x">×</span><label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="—" class="${mR?'mod':''}" autocomplete="off"></label>${it.pct?`<span class="pc">${esc(it.pct)}% de tu máximo</span>`:''}${mK||mR?`<span class="tag-mod">Cambiado</span>`:''}</div>
         ${it.notas?`<div class="nota">${esc(it.notas)}</div>`:''}
         ${o.video&&v?(yt?`<div class="video ${yt.short?'v916':'v169'}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(yt.id)}?rel=0&playsinline=1" title="Video de ${esc(it.nombre)}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`:'')+`<a class="yt" href="${esc(v)}" target="_blank" rel="noopener">Abrir en YouTube</a>`:''}
-        ${last[0]&&!o.log?`<div class="ult">Última vez (${fmt(last[0].fecha)}): ${last[0].kg?esc(last[0].kg)+' kg':''}${last[0].reps?' × '+esc(last[0].reps):''}${last[0].cansancio?' · cansancio '+last[0].cansancio:''}</div>`:''}
-        ${o.log?logHTML(it,hoyReg,last):`<button class="toggle-log" data-log="${esc(it.uid)}">${hoyReg?'✓ Anotado hoy · editar':'Anotar mis kg'}</button>`}
+        <div class="ej-pie">${(()=>{const pv=last.find(r=>r.fecha!==iso(today()));return pv?`<span class="ult">Última vez (${fmt(pv.fecha)}): ${pv.kg?esc(pv.kg)+' kg':''}${pv.reps?' × '+esc(pv.reps):''}${pv.cansancio?' · cansancio '+pv.cansancio:''}</span>`:'<span></span>'})()}<span class="guardando" data-st="${esc(it.uid)}"></span>${o.log?'':`<button class="mas" data-log="${esc(it.uid)}">${hoyReg&&(hoyReg.cansancio||(hoyReg.nota&&hoyReg.nota!=='Hecho'))?'Cansancio / comentario ✓':'+ Cansancio / comentario'}</button>`}</div>
+        ${o.log?logHTML(it,hoyReg,last):''}
       </div>`;
     }
     h+='</section>';
@@ -262,10 +291,9 @@ function render(){
 function logHTML(it,hoy,last){
   const c=hoy?.cansancio||'';
   return `<form class="log" data-form="${esc(it.uid)}">
-    <div class="log-row"><label>Kg que usé<input name="kg" inputmode="decimal" value="${esc(hoy?.kg||'')}" placeholder="${esc(kg(it)||'')}"></label><label>Reps<input name="reps" value="${esc(hoy?.reps||'')}" placeholder="${esc(it.reps||'')}"></label></div>
     <label>Cansancio (opcional, 1 = muy fácil · 10 = máximo)<div class="rpe">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" data-rpe="${n}" aria-pressed="${String(n)===String(c)}">${n}</button>`).join('')}</div><input type="hidden" name="cansancio" value="${esc(c)}"></label>
-    <label>Comentario (opcional)<input class="n" name="nota" value="${esc(hoy?.nota||'')}" placeholder="Ej: me costó la última serie"></label>
-    <div class="log-row"><button class="guardar" type="submit">Guardar</button><button class="toggle-log" type="button" data-log="${esc(it.uid)}">Cancelar</button><span class="ok" data-ok></span></div>
+    <label>Comentario (opcional)<input class="n" name="nota" value="${esc(hoy?.nota&&hoy.nota!=='Hecho'?hoy.nota:'')}" placeholder="Ej: me costó la última serie"></label>
+    <div class="log-row"><button class="guardar" type="submit">Guardar y marcar hecho</button><button class="toggle-log" type="button" data-log="${esc(it.uid)}">Cancelar</button><span class="ok" data-ok></span></div>
     ${last.length>1||(last.length&&!hoy)?`<details><summary class="ult">Historial</summary>${last.slice(0,8).map(r=>`<div class="ult">${fmt(r.fecha)}: ${r.kg?esc(r.kg)+' kg':'—'}${r.reps?' × '+esc(r.reps):''}${r.cansancio?' · cansancio '+r.cansancio:''}${r.nota?' · '+esc(r.nota):''}</div>`).join('')}</details>`:''}
   </form>`;
 }
@@ -274,6 +302,7 @@ document.addEventListener('click',ev=>{
   if(b=t.closest('[data-vista]')){vista=b.dataset.vista;render();window.scrollTo({top:0});return}
   if(b=t.closest('[data-pej]')){progEj=b.dataset.pej;render();return}
   if(b=t.closest('[data-asis]')){marcarAsis(b);return}
+  if(b=t.closest('[data-chk]')){tildar(b);return}
   if(b=t.closest('[data-bv]')){const f=b.closest('form');f[b.dataset.bv].value=b.dataset.n;f.querySelectorAll(`[data-bv="${b.dataset.bv}"]`).forEach(x=>x.setAttribute('aria-pressed',x===b));return}
   if(b=t.closest('[data-editb]')){editB=true;render();return}
   if(b=t.closest('[data-editc]')){editC[b.dataset.editc]=true;render();return}
@@ -302,6 +331,36 @@ async function marcarAsis(b){
   if(error){alertMsg(errTxt(error));return}
   D.registros=(D.registros||[]).filter(r=>r.id!==data.id);if(!data.borrado)D.registros.push(data);render();
 }
+function valores(uid){const c=document.querySelector(`.ej[data-uid="${CSS.escape(uid)}"]`);const g=n=>(c?.querySelector(`[data-in="${n}"]`)?.value||'').trim();return {kg:g('kg'),reps:g('reps')}}
+async function guardarEj(uid,o){
+  const it=findItem(uid)||{};
+  const r=await logRpc({p_token:token,p_rutina:D.rutina.id,p_item:uid,p_fecha:iso(today()),p_kg:o.kg,p_reps:o.reps,p_cansancio:o.cansancio??null,p_nota:o.nota||(o.borrar?'':'Hecho'),p_ej:it.ej||'',p_nombre:it.nombre||''});
+  if(!r.error){D.registros=(D.registros||[]).filter(x=>x.id!==r.data.id);if(!r.data.borrado)D.registros.push(r.data);delete draft[uid]}
+  return r;
+}
+function diaDeItem(uid){for(const s of D.rutina?.secciones||[])for(const d of s.dias||[])for(const b of d.bloques||[])if((b.items||[]).some(i=>i.uid===uid))return d;return null}
+async function tildar(b){
+  const uid=b.dataset.chk,hoy=regHoy(uid);b.disabled=true;
+  let r;
+  if(hoy)r=await guardarEj(uid,{kg:'',reps:'',nota:'',borrar:true});
+  else{const v=valores(uid);r=await guardarEj(uid,{kg:v.kg,reps:v.reps});
+    const d=diaDeItem(uid);if(!r.error&&d&&!regHoy('asis:'+d.uid)){const a=await logRpc({p_token:token,p_rutina:D.rutina.id,p_item:'asis:'+d.uid,p_fecha:iso(today()),p_kg:'',p_reps:'',p_cansancio:null,p_nota:'Asistió',p_ej:'',p_nombre:d.nombre});
+      if(!a.error){D.registros=D.registros.filter(x=>x.id!==a.data.id);D.registros.push(a.data);alertMsg(`${d.nombre} marcado como hecho hoy`)}}}
+  b.disabled=false;
+  if(r.error){alertMsg(errTxt(r.error));return}
+  render();
+}
+document.addEventListener('change',async ev=>{
+  const inp=ev.target.closest('[data-in]');if(!inp)return;
+  const uid=inp.dataset.uid;const v=valores(uid);draft[uid]={...v};
+  const hoy=regHoy(uid);const st=document.querySelector(`[data-st="${CSS.escape(uid)}"]`);
+  if(!hoy){const c=inp.closest('.ej'),it=findItem(uid)||{};const ref=inp.dataset.in==='kg'?String(kg(it)||''):String(it.reps||'');inp.classList.toggle('mod',inp.value.trim()!==ref);return}
+  if(st)st.textContent='Guardando…';
+  const r=await guardarEj(uid,{kg:v.kg,reps:v.reps,cansancio:hoy.cansancio??null,nota:hoy.nota||''});
+  if(r.error){if(st){st.textContent=errTxt(r.error);st.style.color='var(--bad)'}return}
+  render();const s2=document.querySelector(`[data-st="${CSS.escape(uid)}"]`);if(s2){s2.textContent='Guardado ✓';setTimeout(()=>{if(s2.isConnected)s2.textContent=''},1500)}
+});
+document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('[data-in]')){ev.preventDefault();ev.target.blur()}});
 function alertMsg(t){const m=document.createElement('div');m.className='aviso';m.textContent=t;document.body.appendChild(m);setTimeout(()=>m.remove(),2600)}
 document.addEventListener('submit',async ev=>{
   const fb=ev.target.closest('[data-bien]'),fc=ev.target.closest('[data-carga]');
@@ -316,11 +375,10 @@ document.addEventListener('submit',async ev=>{
   btn.disabled=true;ok.textContent='Guardando…';
   const c=f.cansancio.value;
   const it=findItem(uid)||{};
-  const {data,error}=await logRpc({p_token:token,p_rutina:D.rutina.id,p_item:uid,p_fecha:iso(today()),p_kg:f.kg.value.trim(),p_reps:f.reps.value.trim(),p_cansancio:c?Number(c):null,p_nota:f.nota.value.trim(),p_ej:it.ej||'',p_nombre:it.nombre||''});
+  const v=valores(uid);
+  const {data,error}=await guardarEj(uid,{kg:v.kg,reps:v.reps,cansancio:c?Number(c):null,nota:f.nota.value.trim()});
   btn.disabled=false;
   if(error){ok.textContent=errTxt(error);ok.style.color='var(--bad)';return}
-  D.registros=(D.registros||[]).filter(r=>r.id!==data.id);
-  if(!data.borrado)D.registros.push(data);
   open[uid]={...open[uid],log:false};render();
 });
 (async()=>{

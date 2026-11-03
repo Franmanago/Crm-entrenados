@@ -188,6 +188,17 @@ function renderPanel(){
     </div>
   </div>
 
+  ${(()=>{const t=porForma(D.pagos),tot=t.ef+t.tr+t.nd;return `<h2 class="sec">Cobrado por forma de pago</h2>
+  <div class="grid2"><div class="card"><div class="tbl-wrap"><table>
+    <thead><tr><th></th><th>Cobrado</th><th>Tu parte</th></tr></thead>
+    <tbody><tr><td>Efectivo</td><td>${money(t.ef)}</td><td>${money(t.fef)}</td></tr>
+      <tr><td>Transferencia</td><td>${money(t.tr)}</td><td>${money(t.ftr)}</td></tr>
+      ${t.nd?`<tr><td>Sin forma cargada</td><td>${money(t.nd)}</td><td>${money(t.fnd)}</td></tr>`:''}
+      <tr class="total"><td>Total</td><td>${money(tot)}</td><td>${money(t.fef+t.ftr+t.fnd)}</td></tr></tbody></table></div></div>
+    <div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Efectivo vs transferencia</div></div>
+      <div class="split"><i style="width:${t.ef/(tot||1)*100}%;background:var(--ok)"></i><i style="width:${t.tr/(tot||1)*100}%;background:var(--accent)"></i>${t.nd?`<i style="width:${t.nd/(tot||1)*100}%;background:var(--line)"></i>`:''}</div>
+      <div class="legend"><span><i class="dot" style="background:var(--ok)"></i>Efectivo <b>${money(t.ef)}</b></span><span><i class="dot" style="background:var(--accent)"></i>Transferencia <b>${money(t.tr)}</b></span>${t.nd?`<span><i class="dot" style="background:var(--line)"></i>Sin dato <b>${money(t.nd)}</b></span>`:''}</div>
+      <p class="hint" style="margin-top:8px">En los pagos mixtos se suma a cada columna la parte que corresponde. “Tu parte” aplica el % de cada gimnasio.</p></div></div>`})()}
   <h2 class="sec">${isCur?'Para hacer hoy':'Cuotas de '+mesLbl(M)}</h2>
   <div class="grid2">
     ${isCur?`<div class="card">${head(`Vencen hoy · ${fmtShort(iso(today()))}`,'hoy',hoyV.length)}
@@ -212,7 +223,7 @@ function renderPanel(){
     <div class="card"><div class="pad" style="padding-bottom:6px"><b>Agenda de vencimientos · 30 días</b></div>
       ${agK.length?`<ul class="alist">${agK.map(k=>`<li><span class="nm" style="flex:0 0 64px;font-weight:600">${fmtShort(k)}</span><span class="meta" style="flex:1;white-space:normal">${ag[k].length} · ${ag[k].slice(0,4).map(e=>esc(firstName(e))).join(', ')}${ag[k].length>4?'…':''}</span><span class="meta">${money(ag[k].reduce((a,e)=>a+monto(e),0))}</span></li>`).join('')}</ul>`:'<div class="empty">Sin vencimientos próximos.</div>'}
     </div>`:`<div class="card"><div class="pad" style="padding-bottom:6px"><b>Pagos registrados · ${D.pagos.length}</b></div>
-      ${D.pagos.length?`<ul class="alist">${D.pagos.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(p=>`<li><span class="nm">${esc(titleCase(p.nombre||S.ents[p.entrenadoId]?.nombre||p.entrenadoId))}</span><span class="meta">${fmtShort(p.fecha)} · ${money(p.monto)}</span></li>`).join('')}</ul>`:'<div class="empty">Sin pagos registrados.</div>'}
+      ${D.pagos.length?`<ul class="alist">${D.pagos.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(p=>`<li><span class="nm">${esc(titleCase(p.nombre||S.ents[p.entrenadoId]?.nombre||p.entrenadoId))}</span><span class="meta">${fmtShort(p.fecha)} · ${money(p.monto)}${p.forma?' · '+esc(formaTxt(p)):''}</span></li>`).join('')}</ul>`:'<div class="empty">Sin pagos registrados.</div>'}
     </div>`}
   </div>
 
@@ -386,7 +397,7 @@ function fichaHTML(e){
   ${fichaRutinasHTML(e)}
   <div class="card">
     <div class="pad" style="padding-bottom:4px"><b>Pagos</b>${um.length?` <span class="pill p-bad">Adeuda ${um.map(mesLbl).join(', ')}</span>`:''}</div>
-    ${ps.length?`<ul class="timeline">${ps.map(p=>`<li><span class="d">${fmtD(p.fecha)}</span><span class="t"><span class="pill p-ok">${mesLbl(p.mes)}</span> ${money(p.monto)}</span><button class="del" data-delp="${esc(p._id)}" aria-label="Borrar pago">Borrar</button></li>`).join('')}</ul>`:'<div class="empty">Sin pagos registrados en la app.</div>'}
+    ${ps.length?`<ul class="timeline">${ps.map(p=>`<li><span class="d">${fmtD(p.fecha)}</span><span class="t"><span class="pill p-ok">${mesLbl(p.mes)}</span> ${money(p.monto)}${p.forma?` <span class="hint" style="display:inline">· ${esc(formaTxt(p))}</span>`:''}</span><button class="del" data-delp="${esc(p._id)}" aria-label="Borrar pago">Borrar</button></li>`).join('')}</ul>`:'<div class="empty">Sin pagos registrados en la app.</div>'}
   </div>
   <div class="card">
     <div class="pad" style="padding-bottom:4px"><b>Historial</b></div>
@@ -437,6 +448,11 @@ function formHTML(e,isNew){
     <div class="full actions"><button class="btn pri" type="submit">${isNew?'Crear entrenado':'Guardar cambios'}</button>${isNew?'':'<button class="btn" type="button" data-mode="ver">Cancelar</button><button class="btn danger" type="button" id="delbtn" style="margin-left:auto">Eliminar ficha</button>'}</div>
   </form>`;
 }
+const FORMAS=[['efectivo','Efectivo'],['transferencia','Transferencia'],['mixto','Mixto']];
+function partes(p){const m=Number(p.monto)||0;if(p.forma==='efectivo')return {ef:m,tr:0,nd:0};if(p.forma==='transferencia')return {ef:0,tr:m,nd:0};
+  if(p.forma==='mixto'){const ef=Math.min(m,Number(p.efectivo)||0);return {ef,tr:m-ef,nd:0}}return {ef:0,tr:0,nd:m}}
+function formaTxt(p){if(p.forma==='mixto'){const x=partes(p);return `Mixto: ${money(x.ef)} efectivo + ${money(x.tr)} transf.`}return p.forma==='efectivo'?'Efectivo':p.forma==='transferencia'?'Transferencia':''}
+function porForma(pagos){const t={ef:0,tr:0,nd:0,fef:0,ftr:0,fnd:0};pagos.forEach(p=>{const x=partes(p),k=p.pctFran??1;t.ef+=x.ef;t.tr+=x.tr;t.nd+=x.nd;t.fef+=x.ef*k;t.ftr+=x.tr*k;t.fnd+=x.nd*k});return t}
 function pagoHTML(e){
   const sug=(e.pagoRegistrado==='Debe'&&parse(e.proxVenc)&&parse(e.proxVenc)>=today())?e.proxVenc:addMonth(e.proxVenc||iso(today()));
   const um=unpaidMeses(e.id),cm=curMes();
@@ -446,6 +462,8 @@ function pagoHTML(e){
     <label class="full">Cuota del mes<select id="p-mes">${opts.map(k=>`<option value="${k}" ${k===defM?'selected':''}>${mesLbl(k)}${um.includes(k)&&k<cm?' · adeudada':''}</option>`).join('')}</select></label>
     <label>Fecha de pago<input id="p-fecha" type="date" value="${iso(today())}" required></label>
     <label>Monto abonado<input id="p-monto" type="number" min="0" step="100" value="${monto(e)}" required></label>
+    <div class="full"><span class="lbl-s">Forma de pago</span><div class="chips" id="p-forma">${FORMAS.map(([k,l])=>`<button type="button" class="chip" data-forma="${k}" aria-pressed="${k==='efectivo'}">${l}</button>`).join('')}</div></div>
+    <div class="full mixto" id="p-mix" hidden><label>En efectivo<input id="p-ef" type="number" min="0" step="100" value="0"></label><label>Por transferencia<input id="p-tr" type="number" min="0" step="100" value="${monto(e)}"></label><p class="hint full" id="p-mixh"></p></div>
     <label class="full">Nuevo vencimiento<input id="p-venc" type="date" value="${sug}" required></label>
     <p class="hint full">Vencimiento actual: ${fmtD(e.proxVenc)}. Al guardar, el estado pasa a “Al día” y el pago queda en el historial.</p>
     <div class="full actions"><button class="btn pri" type="submit">Confirmar pago</button><button class="btn" type="button" data-mode="ver">Cancelar</button></div>
@@ -531,13 +549,20 @@ function bindSheet(e,isNew){
     });
   }
   const pf=$('#pf');
+  if(pf){const mixH=()=>{const m=Number($('#p-monto').value)||0,ef=Number($('#p-ef').value)||0,tr=Number($('#p-tr').value)||0;$('#p-mixh').textContent=ef+tr===m?`Total ${money(m)} ✓`:`Efectivo + transferencia = ${money(ef+tr)} · el monto es ${money(m)}`;$('#p-mixh').style.color=ef+tr===m?'':'var(--bad)'};
+    $('#p-forma').addEventListener('click',ev=>{const b=ev.target.closest('[data-forma]');if(!b)return;$('#p-forma').querySelectorAll('[data-forma]').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#p-mix').hidden=b.dataset.forma!=='mixto';mixH()});
+    $('#p-ef').addEventListener('input',()=>{const m=Number($('#p-monto').value)||0;$('#p-tr').value=Math.max(0,m-(Number($('#p-ef').value)||0));mixH()});
+    $('#p-tr').addEventListener('input',mixH);
+    $('#p-monto').addEventListener('input',()=>{const m=Number($('#p-monto').value)||0;$('#p-tr').value=Math.max(0,m-(Number($('#p-ef').value)||0));mixH()});}
   if(pf)pf.addEventListener('submit',async ev=>{ev.preventDefault();
     const f=$('#p-fecha').value,v=$('#p-venc').value,m=Number($('#p-monto').value)||0,mes=$('#p-mes').value,g=gymOf(e);
     if(S.pagos.some(p=>p.entrenadoId===e.id&&p.mes===mes)&&!$('#pf').dataset.dup){$('#pf').dataset.dup=1;toast('Ya tiene un pago en '+mesLbl(mes)+'. Tocá Confirmar de nuevo para sumarlo igual');return}
-    if(!await write(()=>S.db.collection('pagos').add({entrenadoId:e.id,nombre:e.nombre,gym:g,fecha:f,monto:m,mes,pctFran:pctFran(g),ts:Date.now()})))return;
+    const forma=($('#p-forma [aria-pressed=true]')||{}).dataset?.forma||'efectivo';let ef=forma==='efectivo'?m:forma==='mixto'?Number($('#p-ef').value)||0:0,tr=forma==='transferencia'?m:forma==='mixto'?Number($('#p-tr').value)||0:0;
+    if(forma==='mixto'&&(ef+tr!==m||!ef||!tr)){toast(`En un pago mixto, efectivo + transferencia tiene que dar ${money(m)}`);return}
+    if(!await write(()=>S.db.collection('pagos').add({entrenadoId:e.id,nombre:e.nombre,gym:g,fecha:f,monto:m,mes,pctFran:pctFran(g),forma,efectivo:ef,transferencia:tr,ts:Date.now()})))return;
     const rest=adeudados(e.id).filter(k=>k!==mes);
     if(await write(()=>S.db.collection('entrenados').doc(e.id).update({ultPago:f,proxVenc:v,pagoRegistrado:rest.length?'Debe':'Al día',ultMonto:m}))){
-      await addHist(e.id,'Pago',`${money(m)} · cuota ${mesLbl(mes)} · próximo vencimiento ${fmtD(v)}`,f);
+      await addHist(e.id,'Pago',`${money(m)} · ${formaTxt({forma,monto:m,efectivo:ef})} · cuota ${mesLbl(mes)} · próximo vencimiento ${fmtD(v)}`,f);
       toast('Pago registrado');setMode('ver');}
   });
   const esf=$('#esf');
@@ -670,23 +695,36 @@ function periodoData(e,M,corto){
     cargaSem:sem.map(([a,b])=>{let v=0;for(const k in cd)if(k>=iso(a)&&k<=iso(b))v+=cd[k];const ac=acwr(e.id,iso(b));return {lbl:fmtShort(iso(a)),v:Math.round(v),acwr:ac.ratio}}),
     ini:iI,fin:iF};
 }
-function kgPorEj(e,iI,iF){const g={};S.regs.filter(r=>r.entrenadoId===e.id&&!especial(r)&&r.fecha>=iI&&r.fecha<=iF).forEach(r=>{const v=parseFloat(String(r.kg||'').replace(',','.'));if(!(v>0))return;const k=r.ej||keyN(r.nombre||r.item);(g[k]=g[k]||{nombre:r.nombre||'Ejercicio',p:{}});g[k].p[r.fecha]=Math.max(g[k].p[r.fecha]||0,v)});return g}
+const numKg=v=>parseFloat(String(v??'').replace(',','.'));
+const repsN=v=>{const m=String(v??'').match(/\d+/);return m?Number(m[0]):null};
+/* kg por ejercicio y día: lo que anotó el entrenado y, los días que marcó asistencia sin anotar, lo que indicaba la rutina */
+function kgPorEj(e,iI,iF){const g={};const rs=S.regs.filter(r=>r.entrenadoId===e.id&&r.fecha>=iI&&r.fecha<=iF);
+  const put=(k,nombre,fecha,kg,reps,plan)=>{if(!(kg>0))return;(g[k]=g[k]||{nombre,p:{}});const o=g[k].p[fecha];if(!o||kg>o.kg||(kg===o.kg&&(repsN(reps)||0)>(repsN(o.reps)||0)))g[k].p[fecha]={kg,reps:String(reps||''),plan}};
+  const hecho=new Set();
+  rs.filter(r=>!especial(r)).forEach(r=>{hecho.add(r.item+'|'+r.fecha);const it=r.rutinaId?itemDe(r.rutinaId,r.item):null;put(r.ej||it?.ej||keyN(r.nombre||it?.nombre||r.item),r.nombre||it?.nombre||'Ejercicio',r.fecha,numKg(r.kg),r.reps||it?.reps,false)});
+  rs.filter(r=>String(r.item||'').startsWith('asis:')).forEach(a=>{const dia=diaDe(a.rutinaId,a.item.slice(5));if(!dia)return;
+    dia.bloques.forEach(b=>b.items.forEach(it=>{if(!String(it.nombre||'').trim()||hecho.has(it.uid+'|'+a.fecha))return;put(it.ej||keyN(it.nombre),it.nombre,a.fecha,numKg(kgItem(it,e).txt),it.reps,true)}))});
+  return g}
+function diaDe(rid,uid){const r=S.rutinas.find(x=>x._id===rid);for(const s of r?.secciones||[])for(const d of s.dias||[])if(d.uid===uid)return d;return null}
+function itemDe(rid,uid){const r=S.rutinas.find(x=>x._id===rid);for(const s of r?.secciones||[])for(const d of s.dias||[])for(const b of d.bloques||[])for(const i of b.items||[])if(i.uid===uid)return i;return null}
 function resumenData(e,M,vs){
   const ms=vs?[M,vs].sort():[M];const two=ms.length===2;
   const yrs=new Set(ms.map(k=>k.slice(0,4))).size>1;
   const corto=k=>{const [y,m]=k.split('-').map(Number);return MESES_N[m-1]+(yrs?' '+y:'')};
   const P=ms.map(k=>periodoData(e,k,corto(k)));
   let kg=[];
+  const best=o=>Object.values(o).reduce((m,x)=>!m||x.kg>m.kg||(x.kg===m.kg&&(repsN(x.reps)||0)>(repsN(m.reps)||0))?x:m,null);
+  const mod=o=>Object.values(o).filter(x=>!x.plan).length;
   if(two){const g1=kgPorEj(e,P[0].ini,P[0].fin),g2=kgPorEj(e,P[1].ini,P[1].fin);
-    kg=Object.keys(g2).filter(k=>g1[k]).map(k=>({nombre:g2[k].nombre,a:Math.max(...Object.values(g1[k].p)),b:Math.max(...Object.values(g2[k].p))}))}
-  else{const g=kgPorEj(e,P[0].ini,P[0].fin);kg=Object.values(g).map(x=>{const pts=Object.entries(x.p).sort((a,b)=>a[0].localeCompare(b[0]));return {nombre:x.nombre,a:pts[0][1],b:Math.max(...pts.map(q=>q[1])),n:pts.length}})}
+    kg=Object.keys(g2).filter(k=>g1[k]).map(k=>{const A=best(g1[k].p),B=best(g2[k].p);return {nombre:g2[k].nombre,a:A.kg,b:B.kg,ar:A.reps,br:B.reps,n:Object.keys(g1[k].p).length+Object.keys(g2[k].p).length,mod:mod(g1[k].p)+mod(g2[k].p)}})}
+  else{const g=kgPorEj(e,P[0].ini,P[0].fin);kg=Object.values(g).map(x=>{const pts=Object.entries(x.p).sort((a,b)=>a[0].localeCompare(b[0]));const B=best(x.p);return {nombre:x.nombre,a:pts[0][1].kg,ar:pts[0][1].reps,b:B.kg,br:B.reps,n:pts.length,mod:mod(x.p)}})}
   kg.sort((a,b)=>(b.b-b.a)/b.a-(a.b-a.a)/a.a);
   const fuerzaPct=kg.length?+(kg.reduce((s2,k)=>s2+(k.b-k.a)/k.a,0)/kg.length*100).toFixed(1):null;
   const carga=P.flatMap((q,i)=>q.cargaSem.map(c=>({...c,p:i})));
   const a=activaDe(e.id);
   const sub=[e.grupo,e.estimulos?`${e.estimulos} entrenamientos por semana`:'',a?'Rutina: '+a.nombre:''].filter(Boolean).join(' · ');
   const vacio=!P.some(q=>q.hechos||q.carga||q.bien.n)&&!kg.length?'Todavía no hay datos anotados en el link para este período.':'';
-  return {titulo:two?`Comparativa: ${mesLbl(ms[0])} vs ${mesLbl(ms[1])}`:`Resumen de ${mesLbl(M)}`,sub,periodos:P,kg,kgLbls:['Primer registro del mes','Máximo del mes'],fuerzaPct,carga,metaSem:Number(e.estimulos)||0,umbral:S.cfg.alertas.acwr,vacio,generado:fmtD(iso(today()))};
+  return {titulo:two?`Comparativa: ${mesLbl(ms[0])} vs ${mesLbl(ms[1])}`:`Resumen de ${mesLbl(M)}`,sub,periodos:P,kg,kgLbls:['Primer día del mes','Mejor del mes'],fuerzaPct,carga,metaSem:Number(e.estimulos)||0,umbral:S.cfg.alertas.acwr,vacio,generado:fmtD(iso(today()))};
 }
 function nombreResumen(e,M,vs){const t=vs?`Comparativa ${[M,vs].sort().map(mesLbl).join(' vs ')}`:`Resumen ${mesLbl(M)}`;return (t+' - '+name(e)).replace(/[\\/:*?"<>|]+/g,' ')+'.pdf'}
 function descargarReportes(ids,M,vs){
@@ -875,22 +913,22 @@ function bindPosponer(r){
 /* ----- asignar plantilla ----- */
 function asignarHTML(arg){
   const pls=Object.entries(S.plantillas);
-  const pid=arg.pid||pls[0]?.[0]||'';
-  const p=S.plantillas[pid];
+  const pid=arg.pid&&S.plantillas[arg.pid]?arg.pid:'';
+  const p=pid?S.plantillas[pid]:null;
   const grupos=[...new Set(Object.values(S.ents).map(e=>e.grupo).filter(Boolean))].sort();
   const sel=arg.sel||new Set();
   const q=keyN(arg.q||'');
   const list=Object.values(S.ents).filter(isAct).filter(e=>sel.has(e.id)||!q||keyN(e.nombre).includes(q)||keyN(e.grupo).includes(q)).sort((a,b)=>(b.grupo||'').localeCompare(a.grupo||'')||name(a).localeCompare(name(b),'es'));
   const nd=p?diasDe(p):0;
   return `<form id="asf" class="form">
-    <label class="full">Plantilla<select id="as-p">${pls.length?pls.map(([id,x])=>`<option value="${esc(id)}" ${id===pid?'selected':''}>${esc(x.nombre)}</option>`).join(''):'<option value="">No hay plantillas</option>'}</select></label>
-    <label>Nombre de la rutina<input id="as-nom" value="${esc(arg.nom??(p?p.nombre:''))}"></label>
+    <label class="full">Plantilla<select id="as-p"><option value="" ${!pid?'selected':''}>Plantilla vacía</option>${pls.map(([id,x])=>`<option value="${esc(id)}" ${id===pid?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></label>
+    <label>Nombre de la rutina<input id="as-nom" value="${esc(arg.nom??(p?p.nombre:'Rutina'))}"></label>
     <label>Entrega sugerida<input id="as-f" type="date" value="${esc(arg.f||iso(today()))}"></label>
-    ${p?`<p class="hint full">${plural((p.secciones||[]).length,'sección','secciones')} · ${nd} días. A cada entrenado le llegan solo las secciones de su posición (o todas si no tiene). Si paga menos estímulos que días, se arma una rotación semanal automática.</p>`:''}
+    ${p?`<p class="hint full">${plural((p.secciones||[]).length,'sección','secciones')} · ${nd} días. A cada entrenado le llegan solo las secciones de su posición (o todas si no tiene). Si paga menos estímulos que días, se arma una rotación semanal automática.</p>`:`<p class="hint full">Cada entrenado recibe una rutina en blanco con tantos días como estímulos paga, lista para completar desde Entregas.</p>`}
     ${grupos.length?`<div class="full actions">${grupos.map(g=>`<button class="chip" type="button" data-grp="${esc(g)}">Todo ${esc(g)}</button>`).join('')}</div>`:''}
     <input id="as-q" class="full search" placeholder="Buscar entrenado" value="${esc(arg.q||'')}" autocomplete="off">
-    <div class="full card" style="max-height:340px;overflow:auto"><ul class="alist">${list.map(e=>`<li><label style="display:flex;gap:10px;align-items:center;flex:1;text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink);font-weight:500"><input type="checkbox" data-sel="${esc(e.id)}" ${sel.has(e.id)?'checked':''} style="width:auto">${esc(name(e))}</label><span class="meta">${e.grupo?esc(e.grupo)+' · ':''}${e.posicion?esc(e.posicion)+' · ':''}${e.estimulos}×</span></li>`).join('')}</ul></div>
-    <div class="full actions"><button class="btn pri" type="submit" ${p?'':'disabled'}>Poner en cola (${sel.size})</button><button class="btn" type="button" data-close>Cancelar</button></div>
+    <div class="full card" style="max-height:340px;overflow:auto"><ul class="alist">${list.map(e=>`<li><label style="display:flex;flex-direction:row;gap:10px;align-items:center;flex:1;text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink);font-weight:500"><input type="checkbox" data-sel="${esc(e.id)}" ${sel.has(e.id)?'checked':''} style="width:auto">${esc(name(e))}</label><span class="meta">${e.grupo?esc(e.grupo)+' · ':''}${e.posicion?esc(e.posicion)+' · ':''}${e.estimulos}×</span></li>`).join('')}</ul></div>
+    <div class="full actions"><button class="btn pri" type="submit">Poner en cola (${sel.size})</button><button class="btn" type="button" data-close>Cancelar</button></div>
   </form>`;
 }
 function bindAsignar(arg){
@@ -901,13 +939,15 @@ function bindAsignar(arg){
   f.addEventListener('change',ev=>{const c=ev.target.closest('[data-sel]');if(c){c.checked?arg.sel.add(c.dataset.sel):arg.sel.delete(c.dataset.sel);keep();f.querySelector('button[type=submit]').textContent=`Poner en cola (${arg.sel.size})`}});
   f.addEventListener('click',ev=>{const g=ev.target.closest('[data-grp]');if(g){Object.values(S.ents).filter(e=>isAct(e)&&e.grupo===g.dataset.grp).forEach(e=>arg.sel.add(e.id));keep();renderSheet()}});
   f.addEventListener('submit',async ev=>{ev.preventDefault();keep();
-    const p=S.plantillas[arg.pid||$('#as-p').value];if(!p||!arg.sel.size){toast('Elegí al menos un entrenado');return}
+    const pv=$('#as-p').value;const p=pv?S.plantillas[pv]:{nombre:'Rutina',secciones:null,duracionSemanas:4};if(!arg.sel.size){toast('Elegí al menos un entrenado');return}
     let n=0;
     for(const id of arg.sel){
       const e=S.ents[id];
+      if(!p.secciones){const doc={entrenadoId:id,nombre:arg.nom||'Rutina',estado:'cola',fechaSugerida:arg.f||iso(today()),duracionSemanas:4,secciones:[newSeccion(Number(e.estimulos)||3)],plantillaId:'',notas:'',controlCarga:false,bienestar:false,creada:Date.now()};
+        if(await write(()=>S.db.collection('rutinas').add(doc)))n++;continue}
       const secs=clone(p.secciones||[]).filter(s=>!s.posicion||!e.posicion||keyN(s.posicion)===keyN(e.posicion));
       const doc={entrenadoId:id,nombre:arg.nom||p.nombre,estado:'cola',fechaSugerida:arg.f||iso(today()),duracionSemanas:p.duracionSemanas||4,
-        secciones:secs.length?secs:clone(p.secciones||[]),plantillaId:arg.pid||'',notas:p.notas||'',controlCarga:!!p.controlCarga,bienestar:!!p.bienestar,creada:Date.now()};
+        secciones:secs.length?secs:clone(p.secciones||[]),plantillaId:pv,notas:p.notas||'',controlCarga:!!p.controlCarga,bienestar:!!p.bienestar,creada:Date.now()};
       if(p.distribucion&&p.distribucion.length)doc.distribucion=clone(p.distribucion);else{const rot=rotacion(diasDe(doc),Number(e.estimulos),doc.duracionSemanas);if(rot)doc.distribucion=rot}
       if(await write(()=>S.db.collection('rutinas').add(doc)))n++;
     }
@@ -1057,9 +1097,9 @@ function editorHTML(){
     <label>Posición (equipos)<select data-p="${P}" data-f="posicion" ${ro?'disabled':''}><option value="">Todas</option>${(S.cfg.posiciones||[]).map(x=>`<option ${keyN(x)===keyN(s.posicion)?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
     ${ro?'':`<div class="full actions"><button class="btn" type="button" data-act="dupSec">Duplicar sección</button><button class="btn" type="button" data-act="addDia">+ Día</button><button class="btn" type="button" data-act="clearSec">Vaciar sección</button>${R.secciones.length>1?'<button class="btn danger" type="button" data-act="delSec">Quitar sección</button>':''}</div>`}
   </div>
-  ${s.dias.map((dia,d)=>`<div class="card dia${falDia(P,d)?' dia-falta':''}"><div class="dia-h"><input class="dia-n" data-p="${P},${d}" data-f="nombre" value="${esc(dia.nombre)}" ${ro?'readonly':''}>${falDia(P,d)?`<span class="pill p-bad">${esc(falDia(P,d).txt)}</span>`:'<span class="pill p-ok">Completo</span>'}${ro?'':`<button type="button" class="btn" data-act="addBloque" data-p="${P},${d}">+ Bloque</button><button type="button" class="btn" data-act="clearDia" data-p="${P},${d}">Vaciar día</button><button type="button" class="btn danger" data-act="delDia" data-p="${P},${d}">Quitar día</button>`}</div>
-    ${dia.bloques.map((bl,b)=>`<div class="bl${bl.items.every(itemVacio)?' bl-vacio':''}"><div class="bl-h"><input list="dl-bl" class="bl-n" data-p="${P},${d},${b}" data-f="nombre" value="${esc(bl.nombre)}" ${ro?'readonly':''}><label>Series<input data-p="${P},${d},${b}" data-f="series" value="${esc(bl.series)}" style="width:56px" ${ro?'readonly':''}></label>${ro?'':`<button type="button" class="x-sm" data-act="delBloque" data-p="${P},${d},${b}" aria-label="Quitar bloque">Quitar</button>`}</div>
-      ${items(d,b,bl)}${ro?'':`<button type="button" class="add-it" data-act="addItem" data-p="${P},${d},${b}">+ Ejercicio</button>`}</div>`).join('')}
+  ${s.dias.map((dia,d)=>`<div class="card dia${falDia(P,d)?' dia-falta':''}"><div class="dia-h"><input class="dia-n" data-p="${P},${d}" data-f="nombre" value="${esc(dia.nombre)}" ${ro?'readonly':''}>${falDia(P,d)?`<span class="pill p-bad">${esc(falDia(P,d).txt)}</span>`:'<span class="pill p-ok">Completo</span>'}${dia.bloques.length>1?(()=>{const all=dia.bloques.every((bl,b)=>E.pleg&&E.pleg[bl.uid||`${P},${d},${b}`]);return `<button type="button" class="btn" data-act="${all?'despDia':'plegDia'}" data-p="${P},${d}">${all?'Expandir bloques':'Minimizar bloques'}</button>`})():''}${ro?'':`<button type="button" class="btn" data-act="addBloque" data-p="${P},${d}">+ Bloque</button><button type="button" class="btn" data-act="clearDia" data-p="${P},${d}">Vaciar día</button><button type="button" class="btn danger" data-act="delDia" data-p="${P},${d}">Quitar día</button>`}</div>
+    ${dia.bloques.map((bl,b)=>{const bk=bl.uid||`${P},${d},${b}`,pl=!!(E.pleg&&E.pleg[bk]);const noms=bl.items.filter(i=>String(i.nombre||'').trim()).map(i=>i.nombre);return `<div class="bl${bl.items.every(itemVacio)?' bl-vacio':''}${pl?' plegado':''}"><div class="bl-h"><button type="button" class="bl-tg" data-act="pleg" data-k="${esc(bk)}" aria-expanded="${!pl}" title="${pl?'Expandir bloque':'Minimizar bloque'}">${pl?'▸':'▾'}</button><input list="dl-bl" class="bl-n" data-p="${P},${d},${b}" data-f="nombre" value="${esc(bl.nombre)}" ${ro?'readonly':''}><label>Series<input data-p="${P},${d},${b}" data-f="series" value="${esc(bl.series)}" style="width:56px" ${ro?'readonly':''}></label>${pl?`<span class="bl-res">${noms.length?plural(noms.length,'ejercicio','ejercicios')+': '+esc(noms.join(', ')):'Sin ejercicios'}</span>`:''}${ro?'':`<button type="button" class="x-sm" data-act="delBloque" data-p="${P},${d},${b}" aria-label="Quitar bloque">Quitar</button>`}</div>
+      ${pl?'':items(d,b,bl)}${ro||pl?'':`<button type="button" class="add-it" data-act="addItem" data-p="${P},${d},${b}">+ Ejercicio</button>`}</div>`}).join('')}
   </div>`).join('')}
   <div class="actions sticky-save">${ro?'':`<button class="btn pri" type="button" data-act="save">Guardar</button>`}
     ${isRut&&R.estado==='cola'&&E.id?`<button class="wa" type="button" data-entregar="${esc(E.id)}">Entregar ahora</button>`:''}
@@ -1108,6 +1148,8 @@ function bindEditor(){
         secciones:reuid(R.secciones).map(s=>({...s,dias:s.dias.map(dd=>({...dd,bloques:dd.bloques.map(bb=>({...bb,items:bb.items.filter(i=>(i.nombre||'').trim())}))}))}))};
       if(await write(()=>S.db.collection('plantillas').add(d)))toast('Guardada en Plantillas como “'+d.nombre+'”');return}
     if(act==='dupPlant'){const d=clone(R);d.nombre=(d.nombre||'')+' (copia)';if(await write(()=>S.db.collection('plantillas').add(d))){toast('Plantilla duplicada');closeSheet()}return}
+    if(act==='pleg'){E.pleg=E.pleg||{};E.pleg[b.dataset.k]=!E.pleg[b.dataset.k];rerenderEditor();return}
+    if(act==='plegDia'||act==='despDia'){E.pleg=E.pleg||{};const a=p.split(',').map(Number);getPath(R,p).bloques.forEach((bl,i)=>{E.pleg[bl.uid||`${a[0]},${a[1]},${i}`]=act==='plegDia'});rerenderEditor();return}
     if(act==='clearDia'||act==='clearSec'){
       if(!b.classList.contains('armed')){b.classList.add('armed','danger');b.textContent=act==='clearDia'?'Tocá de nuevo para vaciar el día':'Tocá de nuevo para vaciar toda la sección';setTimeout(()=>{if(b.isConnected){b.classList.remove('armed','danger');b.textContent=act==='clearDia'?'Vaciar día':'Vaciar sección'}},4000);return}
       const dias=act==='clearDia'?[getPath(R,p)]:S0.dias;

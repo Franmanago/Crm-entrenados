@@ -236,3 +236,14 @@ input.falta::placeholder{color:var(--bad);opacity:.85}
 .asis-w b{font-size:12px;color:var(--ink)}
 .asis-bar{width:100%;max-width:36px;height:44px;background:var(--surface-2);border-radius:5px;display:flex;align-items:flex-end;overflow:hidden;border:1px solid var(--line)}
 .asis-bar i{display:block;width:100%;background:var(--ok)}
+/* forma de pago */
+.lbl-s{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px}
+.mixto{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;border:1px dashed var(--line);border-radius:var(--r);background:var(--surface-2)}
+.mixto[hidden]{display:none}
+.mixto .hint{grid-column:1/-1;margin:0}
+/* bloques plegables en el editor */
+.bl-tg{border:0;background:none;color:var(--muted);font-size:15px;cursor:pointer;padding:4px 6px;line-height:1;border-radius:6px;flex:0 0 auto}
+.bl-tg:hover{background:var(--surface-2);color:var(--ink)}
+.bl.plegado>.it,.bl.plegado>.add-it{display:none}
+.bl-res{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 120px;min-width:0}
+.dia-tools{display:flex;gap:6px;flex-wrap:wrap}
