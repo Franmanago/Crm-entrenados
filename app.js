@@ -1084,7 +1084,12 @@ function planHTML(R,e,ro){
   return h;
 }
 function getPath(R,p){const a=p.split(',').map(Number);let o=R.secciones[a[0]];if(a.length>1)o=o.dias[a[1]];if(a.length>2)o=o.bloques[a[2]];if(a.length>3)o=o.items[a[3]];return o}
-function rerenderEditor(){const sh=$('.sheet');const st=sh?sh.scrollTop:0;renderSheet();const n=$('.sheet');if(n)n.scrollTop=st}
+function rerenderEditor(){
+  const sh=$('.sheet');const st=sh?sh.scrollTop:0;const ae=document.activeElement;let sel=null,c0=null,c1=null;
+  if(ae&&sh&&sh.contains(ae)){if(ae.dataset.p!=null&&ae.dataset.f)sel=`[data-p="${ae.dataset.p}"][data-f="${ae.dataset.f}"]`;else if(ae.dataset.h)sel=`[data-h="${ae.dataset.h}"]`;try{c0=ae.selectionStart;c1=ae.selectionEnd}catch(e){}}
+  renderSheet();const n=$('.sheet');if(n)n.scrollTop=st;
+  if(sel){const el=document.querySelector('#overlay '+sel);if(el){el.focus({preventScroll:true});try{if(c0!=null)el.setSelectionRange(c0,c1)}catch(e){}}}
+}
 function bindEditor(){
   const ov=$('#overlay'),E=S.edit,R=E.data;
   ov.onclick=async ev=>{
@@ -1137,8 +1142,29 @@ function bindEditor(){
     el.addEventListener('mousedown',ev=>{const o=ev.target.closest('[data-acid]');if(o){ev.preventDefault();acPick(o.dataset.acid)}});
   };
   const acMove=d=>{if(!AC.el)return;AC.i=(AC.i+d+AC.list.length)%AC.list.length;AC.el.querySelectorAll('.ac-op').forEach((o,i)=>o.classList.toggle('on',i===AC.i));AC.el.querySelector('.ac-op.on')?.scrollIntoView({block:'nearest'})};
+  const navTo=(el)=>{if(!el)return false;el.focus();try{if(el.select)el.select()}catch(e){}el.scrollIntoView({block:'nearest'});return true};
+  const navMove=(t,key)=>{
+    const row=t.closest('.it');if(!row)return false;
+    const fields=r=>[...r.querySelectorAll('input[data-p][data-f],select[data-p][data-f]')];
+    const fs=fields(row),i=fs.indexOf(t);
+    if(key==='ArrowRight')return navTo(fs[i+1]);
+    if(key==='ArrowLeft')return navTo(fs[i-1]);
+    const rows=[...document.querySelectorAll('#overlay .it')];const ri=rows.indexOf(row);const nr=rows[ri+(key==='ArrowUp'?-1:1)];if(!nr)return false;
+    const nf=fields(nr);return navTo(nf.find(x=>x.dataset.f===t.dataset.f)||nf[Math.min(i,nf.length-1)]);
+  };
   ov.onkeydown=ev=>{
-    if(!ev.target.matches('[data-ac]')||!AC.el)return;
+    const t=ev.target;
+    if(!(t.matches('[data-ac]')&&AC.el)){
+      if(!t.matches('.it input[data-p],.it select[data-p]')||ev.altKey||ev.ctrlKey||ev.metaKey||ev.shiftKey)return;
+      const k=ev.key;let go=false;
+      if(k==='ArrowUp'||k==='ArrowDown'){if(t.tagName==='SELECT')return;go=true}
+      else if(k==='Enter'){if(t.tagName==='SELECT')return;go='ArrowDown'}
+      else if(k==='ArrowRight'||k==='ArrowLeft'){
+        if(t.tagName==='SELECT')go=true;else{const v=t.value||'';const s0=t.selectionStart,s1=t.selectionEnd;const all=s0===0&&s1===v.length;
+          go=all||(k==='ArrowRight'?s1===v.length:s0===0)}}
+      if(go&&navMove(t,go===true?k:go))ev.preventDefault();
+      return;
+    }
     if(ev.key==='ArrowDown'){ev.preventDefault();acMove(1)}
     else if(ev.key==='ArrowUp'){ev.preventDefault();acMove(-1)}
     else if(ev.key==='Enter'||ev.key==='Tab'){if(AC.i>=0){ev.preventDefault();acPick(AC.list[AC.i].id)}}
@@ -1159,9 +1185,10 @@ function bindEditor(){
     if(ev.target.matches('[data-h=duracionSemanas]')){rerenderEditor();return}
     const t=ev.target.closest('[data-p][data-f]');if(!t)return;
     const o=getPath(R,t.dataset.p),f=t.dataset.f;
-    if(f==='nombre'&&'ej' in o){const id=ejByName()[keyN(o.nombre)]||'';o.ej=id;if(id)o.nombre=S.ejs[id].nombre;if(o.pct&&!o.rm&&id)o.rm=S.ejs[id].rm||'';rerenderEditor()}
-    else if(f==='pct'){if(o.pct&&!o.rm&&o.ej)o.rm=S.ejs[o.ej]?.rm||'';rerenderEditor()}
-    else if(f==='posicion'||f==='titulo'||f==='rm'||f==='reps')rerenderEditor();
+    const later=()=>setTimeout(rerenderEditor,0);
+    if(f==='nombre'&&'ej' in o){const id=ejByName()[keyN(o.nombre)]||'';o.ej=id;if(id)o.nombre=S.ejs[id].nombre;if(o.pct&&!o.rm&&id)o.rm=S.ejs[id].rm||'';later()}
+    else if(f==='pct'){if(o.pct&&!o.rm&&o.ej)o.rm=S.ejs[o.ej]?.rm||'';later()}
+    else if(f==='posicion'||f==='titulo'||f==='rm'||f==='reps')later();
   };
 }
 async function saveEditor(silent){
