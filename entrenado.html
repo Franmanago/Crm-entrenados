@@ -283,12 +283,23 @@ document.addEventListener('click',ev=>{
   if(b=t.closest('[data-log]')){const u=b.dataset.log;open[u]={...open[u],log:!open[u]?.log};render();return}
   if(b=t.closest('[data-rpe]')){const f=b.closest('form');const cur=f.cansancio.value;const v=cur===b.dataset.rpe?'':b.dataset.rpe;f.cansancio.value=v;f.querySelectorAll('[data-rpe]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.rpe===v));return}
 });
+function errTxt(e){const m=String(e?.message||'');
+  if(/rutina no disponible/i.test(m))return 'Tu rutina cambió. Recargá la página para ver la nueva.';
+  if(/link inv/i.test(m))return 'Este link ya no es válido. Pedile a tu entrenador el nuevo.';
+  if(/failed to fetch|network|load failed/i.test(m))return 'Sin conexión. Revisá internet y probá de nuevo.';
+  return 'No se pudo guardar. Avisale a tu entrenador. ('+m.slice(0,120)+')'}
+async function logRpc(args){
+  let r=await sb.rpc('portal_log',args);
+  if(r.error&&/portal_log|function|schema cache|parameter/i.test(r.error.message||'')&&!/rutina no disponible|link inv/i.test(r.error.message||'')){
+    const {p_ej,p_nombre,...old}=args;const r2=await sb.rpc('portal_log',old);if(!r2.error)return r2}
+  return r;
+}
 async function marcarAsis(b){
   const uid=b.dataset.asis,off=b.dataset.off==='1';let dn='';for(const s of D.rutina.secciones||[])for(const d of s.dias||[])if(d.uid===uid)dn=d.nombre;
   b.disabled=true;
-  const {data,error}=await sb.rpc('portal_log',{p_token:token,p_rutina:D.rutina.id,p_item:'asis:'+uid,p_fecha:iso(today()),p_kg:'',p_reps:'',p_cansancio:null,p_nota:off?'':'Asistió',p_ej:'',p_nombre:dn});
+  const {data,error}=await logRpc({p_token:token,p_rutina:D.rutina.id,p_item:'asis:'+uid,p_fecha:iso(today()),p_kg:'',p_reps:'',p_cansancio:null,p_nota:off?'':'Asistió',p_ej:'',p_nombre:dn});
   b.disabled=false;
-  if(error){alertMsg('No se pudo guardar. Revisá tu conexión.');return}
+  if(error){alertMsg(errTxt(error));return}
   D.registros=(D.registros||[]).filter(r=>r.id!==data.id);if(!data.borrado)D.registros.push(data);render();
 }
 function alertMsg(t){const m=document.createElement('div');m.className='aviso';m.textContent=t;document.body.appendChild(m);setTimeout(()=>m.remove(),2600)}
@@ -298,16 +309,16 @@ document.addEventListener('submit',async ev=>{
     if(fb){datos={sueno:Number(f.sueno.value),cuerpo:Number(f.cuerpo.value),animo:Number(f.animo.value)};if(!datos.sueno||!datos.cuerpo||!datos.animo){ok.textContent='Respondé las tres preguntas';ok.style.color='var(--bad)';return}}
     else{datos={min:Math.round(Number(String(f.min.value).replace(',','.'))),rpe:Number(f.cansancio.value)};if(!(datos.min>0&&datos.min<600)||!datos.rpe){ok.textContent='Completá minutos y esfuerzo';ok.style.color='var(--bad)';return}}
     ok.textContent='Guardando…';
-    try{await dato(fb?'bien':'carga',fb?'':fc.dataset.carga,datos);if(fb)editB=false;else editC[fc.dataset.carga]=false;render()}catch(e){ok.textContent='No se pudo guardar. Revisá tu conexión.';ok.style.color='var(--bad)'}
+    try{await dato(fb?'bien':'carga',fb?'':fc.dataset.carga,datos);if(fb)editB=false;else editC[fc.dataset.carga]=false;render()}catch(e){ok.textContent=errTxt(e);ok.style.color='var(--bad)'}
     return}
   const f=ev.target.closest('[data-form]');if(!f)return;ev.preventDefault();
   const uid=f.dataset.form,btn=f.querySelector('.guardar'),ok=f.querySelector('[data-ok]');
   btn.disabled=true;ok.textContent='Guardando…';
   const c=f.cansancio.value;
   const it=findItem(uid)||{};
-  const {data,error}=await sb.rpc('portal_log',{p_token:token,p_rutina:D.rutina.id,p_item:uid,p_fecha:iso(today()),p_kg:f.kg.value.trim(),p_reps:f.reps.value.trim(),p_cansancio:c?Number(c):null,p_nota:f.nota.value.trim(),p_ej:it.ej||'',p_nombre:it.nombre||''});
+  const {data,error}=await logRpc({p_token:token,p_rutina:D.rutina.id,p_item:uid,p_fecha:iso(today()),p_kg:f.kg.value.trim(),p_reps:f.reps.value.trim(),p_cansancio:c?Number(c):null,p_nota:f.nota.value.trim(),p_ej:it.ej||'',p_nombre:it.nombre||''});
   btn.disabled=false;
-  if(error){ok.textContent='No se pudo guardar. Revisá tu conexión.';ok.style.color='var(--bad)';return}
+  if(error){ok.textContent=errTxt(error);ok.style.color='var(--bad)';return}
   D.registros=(D.registros||[]).filter(r=>r.id!==data.id);
   if(!data.borrado)D.registros.push(data);
   open[uid]={...open[uid],log:false};render();
