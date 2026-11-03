@@ -200,3 +200,39 @@ body{margin:0}
 .plan-t th,.plan-t td{padding:4px 10px;text-align:center;font-size:13px}
 .plan-t td:first-child{text-align:left}
 .plan-t input{width:18px;height:18px}
+/* ---- contraste de bloques, buscador y alertas ---- */
+:root{--bl-bg:#E6ECF7;--bl-line:#AEBBD3;--bl-head:#D3DDF0;--it-line:#C3CCC8;--hl:#2148B8;--hl-ink:#fff;--mark:#FFE58A}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bl-bg:#1A2436;--bl-line:#3B4E70;--bl-head:#24324B;--it-line:#3A4642;--hl:#7E9CF5;--hl-ink:#0D1530;--mark:#6B5A12}}
+:root[data-theme="dark"]{--bl-bg:#1A2436;--bl-line:#3B4E70;--bl-head:#24324B;--it-line:#3A4642;--hl:#7E9CF5;--hl-ink:#0D1530;--mark:#6B5A12}
+.bl{background:var(--bl-bg);border:1.5px solid var(--bl-line);border-left:5px solid var(--accent);border-radius:8px;padding:0 10px 10px;gap:8px}
+.bl-h{background:var(--bl-head);margin:0 -10px;padding:8px 10px;border-radius:3px 6px 0 0;border-bottom:1.5px solid var(--bl-line)}
+.bl .it{border:1px solid var(--it-line);box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.dia{border-width:1.5px}
+.dia-h{border-bottom:1px solid var(--line);padding-bottom:8px}
+.ac-wrap{position:relative}
+.ac-pop{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;background:var(--surface);border:1.5px solid var(--hl);border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.22);max-height:280px;overflow:auto;padding:4px}
+.ac-op{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:14px;color:var(--ink)}
+.ac-op small{font-size:11px;color:var(--muted);white-space:nowrap}
+.ac-op small.nv{color:var(--warn)}
+.ac-op:hover{background:var(--surface-2)}
+.ac-op.on{background:var(--hl);color:var(--hl-ink)}
+.ac-op.on small{color:inherit;opacity:.85}
+.ac-op mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
+.ac-op.on mark{background:rgba(255,255,255,.28)}
+/* alertas */
+.falta-box{display:flex;flex-direction:column;gap:2px;background:var(--bad-soft);color:var(--bad);border-radius:8px;padding:10px 12px;font-size:13px;text-transform:none;letter-spacing:0}
+.falta-box b{font-size:14px}
+.it-falta{border-color:var(--bad)!important;box-shadow:inset 3px 0 0 var(--bad)}
+input.falta{border-color:var(--bad)!important;background:var(--bad-soft)!important}
+input.falta::placeholder{color:var(--bad);opacity:.85}
+.falta-l{color:var(--bad)!important}
+.dia-falta{border-color:var(--bad)}
+.bl-vacio{border-style:dashed}
+.dot-bad{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-left:4px;vertical-align:middle}
+.falta-card{border-color:var(--bad)}
+/* asistencia en ficha */
+.asis-row{display:flex;gap:8px;margin-top:8px;align-items:flex-end}
+.asis-w{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;font-size:11px;color:var(--muted)}
+.asis-w b{font-size:12px;color:var(--ink)}
+.asis-bar{width:100%;max-width:36px;height:44px;background:var(--surface-2);border-radius:5px;display:flex;align-items:flex-end;overflow:hidden;border:1px solid var(--line)}
+.asis-bar i{display:block;width:100%;background:var(--ok)}
