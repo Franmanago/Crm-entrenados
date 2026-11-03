@@ -98,10 +98,12 @@ function build(r,e,kgFn){
           p.line(M,t+rowH,M+CW,t+rowH,0.35,0.6);t+=rowH;
         }
       }
+      if(r.controlCarga){p.rect(M,t,CW,rowH,0.97,null);const cz=Math.min(fz,7.4);p.text(colX[0]+3,t+rowH*0.66,'Sesión: minutos / esfuerzo (1 a 10)',cz,true,0.15);p.text(colX[3]+3,t+rowH*0.66,'ej: 60 / 7',cz*0.9,false,0.45);p.line(M,t+rowH,M+CW,t+rowH,0.35,0.6);t+=rowH}
       // verticales de la tabla del día
-      const top0=t-(d.bloques.reduce((a,b)=>a+BH+b.items.length*rowH,0))-CH;
+      const top0=t-(d.bloques.reduce((a,b)=>a+BH+b.items.length*rowH,0))-CH-(r.controlCarga?rowH:0);
       colX.forEach((x,i)=>{if(i===0||i===colX.length-1)p.line(x,top0,x,t,0.6,0.35);else{
-        let yy=top0;p.line(x,yy,x,yy+CH,0.35,0.6);yy+=CH;for(const b of d.bloques){yy+=BH;p.line(x,yy,x,yy+b.items.length*rowH,0.35,0.6);yy+=b.items.length*rowH}}});
+        let yy=top0;p.line(x,yy,x,yy+CH,0.35,0.6);yy+=CH;for(const b of d.bloques){yy+=BH;p.line(x,yy,x,yy+b.items.length*rowH,0.35,0.6);yy+=b.items.length*rowH}
+        if(r.controlCarga&&i>=4)p.line(x,yy,x,yy+rowH,0.35,0.6)}});
       p.line(M,t,M+CW,t,0.6,0.35);
       t+=6;
     }
@@ -116,7 +118,7 @@ function build(r,e,kgFn){
       const p=Page();const top=header(p,title);const avail=H-M-FOOT-top;
       // cuántos días entran con fila mínima 10.5
       let take=rest.length;
-      const need=(ds,rh)=>ds.reduce((a,d)=>a+Math.max(12,rh*1.15)+Math.max(9,rh*0.8)+6+d.bloques.reduce((x,b)=>x+Math.max(8.5,rh*0.82)+b.items.length*rh,0),0);
+      const need=(ds,rh)=>ds.reduce((a,d)=>a+Math.max(12,rh*1.15)+Math.max(9,rh*0.8)+6+(r.controlCarga?rh:0)+d.bloques.reduce((x,b)=>x+Math.max(8.5,rh*0.82)+b.items.length*rh,0),0);
       while(take>1&&need(rest.slice(0,take),10.5)>avail)take--;
       const ds=rest.slice(0,take);rest=rest.slice(take);
       let rh=16;while(rh>8&&need(ds,rh)>avail)rh-=0.25;
@@ -145,7 +147,52 @@ function zip(files){
   const end=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cs),...u32(off),...u16(0)]);
   const all=[...parts,...central,end];const tot=all.reduce((a,b)=>a+b.length,0);const out=new Uint8Array(tot);let p=0;for(const a of all){out.set(a,p);p+=a.length}return out;
 }
+/* ===== Reporte mensual ===== */
+function reporte(e,d){
+  const p=Page();const CW=W-2*M;let t=M;
+  const nm=fit(tc(e.nombre),CW*0.62,19,true,12);p.text(M,t+16,nm.s,nm.z,true);
+  const tel=fmtTel(e.telefono);if(tel)p.text(M+CW-tw('Tel: '+tel,8.3,true),t+9,'Tel: '+tel,8.3,true);
+  const sub=[e.grupo,d.rutina?('Rutina: '+d.rutina):''].filter(Boolean).join(' · ');if(sub){const f=fit(sub,CW*0.36,8.3,false,6);p.text(M+CW-tw(f.s,f.z,false),t+20,f.s,f.z,false,0.25)}
+  p.text(M,t+31,'Reporte de '+d.mesLbl,11,true,0.15);t+=37;p.line(M,t,M+CW,t,1.8,0);t+=10;
+  // KPIs
+  const k=d.kpis;const kw=(CW-(k.length-1)*8)/k.length;
+  k.forEach((x,i)=>{const X=M+i*(kw+8);p.rect(X,t,kw,52,0.95,0.7,0.6);p.text(X+8,t+13,x.lbl.toUpperCase(),6.8,true,0.35);const v=fit(x.val,kw-16,17,true,10);p.text(X+8,t+33,v.s,v.z,true);const s2=fit(x.sub||'',kw-16,7.6,false,5.5);p.text(X+8,t+45,s2.s,s2.z,false,0.3)});
+  t+=64;
+  const title=(s)=>{p.text(M,t+10,s.toUpperCase(),10.5,true);t+=14;p.line(M,t,M+CW,t,0.6,0);t+=8};
+  const bars=(items,max,goal,unit)=>{ // items [{lbl,v}]
+    const H0=70,bw=Math.min(46,(CW-20)/Math.max(1,items.length)-10);const step=(CW-20)/Math.max(1,items.length);
+    if(goal){const gy=t+H0-(Math.min(1,goal/max))*H0;p.line(M+6,gy,M+CW-6,gy,0.6,0.55);p.text(M+CW-tw('Meta '+goal,6.8,false),gy-3,'Meta '+goal,6.8,false,0.4)}
+    items.forEach((it,i)=>{const X=M+10+i*step+(step-bw)/2;const h=max?Math.max(1,(it.v/max)*H0):1;p.rect(X,t,bw,H0,0.95,null);p.rect(X,t+H0-h,bw,h,goal&&it.v>=goal?0.3:0.45,null);
+      const vs=String(it.v)+(unit||'');p.text(X+(bw-tw(vs,8,true))/2,t+H0+10,vs,8,true);p.text(X+(bw-tw(it.lbl,6.8,false))/2,t+H0+19,it.lbl,6.8,false,0.4)});
+    t+=H0+28;
+  };
+  title('Asistencia por semana');
+  if(d.asis.marcados){bars(d.asis.semanas,Math.max(d.asis.meta,...d.asis.semanas.map(x=>x.v),1),d.asis.meta)}
+  else{p.text(M,t+8,'No marcó entrenamientos en su link este mes.',8.6,false,0.35);t+=20}
+  title('Progreso de kg');
+  if(d.kg.length){
+    const cols=[0.38,0.1,0.1,0.1,0.12,0.2].map(f=>f*CW);const cx=[M];cols.forEach(c=>cx.push(cx.at(-1)+c));
+    const hd=['Ejercicio','Inicio','Último','Máximo','Cambio','Evolución'];p.rect(M,t,CW,13,0.88,null);hd.forEach((h,i)=>p.text(cx[i]+4,t+9.5,h.toUpperCase(),6.8,true,0.2));t+=13;
+    const rh=17;
+    for(const x of d.kg.slice(0,16)){
+      const n=fit(x.nombre,cols[0]-8,8.4,false,6);p.text(cx[0]+4,t+11.5,n.s,n.z,false);
+      p.text(cx[1]+4,t+11.5,x.ini+' kg',8.4,false,0.25);p.text(cx[2]+4,t+11.5,x.ult+' kg',8.4,true);p.text(cx[3]+4,t+11.5,x.max+' kg',8.4,false,0.25);
+      const dl=(x.delta>0?'+':'')+x.delta+' kg';p.text(cx[4]+4,t+11.5,dl,8.4,true,x.delta>0?0:0.35);
+      const P=x.pts;if(P.length>1){const lo=Math.min(...P),hi=Math.max(...P)||1,w=cols[5]-12,X0=cx[5]+6;const yv=v=>t+rh-4-((v-lo)/((hi-lo)||1))*(rh-8);
+        for(let i=1;i<P.length;i++)p.line(X0+(i-1)*w/(P.length-1),yv(P[i-1]),X0+i*w/(P.length-1),yv(P[i]),1.1,0.15)}
+      p.line(M,t+rh,M+CW,t+rh,0.35,0.7);t+=rh}
+    t+=8;
+  }else{p.text(M,t+8,'No anotó kg en su link este mes.',8.6,false,0.35);t+=20}
+  if(d.carga&&d.carga.semanas.some(x=>x.v)){title('Carga de entrenamiento (minutos × esfuerzo)');bars(d.carga.semanas,Math.max(...d.carga.semanas.map(x=>x.v),1),0,'');
+    if(d.carga.acwr!=null){p.text(M,t,`Relación carga aguda / crónica al cierre del mes: ${d.carga.acwr}  (${d.carga.acwrTxt})`,8.4,false,0.2);t+=14}}
+  if(d.bien&&d.bien.n){title('Bienestar antes de entrenar (promedio de 1 a 5)');
+    [['Sueño',d.bien.sueno],['Cuerpo / dolor',d.bien.cuerpo],['Ánimo / estrés',d.bien.animo]].forEach(([l,v])=>{p.text(M,t+9,l,8.6,false);const X=M+110,bw=CW-170;p.rect(X,t+1,bw,10,0.93,null);p.rect(X,t+1,bw*(v/5),10,0.4,null);p.text(X+bw+8,t+9.5,String(v),8.6,true);t+=15});
+    p.text(M,t+6,`${d.bien.n} ${d.bien.n===1?'respuesta':'respuestas'} en el mes.`,7.6,false,0.4);t+=16}
+  p.line(M,H-M-14,M+CW,H-M-14,0.5,0.6);p.text(M,H-M-4,'Generado el '+d.generado+' · Los datos de asistencia, kg, carga y bienestar los anota el entrenado en su link personal.',6.8,false,0.4);
+  return pdfBytes([p],`Reporte ${d.mesLbl} - ${tc(e.nombre)}`);
+}
+function reporteName(e,mesLbl){return ('Reporte '+mesLbl+' - '+tc(e.nombre)).replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim()+'.pdf'}
 function fileName(e,r){return (tc(e.nombre)+' - '+(r.nombre||'Rutina')).replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,90)+'.pdf'}
 function download(bytes,name,type){const blob=new Blob([bytes],{type});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},1500)}
-return {build,zip,fileName,download,fmtTel};
+return {build,zip,fileName,download,fmtTel,reporte,reporteName};
 })();
