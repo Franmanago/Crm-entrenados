@@ -638,9 +638,10 @@ function cargaDias(id){const m={};S.regs.filter(r=>r.entrenadoId===id&&r.tipo===
 function acwr(id,ref){
   const m=cargaDias(id);const end=ref?parse(ref):today();let ag=0,cr=0;
   for(let i=0;i<28;i++){const d=new Date(end);d.setDate(d.getDate()-i);const v=m[iso(d)]||0;if(i<7)ag+=v;cr+=v}
-  const crs=cr/4;return {agudo:Math.round(ag),cronico:Math.round(crs),ratio:crs>0&&Object.keys(m).length?ag/crs:null};
+  const crs=cr/4;const ks=Object.keys(m).sort();const hist=ks.length&&days(end,parse(ks[0]))>=21;
+  return {agudo:Math.round(ag),cronico:Math.round(crs),ratio:crs>0&&hist?ag/crs:null};
 }
-const acwrTxt=r=>r==null?'sin datos suficientes':r>1.5?'carga muy alta, riesgo de sobrecarga':r>1.3?'en aumento':r<0.8?'carga baja':'zona adecuada';
+const acwrTxt=r=>r==null?'sin historial suficiente (se necesitan 3 semanas)':r>1.5?'carga muy alta, riesgo de sobrecarga':r>1.3?'en aumento':r<0.8?'carga baja':'zona adecuada';
 const acwrPill=r=>r==null?'p-mute':r>S.cfg.alertas.acwr?'p-bad':r>1.3||r<0.8?'p-warn':'p-ok';
 const bienTot=d=>(Number(d?.sueno)||0)+(Number(d?.cuerpo)||0)+(Number(d?.animo)||0);
 const bienTxt=d=>`Sueño ${d?.sueno||'-'} · Cuerpo ${d?.cuerpo||'-'} · Ánimo ${d?.animo||'-'} = ${bienTot(d)}/15`;
@@ -651,36 +652,51 @@ function ausentes(){
     .filter(x=>x.ult&&x.d>=n&&activaDe(x.e.id)).sort((a,b)=>b.d-a.d);
 }
 function semanasDe(ini,fin){const out=[];const d=new Date(ini);d.setDate(d.getDate()-((d.getDay()+6)%7));while(d<=fin){const a=new Date(d),b=new Date(d);b.setDate(b.getDate()+6);out.push([a,b]);d.setDate(d.getDate()+7)}return out}
-function reporteData(e,M){
+function mesesDe(e){const s=new Set(mesesList());S.regs.forEach(r=>{if(r.entrenadoId===e.id&&r.fecha)s.add(r.fecha.slice(0,7))});return [...s].filter(k=>k<=curMes()).sort().reverse()}
+function periodoData(e,M,corto){
   const [y,m]=M.split('-').map(Number);const ini=new Date(y,m-1,1),fin=new Date(y,m,0);const iI=iso(ini),iF=iso(fin);
-  const regs=S.regs.filter(r=>r.entrenadoId===e.id);
-  const inM=r=>r.fecha>=iI&&r.fecha<=iF;
-  const asis=regs.filter(r=>String(r.item||'').startsWith('asis:')&&inM(r));
+  const regs=S.regs.filter(r=>r.entrenadoId===e.id&&r.fecha>=iI&&r.fecha<=iF);
   const sem=semanasDe(ini,fin).map(([a,b])=>[a<ini?ini:a,b>fin?fin:b]);const est=Number(e.estimulos)||0;
-  const semanas=sem.map(([a,b])=>({lbl:fmtShort(iso(a)),v:new Set(asis.filter(r=>r.fecha>=iso(a)&&r.fecha<=iso(b)).map(r=>r.fecha+r.item)).size}));
-  const tot=new Set(asis.map(r=>r.fecha+r.item)).size;const meta=Math.round(est*(fin.getDate()/7));
-  // kg: últimos 3 meses hasta fin de mes, ejercicios con datos en el mes
-  const desde=iso(new Date(y,m-3,1));const g={};
-  regs.filter(r=>!especial(r)&&r.fecha>=desde&&r.fecha<=iF).forEach(r=>{const v=parseFloat(String(r.kg||'').replace(',','.'));if(!(v>0))return;const k=r.ej||r.nombre||r.item;(g[k]=g[k]||{nombre:r.nombre||'Ejercicio',p:{},enMes:false});g[k].p[r.fecha]=Math.max(g[k].p[r.fecha]||0,v);if(inM(r))g[k].enMes=true});
-  const kg=Object.values(g).filter(x=>x.enMes).map(x=>{const pts=Object.entries(x.p).sort((a,b)=>a[0].localeCompare(b[0])).map(p=>p[1]);return {nombre:x.nombre,ini:pts[0],ult:pts.at(-1),max:Math.max(...pts),delta:+(pts.at(-1)-pts[0]).toFixed(1),pts}}).sort((a,b)=>b.pts.length-a.pts.length);
-  const cd=cargaDias(e.id);const carga={semanas:sem.map(([a,b])=>{let v=0;for(const k in cd)if(k>=iso(a)&&k<=iso(b))v+=cd[k];return {lbl:fmtShort(iso(a)),v:Math.round(v)}})};
-  const ac=acwr(e.id,iF);carga.acwr=ac.ratio==null?null:ac.ratio.toFixed(2);carga.acwrTxt=acwrTxt(ac.ratio);
-  const bl=regs.filter(r=>r.tipo==='bien'&&inM(r));const avg=k=>bl.length?+(bl.reduce((a,r)=>a+(Number(r.datos?.[k])||0),0)/bl.length).toFixed(1):0;
-  const bien={n:bl.length,sueno:avg('sueno'),cuerpo:avg('cuerpo'),animo:avg('animo')};
-  const kpis=[{lbl:'Entrenamientos',val:`${tot}${meta?' de '+meta:''}`,sub:tot?'marcados en su link':'sin marcas en el link'}];
-  if(kg.length){const sub=kg.filter(x=>x.delta>0).length;kpis.push({lbl:'Ejercicios con progreso',val:`${sub} de ${kg.length}`,sub:'subieron de kg'})}
-  if(carga.semanas.some(x=>x.v))kpis.push({lbl:'Carga del mes',val:String(carga.semanas.reduce((a,x)=>a+x.v,0)),sub:'minutos × esfuerzo'});
-  if(bien.n)kpis.push({lbl:'Bienestar',val:`${+(bien.sueno+bien.cuerpo+bien.animo).toFixed(1)}/15`,sub:`promedio de ${plural(bien.n,'respuesta','respuestas')}`});
-  const a=activaDe(e.id);
-  return {mesLbl:mesLbl(M),rutina:a?a.nombre:'',kpis,asis:{marcados:tot,semanas,meta:est},kg,carga,bien,generado:fmtD(iso(today()))};
+  const asis=regs.filter(r=>String(r.item||'').startsWith('asis:'));
+  const cnt=(a,b)=>new Set(asis.filter(r=>r.fecha>=iso(a)&&r.fecha<=iso(b)).map(r=>r.fecha+r.item)).size;
+  const cr=regs.filter(r=>r.tipo==='carga');const cd=cargaDias(e.id);
+  const rpe=[0,0,0,0];cr.forEach(r=>{const v=Number(r.datos?.rpe)||0;if(v)rpe[v<=4?0:v<=6?1:v<=8?2:3]++});
+  const bl=regs.filter(r=>r.tipo==='bien');const avg=k=>bl.length?+(bl.reduce((s2,r)=>s2+(Number(r.datos?.[k])||0),0)/bl.length).toFixed(1):0;
+  const bien={n:bl.length,sueno:avg('sueno'),cuerpo:avg('cuerpo'),animo:avg('animo')};bien.tot=+(bien.sueno+bien.cuerpo+bien.animo).toFixed(1);
+  return {M,corto,hechos:new Set(asis.map(r=>r.fecha+r.item)).size,meta:Math.round(est*(fin.getDate()/7)),
+    semanas:sem.map(([a,b])=>({lbl:fmtShort(iso(a)),v:cnt(a,b)})),
+    carga:Math.round(cr.reduce((s2,r)=>s2+(Number(r.datos?.min)||0)*(Number(r.datos?.rpe)||0),0)),sesiones:cr.length,rpe,bien,
+    bienSem:sem.map(([a,b])=>{const x=bl.filter(r=>r.fecha>=iso(a)&&r.fecha<=iso(b));return x.length?+(x.reduce((s2,r)=>s2+bienTot(r.datos),0)/x.length).toFixed(1):null}),
+    cargaSem:sem.map(([a,b])=>{let v=0;for(const k in cd)if(k>=iso(a)&&k<=iso(b))v+=cd[k];const ac=acwr(e.id,iso(b));return {lbl:fmtShort(iso(a)),v:Math.round(v),acwr:ac.ratio}}),
+    ini:iI,fin:iF};
 }
-function descargarReportes(ids,M){
+function kgPorEj(e,iI,iF){const g={};S.regs.filter(r=>r.entrenadoId===e.id&&!especial(r)&&r.fecha>=iI&&r.fecha<=iF).forEach(r=>{const v=parseFloat(String(r.kg||'').replace(',','.'));if(!(v>0))return;const k=r.ej||keyN(r.nombre||r.item);(g[k]=g[k]||{nombre:r.nombre||'Ejercicio',p:{}});g[k].p[r.fecha]=Math.max(g[k].p[r.fecha]||0,v)});return g}
+function resumenData(e,M,vs){
+  const ms=vs?[M,vs].sort():[M];const two=ms.length===2;
+  const yrs=new Set(ms.map(k=>k.slice(0,4))).size>1;
+  const corto=k=>{const [y,m]=k.split('-').map(Number);return MESES_N[m-1]+(yrs?' '+y:'')};
+  const P=ms.map(k=>periodoData(e,k,corto(k)));
+  let kg=[];
+  if(two){const g1=kgPorEj(e,P[0].ini,P[0].fin),g2=kgPorEj(e,P[1].ini,P[1].fin);
+    kg=Object.keys(g2).filter(k=>g1[k]).map(k=>({nombre:g2[k].nombre,a:Math.max(...Object.values(g1[k].p)),b:Math.max(...Object.values(g2[k].p))}))}
+  else{const g=kgPorEj(e,P[0].ini,P[0].fin);kg=Object.values(g).map(x=>{const pts=Object.entries(x.p).sort((a,b)=>a[0].localeCompare(b[0]));return {nombre:x.nombre,a:pts[0][1],b:Math.max(...pts.map(q=>q[1])),n:pts.length}})}
+  kg.sort((a,b)=>(b.b-b.a)/b.a-(a.b-a.a)/a.a);
+  const fuerzaPct=kg.length?+(kg.reduce((s2,k)=>s2+(k.b-k.a)/k.a,0)/kg.length*100).toFixed(1):null;
+  const carga=P.flatMap((q,i)=>q.cargaSem.map(c=>({...c,p:i})));
+  const a=activaDe(e.id);
+  const sub=[e.grupo,e.estimulos?`${e.estimulos} entrenamientos por semana`:'',a?'Rutina: '+a.nombre:''].filter(Boolean).join(' · ');
+  const vacio=!P.some(q=>q.hechos||q.carga||q.bien.n)&&!kg.length?'Todavía no hay datos anotados en el link para este período.':'';
+  return {titulo:two?`Comparativa: ${mesLbl(ms[0])} vs ${mesLbl(ms[1])}`:`Resumen de ${mesLbl(M)}`,sub,periodos:P,kg,kgLbls:['Primer registro del mes','Máximo del mes'],fuerzaPct,carga,metaSem:Number(e.estimulos)||0,umbral:S.cfg.alertas.acwr,vacio,generado:fmtD(iso(today()))};
+}
+function nombreResumen(e,M,vs){const t=vs?`Comparativa ${[M,vs].sort().map(mesLbl).join(' vs ')}`:`Resumen ${mesLbl(M)}`;return (t+' - '+name(e)).replace(/[\\/:*?"<>|]+/g,' ')+'.pdf'}
+function descargarReportes(ids,M,vs){
   const es=ids.map(id=>S.ents[id]).filter(Boolean);if(!es.length){toast('Elegí al menos un entrenado');return}
+  if(vs&&vs===M){toast('Elegí dos meses distintos para comparar');return}
   try{
-    const files=es.map(e=>({name:RutinaPDF.reporteName(e,mesLbl(M)),data:RutinaPDF.reporte(e,reporteData(e,M))}));
-    if(files.length===1){RutinaPDF.download(files[0].data,files[0].name,'application/pdf');toast('Reporte descargado');return}
-    RutinaPDF.download(RutinaPDF.zip(files),`Reportes ${mesLbl(M)}.zip`,'application/zip');toast(`${files.length} reportes descargados en un .zip`);
-  }catch(err){console.error(err);toast('No se pudo generar el reporte')}
+    const files=es.map(e=>({name:nombreResumen(e,M,vs),data:RutinaPDF.resumen(e,resumenData(e,M,vs))}));
+    if(files.length===1){RutinaPDF.download(files[0].data,files[0].name,'application/pdf');toast('Hoja resumen descargada');return}
+    RutinaPDF.download(RutinaPDF.zip(files),`${vs?'Comparativas':'Resumenes'} ${mesLbl(M)}.zip`,'application/zip');toast(`${files.length} hojas descargadas en un .zip`);
+  }catch(err){console.error(err);toast('No se pudo generar la hoja resumen')}
 }
 
 /* ----- rutinas sin terminar ----- */
@@ -787,8 +803,12 @@ function fichaRutinasHTML(e){
     ${cargaFichaHTML(e,a)}
     ${regs.length?`<div class="pad" style="border-top:1px solid var(--line);padding-bottom:4px"><b style="font-size:14px">Últimas cargas anotadas por el entrenado</b></div><ul class="timeline">${regs.map(r=>String(r.item).startsWith('asis:')?`<li><span class="d">${fmtShort(r.fecha)}</span><span class="t">✓ Marcó ${esc(r.nombre||'el día')} como hecho</span><span></span></li>`:`<li><span class="d">${fmtShort(r.fecha)}</span><span class="t">${esc(r.nombre||itemName(r.item))}: <b>${esc(r.kg||'—')}${r.kg?' kg':''}</b>${r.reps?' × '+esc(r.reps):''}${r.cansancio?` · cansancio ${r.cansancio}`:''}${r.nota?' · '+esc(r.nota):''}</span><span></span></li>`).join('')}</ul>`:''}
   </div>
-  <div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Reporte mensual en PDF</div></div><p class="hint" style="margin:4px 0 8px">Asistencia y progreso de kg${S.regs.some(r=>r.entrenadoId===e.id&&(r.tipo==='carga'||r.tipo==='bien'))?', carga y bienestar':''} del mes elegido.</p>
-    <div class="actions"><select id="rep-mes" class="search" style="flex:0 1 200px">${mesesList().slice().reverse().map(k=>`<option value="${k}">${mesLbl(k)}</option>`).join('')}</select><button class="btn" type="button" id="rep-go">Descargar reporte</button></div></div>
+  ${(()=>{const ms=mesesDe(e);const def=ms.includes(mesShift(curMes(),-1))?mesShift(curMes(),-1):ms[0];const vs=ms.find(k=>k<def)||ms.find(k=>k!==def)||'';
+    return `<div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Hoja resumen en PDF (a color)</div></div><p class="hint" style="margin:4px 0 8px">Asistencia, fuerza, carga y bienestar con gráficos y una explicación de cada dato. No incluye pagos.</p>
+    <div class="actions" style="align-items:center"><select id="rep-tipo" class="search" style="flex:0 1 220px"><option value="mes">Resumen del mes</option><option value="comp">Comparativa entre dos meses</option></select>
+    <select id="rep-mes" class="search" style="flex:0 1 170px">${ms.map(k=>`<option value="${k}" ${k===def?'selected':''}>${mesLbl(k)}</option>`).join('')}</select>
+    <span id="rep-vsw" hidden style="display:flex;gap:6px;align-items:center">vs <select id="rep-vs" class="search" style="flex:0 1 170px">${ms.map(k=>`<option value="${k}" ${k===vs?'selected':''}>${mesLbl(k)}</option>`).join('')}</select></span>
+    <button class="btn pri" type="button" id="rep-go">Descargar</button></div></div>`})()}
   <div class="card"><div class="pad" style="padding-bottom:4px"><b>Marcas (RM)</b><p class="hint">Los kg de los ejercicios con % se calculan con estas marcas, redondeando a ${S.cfg.redondeo||2.5} kg. Los grises se calculan solos.</p></div>
     <form id="rmf" class="pad form cols3" style="padding-top:6px">${(S.cfg.rmDefs||[]).map(d=>{const own=(e.rm||{})[d.mov];const der=!own&&rmValue(e,d.mov);return `<label>${esc(titleCase(d.mov))}<input data-rm="${esc(d.mov)}" type="number" min="0" step="0.5" value="${esc(own??'')}" placeholder="${der?String(+der.toFixed(1)):''}"></label>`}).join('')}
       <div class="full actions"><button class="btn" type="submit">Guardar marcas</button></div></form></div>`;
@@ -812,7 +832,8 @@ function cargaFichaHTML(e,a){
   return h;
 }
 function bindFichaRutinas(e){
-  const rg=$('#rep-go');if(rg)rg.addEventListener('click',()=>descargarReportes([e.id],$('#rep-mes').value));
+  const rg=$('#rep-go');if(rg){const tp=$('#rep-tipo');tp.addEventListener('change',()=>{$('#rep-vsw').hidden=tp.value!=='comp'});
+    rg.addEventListener('click',()=>descargarReportes([e.id],$('#rep-mes').value,tp.value==='comp'?$('#rep-vs').value:null))}
   const cp=$('#portal-copy');if(cp)cp.addEventListener('click',()=>{const u=$('#portal-url').value;const p=navigator.clipboard?.writeText(u);if(p)p.then(()=>toast('Link copiado'),()=>{$('#portal-url').select()});else $('#portal-url').select()});
   const gen=$('#portal-gen');if(gen)gen.addEventListener('click',async()=>{if(await ensureToken(e)){toast('Link creado');renderSheet()}});
   const rmf=$('#rmf');if(rmf)rmf.addEventListener('submit',async ev=>{ev.preventDefault();const rm={};rmf.querySelectorAll('[data-rm]').forEach(i=>{const v=Number(i.value);if(v>0)rm[i.dataset.rm]=v});
@@ -910,7 +931,7 @@ function descargarPDFs(ids){
 function imprimirHTML(){
   const P=S.pr=S.pr||{sel:new Set(),f:'activa',g:'',q:'',modo:'rutinas',selR:new Set(),mes:null};
   P.selR=P.selR||new Set();P.modo=P.modo||'rutinas';
-  const modos=`<div class="chips" style="margin-bottom:10px">${[['rutinas','Rutinas'],['reportes','Reportes mensuales']].map(([k,l])=>`<button class="chip" data-prmodo="${k}" aria-pressed="${P.modo===k}">${l}</button>`).join('')}</div>`;
+  const modos=`<div class="chips" style="margin-bottom:10px">${[['rutinas','Rutinas'],['reportes','Hojas resumen']].map(([k,l])=>`<button class="chip" data-prmodo="${k}" aria-pressed="${P.modo===k}">${l}</button>`).join('')}</div>`;
   if(P.modo==='reportes')return modos+reportesHTML(P);
   const grupos=[...new Set(Object.values(S.ents).map(e=>e.grupo).filter(Boolean))].sort();
   const q=keyN(P.q);
@@ -928,16 +949,19 @@ function imprimirHTML(){
   <div class="card">${list.length?`<ul class="alist">${list.map(r=>{const e=S.ents[r.entrenadoId];return `<li><label style="display:flex;gap:10px;align-items:center;flex:1;min-width:0;cursor:pointer"><input type="checkbox" data-prsel="${esc(r._id)}" ${P.sel.has(r._id)?'checked':''}><span style="min-width:0"><b>${esc(name(e))}</b> <span class="pill ${r.estado==='activa'?'p-ok':'p-warn'}">${r.estado==='activa'?'Activa':'En cola'}</span><br><span class="hint">${esc(r.nombre||'Rutina')} · ${diasDe(r)} días${e.grupo?' · '+esc(e.grupo):''}</span></span></label><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(r._id)}">PDF</button></li>`}).join('')}</ul>`:'<div class="empty">No hay rutinas con ese filtro.</div>'}</div>`;
 }
 function reportesHTML(P){
-  const ms=mesesList().slice().reverse();if(!P.mes||!ms.includes(P.mes))P.mes=ms.find(k=>k<curMes())||ms[0];
+  const ms=[...new Set([...mesesList(),...S.regs.map(r=>(r.fecha||'').slice(0,7)).filter(Boolean)])].filter(k=>k<=curMes()).sort().reverse();if(!P.mes||!ms.includes(P.mes))P.mes=ms.find(k=>k<curMes())||ms[0];
+  P.tipo=P.tipo||'mes';if(!P.vs||P.vs===P.mes)P.vs=ms.find(k=>k<P.mes)||ms.find(k=>k!==P.mes)||'';
   const grupos=[...new Set(Object.values(S.ents).map(e=>e.grupo).filter(Boolean))].sort();const q=keyN(P.q);
   const list=Object.values(S.ents).filter(isAct).filter(e=>!P.g||e.grupo===P.g).filter(e=>!q||keyN(e.nombre).includes(q)).sort((a,b)=>name(a).localeCompare(name(b),'es'));
   S._prList=list.map(e=>e.id);const n=P.selR.size;
   const act=e=>{const r=S.regs.filter(x=>x.entrenadoId===e.id&&x.fecha&&x.fecha.startsWith(P.mes));return {a:new Set(r.filter(x=>String(x.item).startsWith('asis:')).map(x=>x.fecha+x.item)).size,k:r.filter(x=>!especial(x)&&parseFloat(x.kg)>0).length}};
-  return `<p class="hint" style="margin:0 0 10px">Un PDF por entrenado con asistencia, progreso de kg y, si los usa, carga y bienestar. No incluye datos de pagos. Si elegís varios, se descargan juntos en un .zip.</p>
+  return `<p class="hint" style="margin:0 0 10px">Una hoja A4 a color por entrenado con asistencia, fuerza, carga y bienestar, cada dato con su explicación. No incluye pagos. Si elegís varios, se descargan juntos en un .zip.</p>
+  <div class="chips" style="margin-bottom:10px">${[['mes','Resumen del mes'],['comp','Comparativa entre dos meses']].map(([k,l])=>`<button class="chip" data-prtipo="${k}" aria-pressed="${P.tipo===k}">${l}</button>`).join('')}</div>
   <div class="toolbar"><input id="pr-q" class="search" type="search" placeholder="Buscar entrenado" value="${esc(P.q)}" autocomplete="off">
     <select id="pr-mes" class="search" style="flex:0 1 200px">${ms.map(k=>`<option value="${k}" ${k===P.mes?'selected':''}>${mesLbl(k)}</option>`).join('')}</select>
+    ${P.tipo==='comp'?`<span style="display:flex;gap:6px;align-items:center">vs <select id="pr-vs" class="search" style="flex:0 1 200px">${ms.filter(k=>k!==P.mes).map(k=>`<option value="${k}" ${k===P.vs?'selected':''}>${mesLbl(k)}</option>`).join('')}</select></span>`:''}
     ${grupos.length?`<select id="pr-g" class="search" style="flex:0 1 200px"><option value="">Todos los grupos</option>${grupos.map(g=>`<option ${g===P.g?'selected':''}>${esc(g)}</option>`).join('')}</select>`:''}</div>
-  <div class="actions" style="margin-bottom:10px;align-items:center"><button class="btn" data-prall="1">Seleccionar los ${list.length}</button><button class="btn" data-prnone="1">Ninguno</button><button class="btn pri" data-prgo="1" ${n?'':'disabled'} style="margin-left:auto">Descargar reportes (${n})</button></div>
+  <div class="actions" style="margin-bottom:10px;align-items:center"><button class="btn" data-prall="1">Seleccionar los ${list.length}</button><button class="btn" data-prnone="1">Ninguno</button><button class="btn pri" data-prgo="1" ${n?'':'disabled'} style="margin-left:auto">Descargar hojas (${n})</button></div>
   <div class="card">${list.length?`<ul class="alist">${list.map(e=>{const x=act(e);return `<li><label style="display:flex;gap:10px;align-items:center;flex:1;min-width:0;cursor:pointer"><input type="checkbox" data-prsel="${esc(e.id)}" ${P.selR.has(e.id)?'checked':''}><span style="min-width:0"><b>${esc(name(e))}</b><br><span class="hint">${x.a} entrenamientos marcados · ${x.k} cargas de kg${e.grupo?' · '+esc(e.grupo):''}</span></span></label></li>`}).join('')}</ul>`:'<div class="empty">No hay entrenados con ese filtro.</div>'}</div>`;
 }
 function bindImprimir(){
@@ -946,13 +970,15 @@ function bindImprimir(){
   const g=$('#pr-g');if(g)g.addEventListener('change',()=>{P.g=g.value;renderRutinas()});
   const sel=()=>P.modo==='reportes'?P.selR:P.sel;
   const pm=$('#pr-mes');if(pm)pm.addEventListener('change',()=>{P.mes=pm.value;renderRutinas()});
-  el.onchange=ev=>{const c=ev.target.closest('[data-prsel]');if(!c)return;c.checked?sel().add(c.dataset.prsel):sel().delete(c.dataset.prsel);const b=el.querySelector('[data-prgo]');const n=sel().size;b.textContent=P.modo==='reportes'?`Descargar reportes (${n})`:`Descargar PDF (${n})`;b.disabled=!n};
+  const pv=$('#pr-vs');if(pv)pv.addEventListener('change',()=>{P.vs=pv.value});
+  el.onchange=ev=>{const c=ev.target.closest('[data-prsel]');if(!c)return;c.checked?sel().add(c.dataset.prsel):sel().delete(c.dataset.prsel);const b=el.querySelector('[data-prgo]');const n=sel().size;b.textContent=P.modo==='reportes'?`Descargar hojas (${n})`:`Descargar PDF (${n})`;b.disabled=!n};
   el.onclick=ev=>{let b;
-    if(b=ev.target.closest('[data-prmodo]')){P.modo=b.dataset.prmodo;P.q='';renderRutinas()}
+    if(b=ev.target.closest('[data-prtipo]')){P.tipo=b.dataset.prtipo;renderRutinas()}
+    else if(b=ev.target.closest('[data-prmodo]')){P.modo=b.dataset.prmodo;P.q='';renderRutinas()}
     else if(b=ev.target.closest('[data-prf]')){P.f=b.dataset.prf;renderRutinas()}
     else if(ev.target.closest('[data-prall]')){(S._prList||[]).forEach(id=>sel().add(id));renderRutinas()}
     else if(ev.target.closest('[data-prnone]')){sel().clear();renderRutinas()}
-    else if(ev.target.closest('[data-prgo]')){P.modo==='reportes'?descargarReportes([...P.selR],P.mes):descargarPDFs([...P.sel])}};
+    else if(ev.target.closest('[data-prgo]')){P.modo==='reportes'?descargarReportes([...P.selR],P.mes,P.tipo==='comp'?P.vs:null):descargarPDFs([...P.sel])}};
 }
 
 /* ----- copiar rutina de otro entrenado ----- */

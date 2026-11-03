@@ -12,11 +12,16 @@ function fit(s,maxW,size,bold,minSize){s=String(s??'');let z=size;while(z>minSiz
   if(tw(s,z,bold)<=maxW)return {s,z};let t=s;while(t.length>1&&tw(t+'…',z,bold)>maxW)t=t.slice(0,-1);return {s:t+'…',z}}
 function wrap(s,maxW,size,bold){const words=String(s??'').split(/\s+/).filter(Boolean),lines=[];let cur='';
   for(const w of words){const t=cur?cur+' '+w:w;if(tw(t,size,bold)<=maxW)cur=t;else{if(cur)lines.push(cur);cur=w}}if(cur)lines.push(cur);return lines}
+const hex=c=>{c=c.replace('#','');return [0,2,4].map(i=>parseInt(c.slice(i,i+2),16)/255)};
+const col=(c,f)=>{if(c==null)return '';if(typeof c==='string')c=hex(c);if(Array.isArray(c))return c.map(v=>v.toFixed(3)).join(' ')+(f?' rg ':' RG ');return c.toFixed(2)+(f?' g ':' G ')};
 function Page(){const ops=[];const y=v=>(H-v).toFixed(2);
   return {ops,
-    text(x,top,s,size,bold,gray){ops.push(`BT /${bold?'F2':'F1'} ${size.toFixed(2)} Tf ${(gray??0).toFixed(2)} g ${x.toFixed(2)} ${y(top)} Td (${enc(s)}) Tj ET`)},
-    rect(x,top,w,h,fill,stroke,lw){ops.push(`${(lw??0.5).toFixed(2)} w ${fill!=null?fill.toFixed(2)+' g ':''}${stroke!=null?stroke.toFixed(2)+' G ':''}${x.toFixed(2)} ${y(top+h)} ${w.toFixed(2)} ${h.toFixed(2)} re ${fill!=null&&stroke!=null?'B':fill!=null?'f':'S'}`)},
-    line(x1,t1,x2,t2,lw,gray){ops.push(`${lw.toFixed(2)} w ${(gray??0).toFixed(2)} G ${x1.toFixed(2)} ${y(t1)} m ${x2.toFixed(2)} ${y(t2)} l S`)}}}
+    text(x,top,s,size,bold,gray){ops.push(`BT /${bold?'F2':'F1'} ${size.toFixed(2)} Tf ${col(gray??0,true)}${x.toFixed(2)} ${y(top)} Td (${enc(s)}) Tj ET`)},
+    rect(x,top,w,h,fill,stroke,lw){ops.push(`${(lw??0.5).toFixed(2)} w ${col(fill,true)}${col(stroke,false)}${x.toFixed(2)} ${y(top+h)} ${w.toFixed(2)} ${h.toFixed(2)} re ${fill!=null&&stroke!=null?'B':fill!=null?'f':'S'}`)},
+    line(x1,t1,x2,t2,lw,gray){ops.push(`${lw.toFixed(2)} w ${col(gray??0,false)}${x1.toFixed(2)} ${y(t1)} m ${x2.toFixed(2)} ${y(t2)} l S`)},
+    poly(pts,fill,stroke,lw,close){if(!pts.length)return;ops.push(`${(lw??0.5).toFixed(2)} w 1 J 1 j ${col(fill,true)}${col(stroke,false)}${pts.map((p,i)=>`${p[0].toFixed(2)} ${y(p[1])} ${i?'l':'m'}`).join(' ')} ${close===false?'':'h '}${fill!=null&&stroke!=null?'B':fill!=null?'f':'S'}`)},
+    arc(cx,cy,r0,r1,a0,a1,fill){const n=Math.max(6,Math.ceil(Math.abs(a1-a0)/0.08));const pts=[];for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n;pts.push([cx+r1*Math.cos(a),cy+r1*Math.sin(a)])}
+      for(let i=n;i>=0;i--){const a=a0+(a1-a0)*i/n;pts.push([cx+r0*Math.cos(a),cy+r0*Math.sin(a)])}this.poly(pts,fill,null)}}}
 function pdfBytes(pages,title){
   const objs=[];const add=s=>{objs.push(s);return objs.length};
   const f1=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
@@ -147,6 +152,98 @@ function zip(files){
   const end=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cs),...u32(off),...u16(0)]);
   const all=[...parts,...central,end];const tot=all.reduce((a,b)=>a+b.length,0);const out=new Uint8Array(tot);let p=0;for(const a of all){out.set(a,p);p+=a.length}return out;
 }
+/* ===== Hoja resumen a color (1 período o comparativa de 2) ===== */
+function resumen(e,D){
+  const C={navy:'#17306E',ink:'#16202B',muted:'#5F6B7A',line:'#D5DBE5',soft:'#F2F5FA',p1:'#A9B7D3',p2:'#2148B8',ok:'#1E9E5A',okS:'#E3F4EA',warn:'#E0A100',bad:'#D64545',badS:'#FBE4E4',white:'#FFFFFF',pie:['#7CC4A0','#F2C14E','#EE8B3A','#D64545'],sc:['#E46A6A','#F09A5A','#F2C94C','#7DC37A']};
+  const p=Page();const CW=W-2*M;const P=D.periodos,two=P.length===2;const col=i=>two?(i?C.p2:C.p1):C.p2;
+  const T=(x,y,s,z,b,c)=>p.text(x,y,String(s),z,b,c??C.ink);const TR=(x,y,s,z,b,c)=>T(x-tw(String(s),z,b),y,s,z,b,c);const TC=(x,y,s,z,b,c)=>T(x-tw(String(s),z,b)/2,y,s,z,b,c);
+  const circ=(cx,cy,r)=>{const o=[];for(let i=0;i<24;i++){const a=i/24*Math.PI*2;o.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}return o};
+  const card=(x,y,w,h,t,desc)=>{p.rect(x,y,w,h,C.white,C.line,0.8);T(x+12,y+17,t.toUpperCase(),8.2,true,C.navy);if(!desc)return 0;const L=wrap(desc,w-24,6.9,false);L.forEach((l,i)=>T(x+12,y+28+i*8.4,l,6.9,false,C.muted));return L.length*8.4};
+  const fmtK=v=>v>=1000?(v/1000).toFixed(1)+'k':String(Math.round(v));
+  const badge=(x,y,dl,suf)=>{const up=dl>=0;const t=(up?'+':'-')+Math.abs(dl)+suf;const bw=tw(t,8,true)+20;p.rect(x-bw,y,bw,13,up?C.okS:C.badS,null);const ax=x-bw+6,ay=y+9.5;
+    if(up)p.poly([[ax,ay],[ax+6,ay],[ax+3,ay-5]],C.ok);else p.poly([[ax,ay-5],[ax+6,ay-5],[ax+3,ay]],C.bad);T(ax+9,ay,t,8,true,up?C.ok:C.bad)};
+  // encabezado
+  p.rect(0,0,W,76,C.navy,null);
+  const nm=fit(tc(e.nombre).toUpperCase(),CW-170,22,true,13);T(M,32,nm.s,nm.z,true,C.white);
+  T(M,49,D.titulo,11.5,true,'#C9D6F5');const sb=fit(D.sub,CW-170,8.4,false,6);T(M,64,sb.s,sb.z,false,'#AFC0E8');
+  if(two)P.forEach((q,i)=>{const x=W-M-150+i*80;p.rect(x,26,10,10,col(i),'#FFFFFF',0.8);const f=fit(q.corto,62,9,true,6);T(x+15,35,f.s,f.z,true,C.white)});
+  const tel=fmtTel(e.telefono);if(tel)TR(W-M,two?60:35,'Tel: '+tel,8.2,true,'#C9D6F5');
+  let y=88;const L=P[P.length-1],F=P[0];
+  // KPIs
+  const kw=(CW-30)/4;
+  const kp=[
+    ['Entrenamientos',String(L.hechos),L.meta?`de ${L.meta}`:'',two?`${F.corto}: ${F.hechos}`:'marcados en el link',two?L.hechos-F.hechos:null,''],
+    ['Fuerza promedio',D.fuerzaPct==null?'—':`${D.fuerzaPct>=0?'+':''}${D.fuerzaPct}%`,'',D.kg.length?`kg máximos · ${D.kg.length} ejercicios`:'sin kg anotados',null,''],
+    ['Carga del mes',L.carga?fmtK(L.carga):'—',L.carga?'min × esfuerzo':'',two?`${F.corto}: ${F.carga?fmtK(F.carga):'—'}`:(L.sesiones?`${L.sesiones} sesiones anotadas`:'sin sesiones anotadas'),two&&F.carga&&L.carga?Math.round((L.carga-F.carga)/F.carga*100):null,'%'],
+    ['Bienestar',L.bien.n?String(L.bien.tot):'—',L.bien.n?'de 15':'',two?`${F.corto}: ${F.bien.n?F.bien.tot:'—'}`:(L.bien.n?`${L.bien.n} respuestas`:'sin respuestas'),two&&F.bien.n&&L.bien.n?+(L.bien.tot-F.bien.tot).toFixed(1):null,'']];
+  kp.forEach(([l,v,u,s2,dl,suf],i)=>{const x=M+i*(kw+10);p.rect(x,y,kw,58,C.white,C.line,0.8);T(x+12,y+15,l.toUpperCase(),7.4,true,C.muted);T(x+12,y+38,v,20,true);if(u)T(x+14+tw(v,20,true),y+38,u,8,false,C.muted);
+    const f=fit(s2,kw-(dl!=null?78:24),7.6,false,5.5);T(x+12,y+51,f.s,f.z,false,C.muted);if(dl!=null)badge(x+kw-10,y+41,dl,suf)});
+  y+=68;
+  // asistencia
+  const ah=146;const d1=card(M,y,190,ah,'Cumplimiento del mes','Días que marcaste como hechos sobre los que te tocaban en el mes. La constancia es lo que más influye en tus resultados.');
+  const d2=card(M+200,y,CW-200,ah,'Entrenamientos por semana','Cuántos días entrenaste cada semana. La línea verde es tu meta según tu plan: sostenerla es lo que te hace progresar.');
+  P.forEach((q,i)=>{const R=27,r=19,cx=two?M+52+i*86:M+95,cy=y+32+d1+R+2;const f=q.meta?Math.min(1,q.hechos/q.meta):0;
+    p.arc(cx,cy,r,R,0,Math.PI*2,C.soft);if(f>0)p.arc(cx,cy,r,R,-Math.PI/2,-Math.PI/2+Math.PI*2*f,col(i));
+    TC(cx,cy+5,q.meta?Math.round(q.hechos/q.meta*100)+'%':'—',12.5,true);TC(cx,y+ah-18,q.corto,8.4,true,C.muted);TC(cx,y+ah-8,`${q.hechos} de ${q.meta||'?'}`,7.6,false,C.muted)});
+  {const x0=M+222,bw=CW-200-44,top=y+34+d2,hh=ah-34-d2-24;const n=Math.max(...P.map(q=>q.semanas.length));const gw=bw/Math.max(1,n);
+   const mx=Math.max(D.metaSem||0,...P.flatMap(q=>q.semanas.map(s=>s.v)),1)+1;
+   for(let v=0;v<=mx;v++){const yy=top+hh-v/mx*hh;p.line(x0,yy,x0+bw,yy,0.4,C.line);TR(x0-5,yy+3,v,7,false,C.muted)}
+   if(D.metaSem){const gy=top+hh-D.metaSem/mx*hh;p.line(x0,gy,x0+bw,gy,1,C.ok);TR(x0+bw,gy-4,'Meta '+D.metaSem,7.4,true,C.ok)}
+   for(let i=0;i<n;i++){const b=two?gw*0.3:gw*0.5,gx=x0+i*gw+(gw-(two?2*b+3:b))/2;P.forEach((q,j)=>{const v=q.semanas[i]?.v;if(v==null)return;const hx=gx+(two?j*(b+3):0);const h=v/mx*hh;if(h>0)p.rect(hx,top+hh-h,b,h,col(j),null);TC(hx+b/2,top+hh-h-3,v,7.6,true,two&&!j?C.muted:C.ink)});
+     TC(x0+i*gw+gw/2,top+hh+13,two?'Semana '+(i+1):(P[0].semanas[i]?.lbl||''),7.4,false,C.muted)}}
+  y+=ah+10;
+  // fuerza
+  if(D.kg.length){const rows=D.kg.slice(0,8);const kh=44+rows.length*19;
+    const d3=card(M,y,CW,kh,two?'Progreso de fuerza · kg máximo de cada mes':'Progreso de fuerza en el mes',two?'El kg más alto que anotaste en cada ejercicio en cada mes. Si sube, tu fuerza está mejorando; por eso es clave anotar siempre lo que usás.':'Tu primer registro del mes contra el máximo que alcanzaste. Si sube, tu fuerza está mejorando; por eso es clave anotar siempre lo que usás.');
+    const x0=M+130,bw=CW-130-90,mx=Math.max(...rows.map(k=>Math.max(k.a,k.b)))*1.05;let yy=y+30+d3;
+    if(!two){[[D.kgLbls[0],C.p1],[D.kgLbls[1],C.p2]].forEach(([l,c],i)=>{const lx=M+CW-230+i*112;p.rect(lx,y+10,8,8,c,null);T(lx+11,y+17,l,7.2,false,C.muted)})}
+    rows.forEach(k=>{const n=fit(k.nombre,115,8.8,true,6);T(M+12,yy+12,n.s,n.z,true);
+      p.rect(x0,yy+1,bw*k.a/mx,7,C.p1,null);T(x0+bw*k.a/mx+4,yy+7.5,k.a+' kg',7,false,C.muted);
+      p.rect(x0,yy+9.5,bw*k.b/mx,8,C.p2,null);T(x0+bw*k.b/mx+4,yy+16.5,k.b+' kg',7.4,true);
+      const d=+(k.b-k.a).toFixed(1);const t=(d>0?'+':'')+d+' kg';const w2=tw(t,8.4,true)+12;p.rect(M+CW-12-w2,yy+2,w2,15,d>0?C.okS:d<0?C.badS:C.soft,null);T(M+CW-6-w2,yy+13,t,8.4,true,d>0?C.ok:d<0?C.bad:C.muted);yy+=19});
+    y+=kh+10}
+  // carga + rpe
+  const hayC=D.carga.length&&D.carga.some(c=>c.v);
+  if(hayC){const ch=164;
+    const d4=card(M,y,CW*0.6,ch,'Carga semanal (minutos × esfuerzo)','Minutos de la sesión × qué tan dura fue (1 a 10), sumado por semana. Subir de a poco mejora tu rendimiento; un salto brusco aumenta el riesgo de lesión.');
+    const d5=card(M+CW*0.6+10,y,CW*0.4-10,ch,'Esfuerzo de las sesiones','Cómo calificaste cada sesión al terminarla. Alternar sesiones duras y suaves te permite recuperarte y rendir más.');
+    const x0=M+40,bw=CW*0.6-56,top=y+36+d4,hh=ch-36-d4-34,n=D.carga.length,gw=bw/n;const mx=Math.max(...D.carga.map(c=>c.v))*1.15||1;
+    const st=mx>3000?1000:500;for(let v=0;v<=mx;v+=st){const yy=top+hh-v/mx*hh;p.line(x0,yy,x0+bw,yy,0.4,C.line);TR(x0-4,yy+3,v?fmtK(v):'0',7,false,C.muted)}
+    D.carga.forEach((c,i)=>{const a=c.acwr;const cc=a==null?C.p1:a>D.umbral?C.bad:a>1.3?C.warn:a<0.8?C.p1:C.ok;const h=c.v/mx*hh,bx=x0+i*gw+gw*0.15,b=gw*0.7;if(h>0)p.rect(bx,top+hh-h,b,h,cc,null);
+      TC(bx+b/2,top+hh-h-3,c.v?fmtK(c.v):'0',6.8,true);TC(bx+b/2,top+hh+11,c.lbl,6.4,false,C.muted);
+      if(two&&i>0&&D.carga[i-1].p!==c.p){const sx=x0+i*gw-1;p.line(sx,top-4,sx,top+hh,0.8,C.muted);T(sx+3,top+4,P[c.p].corto,7,true,C.muted);TR(sx-3,top+4,P[D.carga[i-1].p].corto,7,true,C.muted)}});
+    const ly=y+ch-12;[['Adecuada',C.ok],['En aumento',C.warn],['Muy alta',C.bad],['Baja o sin historial',C.p1]].forEach(([l,c],i)=>{const lx=x0+[0,62,128,190][i];p.rect(lx,ly-7,8,8,c,null);T(lx+12,ly,l,7.2,false,C.muted)});
+    const area=M+CW*0.6+10,aw=CW*0.4-10,lbls=['Suave (1-4)','Moderada (5-6)','Dura (7-8)','Máxima (9-10)'];
+    if(two){P.forEach((q,i)=>{const R=27,r=16,cx=area+44+i*80,cy=y+36+d5+R+4;const tot=q.rpe.reduce((a,b)=>a+b,0);let a=-Math.PI/2;
+        if(tot)q.rpe.forEach((v,k)=>{const da=v/tot*Math.PI*2;if(da>0)p.arc(cx,cy,r,R,a,a+da,C.pie[k]);a+=da});else p.arc(cx,cy,r,R,0,Math.PI*2,C.soft);
+        TC(cx,cy+4,tot,10.5,true);TC(cx,cy+R+11,q.corto,7.6,true,C.muted)});
+      lbls.forEach((l,k)=>{const lx=area+12+(k%2)*(aw/2-6),ly2=y+ch-24+Math.floor(k/2)*11;p.rect(lx,ly2-7,8,8,C.pie[k],null);T(lx+11,ly2,l,6.8,false,C.muted)})}
+    else{const q=P[0],R=40,r=23,cx=area+58,cy=y+34+d5+(ch-34-d5)/2;const tot=q.rpe.reduce((a,b)=>a+b,0);let a=-Math.PI/2;
+      if(tot)q.rpe.forEach((v,k)=>{const da=v/tot*Math.PI*2;if(da>0)p.arc(cx,cy,r,R,a,a+da,C.pie[k]);a+=da});else p.arc(cx,cy,r,R,0,Math.PI*2,C.soft);
+      TC(cx,cy+2,tot,14,true);TC(cx,cy+12,'sesiones',6.8,false,C.muted);
+      lbls.forEach((l,k)=>{const lx=cx+R+12,ly2=cy-30+k*20;p.rect(lx,ly2-8,9,9,C.pie[k],null);T(lx+13,ly2,l,7.8,true);T(lx+13,ly2+9,`${q.rpe[k]} · ${tot?Math.round(q.rpe[k]/tot*100):0}%`,7.2,false,C.muted)})}
+    y+=ch+10}
+  // bienestar
+  if(P.some(q=>q.bien.n)){const wh=Math.min(150,H-M-24-y);
+    const d6=card(M,y,CW,wh,'Bienestar mensual (promedio, escala de 1 a 5)','Promedio de lo que respondés antes de entrenar. Dormir mal, llegar dolorido o estresado baja tu rendimiento: con este dato ajustamos la carga de cada día.');
+    const x0=M+108,bw=CW*0.40,seg=bw/4;
+    [['sueno','Sueño'],['cuerpo','Cuerpo / dolor'],['animo','Ánimo / estrés']].forEach(([k,l],i)=>{const yy=y+40+d6+i*25;T(M+12,yy+4,l,8.8,true);
+      for(let s2=0;s2<4;s2++)p.rect(x0+s2*seg,yy-3,seg-2,8,C.sc[s2],null);[1,2,3,4,5].forEach(n=>TC(x0+(n-1)*seg,yy+14,n,6.4,false,C.muted));
+      const pos=v=>x0+(v-1)*seg;const vals=P.map(q=>q.bien.n?q.bien[k]:null);
+      vals.forEach((v,j)=>{if(v==null)return;if(two&&!j)p.poly(circ(pos(v),yy+1,5.5),C.white,C.p1,2);else p.poly(circ(pos(v),yy+1,5.5),C.p2,C.white,1.5)});
+      if(two&&vals[0]!=null&&vals[1]!=null){const d=+(vals[1]-vals[0]).toFixed(1);T(x0+bw+14,yy+4,`${vals[0]}  >  ${vals[1]}`,8.6,true);T(x0+bw+66,yy+4,(d>=0?'+':'')+d,8.6,true,d>=0?C.ok:C.bad)}
+      else{const v=vals.filter(x=>x!=null).pop();if(v!=null)T(x0+bw+14,yy+4,v+' de 5',8.6,true)}});
+    if(two){const ly=y+wh-10;p.poly(circ(M+16,ly-3,4),C.white,C.p1,1.6);T(M+24,ly,F.corto,7.4,false,C.muted);p.poly(circ(M+90,ly-3,4),C.p2,null);T(M+98,ly,L.corto,7.4,false,C.muted)}
+    const all=P.flatMap((q,i)=>q.bienSem.map(v=>({v,i}))).filter(x=>x.v!=null);
+    if(all.length>1){const tx=x0+bw+110,tw0=M+CW-14-tx,top=y+42+d6,hh=wh-42-d6-34;T(tx,top-2,'Total semanal (de 15)',7.2,true,C.muted);
+      const lo=Math.max(3,Math.floor(Math.min(...all.map(a=>a.v))-1)),hi=15;const X=i=>tx+8+i*(tw0-8)/(all.length-1),Y=v=>top+8+hh-(v-lo)/(hi-lo)*hh;
+      [lo,Math.round((lo+hi)/2),hi].forEach(v=>{p.line(tx+8,Y(v),tx+tw0,Y(v),0.4,C.line);TR(tx+5,Y(v)+2.5,v,6.4,false,C.muted)});
+      P.forEach((q,j)=>{const pts=[];all.forEach((a,i)=>{if(a.i===j)pts.push([X(i),Y(a.v)])});if(pts.length>1)p.poly(pts,null,col(j),1.8,false);pts.forEach(pt=>p.poly(circ(pt[0],pt[1],2.3),col(j),null))})}
+    y+=wh+10}
+  if(y<H-M-60&&D.vacio)T(M,y+14,D.vacio,8.4,false,C.muted);
+  p.line(M,H-M-10,M+CW,H-M-10,0.5,C.line);T(M,H-M,`Generado el ${D.generado} · Los datos de asistencia, kg, carga y bienestar los anota el entrenado en su link personal.`,6.8,false,C.muted);
+  return pdfBytes([p],D.titulo+' - '+tc(e.nombre));
+}
 /* ===== Reporte mensual ===== */
 function reporte(e,d){
   const p=Page();const CW=W-2*M;let t=M;
@@ -194,5 +291,5 @@ function reporte(e,d){
 function reporteName(e,mesLbl){return ('Reporte '+mesLbl+' - '+tc(e.nombre)).replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim()+'.pdf'}
 function fileName(e,r){return (tc(e.nombre)+' - '+(r.nombre||'Rutina')).replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,90)+'.pdf'}
 function download(bytes,name,type){const blob=new Blob([bytes],{type});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},1500)}
-return {build,zip,fileName,download,fmtTel,reporte,reporteName};
+return {build,zip,fileName,download,fmtTel,reporte,reporteName,resumen,_k:{Page,pdfBytes,tw,fit,wrap,W,H,M,fmtTel,tc}};
 })();
