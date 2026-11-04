@@ -149,10 +149,47 @@ details summary{cursor:pointer;font-weight:600}
 .ej-pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .mas{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:13.5px;padding:0}
 .guardando{font-size:13px;color:var(--muted)}
+/* ===== Timer / Tabata ===== */
+.tmr-fab{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));z-index:20;border:0;background:var(--ink);color:var(--bg);border-radius:999px;padding:13px 18px;font-weight:700;font-size:16px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.bl-tm{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 9px;font-size:13px;font-weight:700;color:var(--ink);margin-left:8px}
+.bl-h .bl-r{display:flex;align-items:center}
+#tmr{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);padding:max(14px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px));overflow:auto}
+#tmr[hidden]{display:none}
+.t-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.t-top h2{font-family:var(--display);font-size:26px;margin:0;text-transform:uppercase;letter-spacing:.02em}
+.t-x{border:0;background:rgba(127,127,127,.18);color:inherit;border-radius:10px;padding:8px 14px;font-weight:700;font-size:15px}
+.t-cfg{max-width:520px;width:100%;margin:12px auto 0;display:flex;flex-direction:column;gap:12px}
+.t-pre{display:flex;gap:6px;flex-wrap:wrap}
+.t-pre button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-weight:600;font-size:14px}
+.t-pre button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.t-row{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.t-row b{font-size:16px}.t-row small{display:block;color:var(--muted);font-size:12.5px}
+.t-st{display:flex;align-items:center;gap:8px}
+.t-st button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);font-size:22px;font-weight:700}
+.t-st output{font-family:var(--display);font-size:30px;font-weight:700;min-width:74px;text-align:center}
+.t-ejs{font-size:14px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.t-tot{text-align:center;color:var(--muted);font-size:14px}
+.t-go{border:0;background:var(--ok);color:#fff;border-radius:14px;padding:16px;font-weight:700;font-size:20px;font-family:var(--display);letter-spacing:.04em;text-transform:uppercase}
+#tmr.run{color:#fff}
+#tmr.run .t-x{background:rgba(255,255,255,.2)}
+#tmr.f-prep{background:#B9770E}#tmr.f-work{background:#1E7A4C}#tmr.f-rest{background:#B42B2B}#tmr.f-fin{background:#2148B8}
+.t-run{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center}
+.t-fase{font-family:var(--display);font-size:clamp(34px,11vw,64px);font-weight:700;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.t-num{font-family:var(--display);font-weight:700;font-size:clamp(150px,52vw,300px);line-height:.95;font-variant-numeric:tabular-nums}
+.t-rnd{font-size:20px;font-weight:600;opacity:.95}
+.t-ej{font-size:clamp(22px,7vw,34px);font-weight:700;margin-top:6px}
+.t-sig{font-size:16px;opacity:.85}
+.t-bar{width:100%;max-width:520px;height:8px;background:rgba(255,255,255,.25);border-radius:99px;overflow:hidden;margin-top:14px}
+.t-bar i{display:block;height:100%;background:#fff}
+.t-ctl{display:flex;justify-content:center;gap:12px;margin-top:10px}
+.t-ctl{width:100%;max-width:520px}
+.t-ctl button{flex:1;border:0;background:rgba(255,255,255,.22);color:#fff;border-radius:14px;padding:14px 8px;font-weight:700;font-size:16px;white-space:nowrap}
+.t-ctl .t-pp{background:#fff;color:#15201D;flex:1.3}
 </style>
 </head>
 <body>
 <header><div class="wrap"><div class="hola" id="hola">Cargando…</div><h1 id="titulo">Mi rutina</h1><div class="meta" id="meta"></div></div></header>
+<div id="tmr" hidden aria-live="polite"></div>
 <main class="wrap" id="main"><div class="card msg"><p class="hint">Cargando tu rutina…</p></div></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
@@ -308,7 +345,7 @@ function render(){
   if(!dia){h+='<div class="card msg"><p class="hint">Esta sección no tiene días cargados.</p></div>'}
   else for(const b of dia.bloques||[]){
     if(!(b.items||[]).length)continue;
-    h+=`<section class="card"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span>${b.series?`<span class="series"><b>${esc(b.series)}</b> series</span>`:''}</div>`;
+    h+=`<section class="card"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span><span class="bl-r">${b.series?`<span class="series"><b>${esc(b.series)}</b> series</span>`:''}<button class="bl-tm" data-tmrbl="${esc(b.uid||'')}" title="Timer para este bloque">⏱</button></span></div>`;
     for(const it of b.items){
       const v=D.videos[it.ej],yt=ytId(v),k=kg(it),last=regsFor(it.uid),hoyReg=last.find(r=>r.fecha===fSel());
       const o=open[it.uid]||{};
@@ -325,7 +362,7 @@ function render(){
     }
     h+='</section>';
   }
-  h+='<p class="hint" style="text-align:center;margin-top:8px">Guardá este link en favoritos o agregalo a la pantalla de inicio.</p>';
+  h+='<p class="hint" style="text-align:center;margin-top:8px">Guardá este link en favoritos o agregalo a la pantalla de inicio.</p><div style="height:60px"></div><button class="tmr-fab" data-tmr="1">⏱ Timer</button>';
   $('#main').innerHTML=h;
 }
 function logHTML(it,hoy,last){
@@ -343,6 +380,8 @@ document.addEventListener('click',ev=>{
   if(b=t.closest('[data-pej]')){progEj=b.dataset.pej;render();return}
   if(b=t.closest('[data-asis]')){marcarAsis(b);return}
   if(b=t.closest('[data-chk]')){tildar(b);return}
+  if(b=t.closest('[data-tmr]')){Timer.abrir(null);return}
+  if(b=t.closest('[data-tmrbl]')){Timer.abrir(b.dataset.tmrbl);return}
   if(b=t.closest('[data-fecha]')){fechaSel=b.dataset.fecha===iso(today())?null:b.dataset.fecha;draft={};editB=false;editC={};render();return}
   if(b=t.closest('[data-bv]')){const f=b.closest('form');f[b.dataset.bv].value=b.dataset.n;f.querySelectorAll(`[data-bv="${b.dataset.bv}"]`).forEach(x=>x.setAttribute('aria-pressed',x===b));return}
   if(b=t.closest('[data-editb]')){editB=true;render();return}
@@ -403,6 +442,61 @@ document.addEventListener('change',async ev=>{
   render();const s2=document.querySelector(`[data-st="${CSS.escape(uid)}"]`);if(s2){s2.textContent='Guardado ✓';setTimeout(()=>{if(s2.isConnected)s2.textContent=''},1500)}
 });
 document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('[data-in]')){ev.preventDefault();ev.target.blur()}});
+const Timer=(()=>{
+  const PRE=[['tabata','Tabata 20/10',{w:20,r:10,n:8}],['4020','40/20',{w:40,r:20,n:8}],['3030','30/30',{w:30,r:30,n:10}],['emom','EMOM 60',{w:60,r:0,n:10}]];
+  let c=Object.assign({w:20,r:10,n:8,p:10,pre:'tabata'},JSON.parse(store.get('tmr')||'{}')),ejs=[],titulo='Timer',fases=[],fi=0,fin=0,rest=0,pausa=false,iv=null,lock=null,ac=null,ultS=-1;
+  const el=()=>$('#tmr');
+  const mmss=s=>{s=Math.max(0,Math.ceil(s));return s>=60?Math.floor(s/60)+':'+pad(s%60):String(s)};
+  const total=()=>c.p+c.n*c.w+Math.max(0,c.n-1)*c.r;
+  function beep(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='square';g.gain.value=.12;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
+  const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+  async function wake(on){try{if(on&&'wakeLock' in navigator)lock=await navigator.wakeLock.request('screen');else if(lock){lock.release();lock=null}}catch(e){}}
+  function abrir(blUid){
+    ejs=[];titulo='Timer';
+    if(blUid){for(const s2 of D.rutina?.secciones||[])for(const d of s2.dias||[])for(const b of d.bloques||[])if(b.uid===blUid){titulo=b.nombre||'Bloque';ejs=(b.items||[]).map(i=>i.nombre).filter(Boolean);const n=parseInt(b.series);if(n>0&&n<=50){const v=Math.min(99,n*Math.max(1,ejs.length));if(v!==c.n){c.n=v;c.pre=''}}}}
+    el().hidden=false;document.body.style.overflow='hidden';cfg()}
+  function cerrar(){stop();el().hidden=true;el().className='';document.body.style.overflow=''}
+  function cfg(){
+    el().className='';
+    const st=(k,l,sub,step,min,max)=>`<div class="t-row"><div><b>${l}</b><small>${sub}</small></div><div class="t-st"><button data-tst="${k}" data-d="${-step}" aria-label="Menos">−</button><output>${k==='n'?c[k]:mmss(c[k])+(c[k]<60?'"':'')}</output><button data-tst="${k}" data-d="${step}" aria-label="Más">+</button></div></div>`;
+    el().innerHTML=`<div class="t-top"><h2>⏱ ${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div>
+    <div class="t-cfg"><div class="t-pre">${PRE.map(([k,l])=>`<button data-tpre="${k}" aria-pressed="${c.pre===k}">${l}</button>`).join('')}</div>
+      ${st('w','Trabajo','segundos de esfuerzo',5,5,600)}${st('r','Descanso','entre rondas (0 = sin pausa)',5,0,600)}${st('n','Rondas','cantidad de intervalos',1,1,99)}${st('p','Preparación','antes de arrancar',5,0,60)}
+      ${ejs.length?`<div class="t-ejs"><b style="color:var(--ink)">Ejercicios en orden:</b> ${ejs.map(esc).join(' → ')}. Van rotando en cada ronda.</div>`:''}
+      <div class="t-tot">Duración total: <b>${mmss(total())} ${total()>=60?'min':'seg'}</b></div>
+      <button class="t-go" data-tgo="1">Empezar</button>
+      <p class="hint" style="text-align:center">Subí el volumen: suena al cambiar de fase y en los últimos 3 segundos.</p></div>`}
+  function armar(){fases=[];if(c.p)fases.push({t:'prep',d:c.p});for(let i=0;i<c.n;i++){fases.push({t:'work',d:c.w,i,ej:ejs.length?ejs[i%ejs.length]:''});if(c.r&&i<c.n-1)fases.push({t:'rest',d:c.r,i,ej:ejs.length?ejs[(i+1)%ejs.length]:''})}}
+  function go(){store.set('tmr',JSON.stringify(c));armar();fi=0;pausa=false;wake(true);beep(660,.08);iniciar(fases[0].d);iv=setInterval(tick,100);dibujar()}
+  function iniciar(d){fin=performance.now()+d*1000;ultS=-1}
+  function stop(){clearInterval(iv);iv=null;wake(false)}
+  function sig(){fi++;if(fi>=fases.length){stop();terminado();return}const f=fases[fi];beep(f.t==='work'?1046:520,f.t==='work'?.35:.25);vib(f.t==='work'?[200,80,200]:300);iniciar(f.d);dibujar()}
+  function tick(){if(pausa)return;const r=(fin-performance.now())/1000;if(r<=0){sig();return}const s=Math.ceil(r);if(s!==ultS){ultS=s;if(s<=3)beep(880,.09);const n=el().querySelector('.t-num');if(n)n.textContent=mmss(r);}
+    const b=el().querySelector('.t-bar i');if(b)b.style.width=(1-r/fases[fi].d)*100+'%'}
+  function dibujar(){const f=fases[fi];const r=pausa?rest:(fin-performance.now())/1000;
+    el().className='run f-'+f.t;
+    const L={prep:'Preparate',work:'¡Trabajo!',rest:'Descanso'}[f.t];
+    el().innerHTML=`<div class="t-top"><h2>${esc(titulo)}</h2><button class="t-x" data-tx="1">Salir</button></div>
+    <div class="t-run"><div class="t-fase">${pausa?'En pausa':L}</div><div class="t-num">${mmss(r)}</div>
+      <div class="t-rnd">${f.t==='prep'?`${c.n} rondas · ${c.w}" / ${c.r}"`:`Ronda ${f.i+1} de ${c.n}`}</div>
+      ${f.ej?`<div class="${f.t==='work'?'t-ej':'t-sig'}">${f.t==='work'?esc(f.ej):'Sigue: '+esc(f.ej)}</div>`:(f.t==='prep'&&ejs.length?`<div class="t-sig">Primero: ${esc(ejs[0])}</div>`:'')}
+      <div class="t-bar"><i style="width:${(1-r/f.d)*100}%"></i></div>
+      <div class="t-ctl"><button data-tctl="reset">↺ Reiniciar</button><button class="t-pp" data-tctl="pp">${pausa?'▶ Seguir':'❚❚ Pausa'}</button><button data-tctl="skip">Saltar ⏭</button></div></div>`}
+  function terminado(){beep(1046,.2);setTimeout(()=>beep(1318,.4),250);vib([300,100,300,100,500]);el().className='run f-fin';
+    el().innerHTML=`<div class="t-top"><h2>${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div><div class="t-run"><div class="t-fase">¡Terminaste!</div><div class="t-rnd">${c.n} rondas · ${mmss(total())} ${total()>=60?'min':'seg'}</div><div class="t-ctl"><button class="t-pp" data-tctl="otra">Otra vez</button><button data-tctl="cfg">Cambiar tiempos</button></div></div>`}
+  document.addEventListener('click',ev=>{const t=ev.target;if(!t.closest||!t.closest('#tmr'))return;let b;
+    if(b=t.closest('[data-tx]')){cerrar();return}
+    if(b=t.closest('[data-tpre]')){const p=PRE.find(x=>x[0]===b.dataset.tpre);Object.assign(c,p[2],{pre:p[0]});cfg();return}
+    if(b=t.closest('[data-tst]')){const k=b.dataset.tst,lim={w:[5,600],r:[0,600],n:[1,99],p:[0,60]}[k];c[k]=Math.min(lim[1],Math.max(lim[0],c[k]+Number(b.dataset.d)));c.pre='';cfg();return}
+    if(b=t.closest('[data-tgo]')){go();return}
+    if(b=t.closest('[data-tctl]')){const a=b.dataset.tctl;
+      if(a==='pp'){if(!pausa){rest=(fin-performance.now())/1000;pausa=true}else{pausa=false;fin=performance.now()+rest*1000}dibujar()}
+      else if(a==='skip'){if(!pausa)sig();else{pausa=false;sig()}}
+      else if(a==='reset'){stop();go()}
+      else if(a==='otra'){go()}else if(a==='cfg'){cfg()}}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iv)wake(true)});
+  return {abrir};
+})();
 function alertMsg(t){const m=document.createElement('div');m.className='aviso';m.textContent=t;document.body.appendChild(m);setTimeout(()=>m.remove(),2600)}
 document.addEventListener('submit',async ev=>{
   const fb=ev.target.closest('[data-bien]'),fc=ev.target.closest('[data-carga]');
