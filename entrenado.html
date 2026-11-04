@@ -388,10 +388,10 @@ function render(){
       const mK=String(vk)!==String(k||''),mR=String(vr)!==String(it.reps||''),ok=!!hoyReg;
       h+=`<div class="ej${ok?' hecho':''}" data-uid="${esc(it.uid)}">
         <div class="ej-top"><button class="chk" data-chk="${esc(it.uid)}" aria-pressed="${ok}" aria-label="${ok?'Hecho. Tocá para desmarcar':'Marcar como hecho'}" title="${ok?'Hecho':'Marcar como hecho'}">✓</button><div class="ej-n">${esc(it.nombre)}</div>${v?`<button class="vbtn" data-video="${esc(it.uid)}" aria-expanded="${!!o.video}">${o.video?'Cerrar':'▶ Video'}</button>`:''}</div>
-        <div class="campos"><label class="campo">Kg<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label>${b.modo==='timer'?'':`<span class="x">×</span><label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="—" class="${mR?'mod':''}" autocomplete="off"></label>`}${it.pct?`<span class="pc">${esc(it.pct)}% de tu máximo</span>`:''}${mK||(mR&&b.modo!=='timer')?`<span class="tag-mod">Cambiado</span>`:''}</div>
+        <div class="campos">${b.modo==='timer'?'':`<label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="—" class="${mR?'mod':''}" autocomplete="off"></label><span class="x">×</span>`}<label class="campo">Kg<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label>${it.pct?`<span class="pc">${esc(it.pct)}% de tu máximo</span>`:''}${mK||(mR&&b.modo!=='timer')?`<span class="tag-mod">Cambiado</span>`:''}</div>
         ${it.notas?`<div class="nota">${esc(it.notas)}</div>`:''}
         ${o.video&&v?(yt?`<div class="video ${yt.short?'v916':'v169'}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(yt.id)}?rel=0&playsinline=1" title="Video de ${esc(it.nombre)}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`:'')+`<a class="yt" href="${esc(v)}" target="_blank" rel="noopener">Abrir en YouTube</a>`:''}
-        <div class="ej-pie">${(()=>{const pv=last.find(r=>r.fecha<fSel());return pv?`<span class="ult">Última vez (${fmt(pv.fecha)}): ${pv.kg?esc(pv.kg)+' kg':''}${pv.reps?' × '+esc(pv.reps):''}${pv.cansancio?' · cansancio '+pv.cansancio:''}</span>`:'<span></span>'})()}<span class="guardando" data-st="${esc(it.uid)}"></span>${o.log?'':`<button class="mas" data-log="${esc(it.uid)}">${hoyReg&&(hoyReg.cansancio||(hoyReg.nota&&hoyReg.nota!=='Hecho'))?'Cansancio / comentario ✓':'+ Cansancio / comentario'}</button>`}</div>
+        <div class="ej-pie">${(()=>{const pv=last.find(r=>r.fecha<fSel());return pv?`<span class="ult">Última vez (${fmt(pv.fecha)}): ${[pv.reps?esc(pv.reps)+' reps':'',pv.kg?esc(pv.kg)+' kg':''].filter(Boolean).join(' × ')}${pv.cansancio?' · cansancio '+pv.cansancio:''}</span>`:'<span></span>'})()}<span class="guardando" data-st="${esc(it.uid)}"></span>${o.log?'':`<button class="mas" data-log="${esc(it.uid)}">${hoyReg&&(hoyReg.cansancio||(hoyReg.nota&&hoyReg.nota!=='Hecho'))?'Cansancio / comentario ✓':'+ Cansancio / comentario'}</button>`}</div>
         ${o.log?logHTML(it,hoyReg,last):''}
       </div>`;
     }
@@ -406,7 +406,7 @@ function logHTML(it,hoy,last){
     <label>Cansancio (opcional, 1 = muy fácil · 10 = máximo)<div class="rpe">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" data-rpe="${n}" aria-pressed="${String(n)===String(c)}">${n}</button>`).join('')}</div><input type="hidden" name="cansancio" value="${esc(c)}"></label>
     <label>Comentario (opcional)<input class="n" name="nota" value="${esc(hoy?.nota&&hoy.nota!=='Hecho'?hoy.nota:'')}" placeholder="Ej: me costó la última serie"></label>
     <div class="log-row"><button class="guardar" type="submit">Guardar y marcar hecho</button><button class="toggle-log" type="button" data-log="${esc(it.uid)}">Cancelar</button><span class="ok" data-ok></span></div>
-    ${last.length>1||(last.length&&!hoy)?`<details><summary class="ult">Historial</summary>${last.slice(0,8).map(r=>`<div class="ult">${fmt(r.fecha)}: ${r.kg?esc(r.kg)+' kg':'—'}${r.reps?' × '+esc(r.reps):''}${r.cansancio?' · cansancio '+r.cansancio:''}${r.nota?' · '+esc(r.nota):''}</div>`).join('')}</details>`:''}
+    ${last.length>1||(last.length&&!hoy)?`<details><summary class="ult">Historial</summary>${last.slice(0,8).map(r=>`<div class="ult">${fmt(r.fecha)}: ${[r.reps?esc(r.reps)+' reps':'',r.kg?esc(r.kg)+' kg':''].filter(Boolean).join(' × ')||'—'}${r.cansancio?' · cansancio '+r.cansancio:''}${r.nota?' · '+esc(r.nota):''}</div>`).join('')}</details>`:''}
   </form>`;
 }
 document.addEventListener('click',ev=>{
@@ -492,7 +492,7 @@ const Timer=(()=>{
   function beep(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='square';g.gain.value=.12;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
   const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
   async function wake(on){try{if(on&&'wakeLock' in navigator)lock=await navigator.wakeLock.request('screen');else if(lock){lock.release();lock=null}}catch(e){}}
-  const carga=x=>[x.kg?esc(x.kg)+' kg':'',x.reps?(x.kg?'× ':'')+esc(x.reps)+(/\d$/.test(x.reps)?' reps':''):''].filter(Boolean).join(' ');
+  const carga=x=>[x.reps?esc(x.reps)+(/\d$/.test(x.reps)?' reps':''):'',x.kg?esc(x.kg)+' kg':''].filter(Boolean).join(' × ');
   function abrir(uid){
     ejs=[];titulo='Timer';plan=false;blUid=null;c=libre;
     if(uid){for(const s2 of D.rutina?.secciones||[])for(const d of s2.dias||[])for(const b of d.bloques||[])if(b.uid===uid){
