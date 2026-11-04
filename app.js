@@ -744,7 +744,7 @@ function faltantes(r){
   (r.secciones||[]).forEach((s,si)=>(s.dias||[]).forEach((d,di)=>{
     let sinReps=0,sinEj=0;const vac=[];let tot=0;
     (d.bloques||[]).forEach(b=>{const v=(b.items||[]).filter(i=>!itemVacio(i));tot+=v.length;if(!v.length)vac.push(b.nombre||'bloque');
-      v.forEach(i=>{if(!String(i.nombre||'').trim())sinEj++;else if(!String(i.reps||'').trim())sinReps++})});
+      v.forEach(i=>{if(!String(i.nombre||'').trim())sinEj++;else if(b.modo!=='timer'&&!String(i.reps||'').trim())sinReps++})});
     const p=[];
     if(!tot)p.push('sin ejercicios');
     else{if(sinEj)p.push(plural(sinEj,'fila sin ejercicio','filas sin ejercicio'));if(sinReps)p.push(plural(sinReps,'ejercicio sin reps','ejercicios sin reps'));if(vac.length)p.push((vac.length===1?'bloque vacío: ':'bloques vacíos: ')+vac.map(x=>titleCase(x)).join(', '))}
@@ -1065,10 +1065,10 @@ function editorHTML(){
   const ro=isRut&&R.estado==='finalizada';
   const inp=(path,f,v,ph,w)=>`<input data-p="${path}" data-f="${f}" value="${esc(v??'')}" placeholder="${ph||''}" ${w?`style="width:${w}"`:''} ${ro?'readonly':''}>`;
   const items=(d,b,bl)=>bl.items.map((it,i)=>{const path=`${P},${d},${b},${i}`;const k=isRut?kgItem(it,e):null;const has=it.ej&&S.ejs[it.ej];
-    const vac=itemVacio(it),fEj=!vac&&!String(it.nombre||'').trim(),fRe=!vac&&!fEj&&!String(it.reps||'').trim();
+    const tm=bl.modo==='timer';const vac=itemVacio(it),fEj=!vac&&!String(it.nombre||'').trim(),fRe=!tm&&!vac&&!fEj&&!String(it.reps||'').trim();
     return `<div class="it${fEj||fRe?' it-falta':''}">
       <div class="it-ej ac-wrap"><input data-ac="1" autocomplete="off" class="${fEj?'falta':''}" data-p="${path}" data-f="nombre" value="${esc(it.nombre)}" placeholder="${fEj?'Falta el ejercicio':'Ejercicio'}" ${ro?'readonly':''}>${it.nombre?(has?(S.ejs[it.ej].video?`<a class="vid" target="_blank" rel="noopener" href="${esc(S.ejs[it.ej].video)}" title="Ver video">▶</a>`:''):`<button type="button" class="miss" data-addej="${esc(it.nombre)}" title="No está en la biblioteca">+ video</button>`):''}</div>
-      <label class="${fRe?'falta-l':''}">Reps${fRe?`<input data-p="${path}" data-f="reps" value="" placeholder="Falta" class="falta" ${ro?'readonly':''}>`:inp(path,'reps',it.reps,'10')}</label>
+      <label class="${fRe?'falta-l':''}">${tm?'Reps (opcional)':'Reps'}${fRe?`<input data-p="${path}" data-f="reps" value="" placeholder="Falta" class="falta" ${ro?'readonly':''}>`:inp(path,'reps',it.reps,tm?'máx':'10')}</label>
       <label>Kg${inp(path,'kg',it.kg,it.pct?'auto':'')}</label>
       <label>%RM${inp(path,'pct',it.pct,'')}</label>
       ${it.pct?`<label>Marca<select data-p="${path}" data-f="rm" ${ro?'disabled':''}><option value="">—</option>${movs().map(m=>`<option ${m===it.rm?'selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}
@@ -1098,7 +1098,7 @@ function editorHTML(){
     ${ro?'':`<div class="full actions"><button class="btn" type="button" data-act="dupSec">Duplicar sección</button><button class="btn" type="button" data-act="addDia">+ Día</button><button class="btn" type="button" data-act="clearSec">Vaciar sección</button>${R.secciones.length>1?'<button class="btn danger" type="button" data-act="delSec">Quitar sección</button>':''}</div>`}
   </div>
   ${s.dias.map((dia,d)=>`<div class="card dia${falDia(P,d)?' dia-falta':''}"><div class="dia-h"><input class="dia-n" data-p="${P},${d}" data-f="nombre" value="${esc(dia.nombre)}" ${ro?'readonly':''}>${falDia(P,d)?`<span class="pill p-bad">${esc(falDia(P,d).txt)}</span>`:'<span class="pill p-ok">Completo</span>'}${dia.bloques.length>1?(()=>{const all=dia.bloques.every((bl,b)=>E.pleg&&E.pleg[bl.uid||`${P},${d},${b}`]);return `<button type="button" class="btn" data-act="${all?'despDia':'plegDia'}" data-p="${P},${d}">${all?'Expandir bloques':'Minimizar bloques'}</button>`})():''}${ro?'':`<button type="button" class="btn" data-act="addBloque" data-p="${P},${d}">+ Bloque</button><button type="button" class="btn" data-act="clearDia" data-p="${P},${d}">Vaciar día</button><button type="button" class="btn danger" data-act="delDia" data-p="${P},${d}">Quitar día</button>`}</div>
-    ${dia.bloques.map((bl,b)=>{const bk=bl.uid||`${P},${d},${b}`,pl=!!(E.pleg&&E.pleg[bk]);const noms=bl.items.filter(i=>String(i.nombre||'').trim()).map(i=>i.nombre);return `<div class="bl${bl.items.every(itemVacio)?' bl-vacio':''}${pl?' plegado':''}"><div class="bl-h"><button type="button" class="bl-tg" data-act="pleg" data-k="${esc(bk)}" aria-expanded="${!pl}" title="${pl?'Expandir bloque':'Minimizar bloque'}">${pl?'▸':'▾'}</button><input list="dl-bl" class="bl-n" data-p="${P},${d},${b}" data-f="nombre" value="${esc(bl.nombre)}" ${ro?'readonly':''}><label>Series<input data-p="${P},${d},${b}" data-f="series" value="${esc(bl.series)}" style="width:56px" ${ro?'readonly':''}></label>${pl?`<span class="bl-res">${noms.length?plural(noms.length,'ejercicio','ejercicios')+': '+esc(noms.join(', ')):'Sin ejercicios'}</span>`:''}${ro?'':`<button type="button" class="x-sm" data-act="delBloque" data-p="${P},${d},${b}" aria-label="Quitar bloque">Quitar</button>`}</div>
+    ${dia.bloques.map((bl,b)=>{const bk=bl.uid||`${P},${d},${b}`,pl=!!(E.pleg&&E.pleg[bk]);const noms=bl.items.filter(i=>String(i.nombre||'').trim()).map(i=>i.nombre);return `<div class="bl${bl.items.every(itemVacio)?' bl-vacio':''}${pl?' plegado':''}"><div class="bl-h"><button type="button" class="bl-tg" data-act="pleg" data-k="${esc(bk)}" aria-expanded="${!pl}" title="${pl?'Expandir bloque':'Minimizar bloque'}">${pl?'▸':'▾'}</button><input list="dl-bl" class="bl-n" data-p="${P},${d},${b}" data-f="nombre" value="${esc(bl.nombre)}" ${ro?'readonly':''}><label>Modalidad<select data-p="${P},${d},${b}" data-f="modo" ${ro?'disabled':''}><option value="">Por series</option><option value="timer" ${bl.modo==='timer'?'selected':''}>Por tiempo ⏱</option></select></label>${bl.modo==='timer'?`<label>Trabajo (seg)<input data-p="${P},${d},${b}" data-f="trabajo" value="${esc(bl.trabajo??'40')}" inputmode="numeric" style="width:64px" ${ro?'readonly':''}></label><label>Descanso (seg)<input data-p="${P},${d},${b}" data-f="descanso" value="${esc(bl.descanso??'20')}" inputmode="numeric" style="width:64px" ${ro?'readonly':''}></label><label>Vueltas<input data-p="${P},${d},${b}" data-f="vueltas" value="${esc(bl.vueltas??'3')}" inputmode="numeric" style="width:56px" ${ro?'readonly':''}></label><label>Pausa entre vueltas<input data-p="${P},${d},${b}" data-f="pausa" value="${esc(bl.pausa??'60')}" inputmode="numeric" style="width:64px" ${ro?'readonly':''}></label>`:`<label>Series<input data-p="${P},${d},${b}" data-f="series" value="${esc(bl.series)}" style="width:56px" ${ro?'readonly':''}></label>`}${pl?`<span class="bl-res">${noms.length?plural(noms.length,'ejercicio','ejercicios')+': '+esc(noms.join(', ')):'Sin ejercicios'}</span>`:''}${ro?'':`<button type="button" class="x-sm" data-act="delBloque" data-p="${P},${d},${b}" aria-label="Quitar bloque">Quitar</button>`}</div>
       ${pl?'':items(d,b,bl)}${ro||pl?'':`<button type="button" class="add-it" data-act="addItem" data-p="${P},${d},${b}">+ Ejercicio</button>`}</div>`}).join('')}
   </div>`).join('')}
   <div class="actions sticky-save">${ro?'':`<button class="btn pri" type="button" data-act="save">Guardar</button>`}
@@ -1230,7 +1230,7 @@ function bindEditor(){
     const later=()=>setTimeout(rerenderEditor,0);
     if(f==='nombre'&&'ej' in o){const id=ejByName()[keyN(o.nombre)]||'';o.ej=id;if(id)o.nombre=S.ejs[id].nombre;if(o.pct&&!o.rm&&id)o.rm=S.ejs[id].rm||'';later()}
     else if(f==='pct'){if(o.pct&&!o.rm&&o.ej)o.rm=S.ejs[o.ej]?.rm||'';later()}
-    else if(f==='posicion'||f==='titulo'||f==='rm'||f==='reps')later();
+    else if(f==='posicion'||f==='titulo'||f==='rm'||f==='reps'||f==='modo')later();
   };
 }
 async function saveEditor(silent){

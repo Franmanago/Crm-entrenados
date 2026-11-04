@@ -90,7 +90,8 @@ function build(r,e,kgFn){
       t+=CH;
       for(const b of d.bloques){
         p.rect(M,t,CW,BH,0.94,null);const bz=Math.min(7.2,BH*0.68);const bn=(b.nombre||'').toUpperCase();p.text(M+3,t+BH*0.72,bn,bz,true,0.1);
-        if(b.series)p.text(M+6+tw(bn,bz,true),t+BH*0.72,`· ${b.series} series`,bz*0.95,false,0.3);
+        const bt=b.modo==='timer'?`· POR TIEMPO: ${b.trabajo||40}" trabajo / ${b.descanso||20}" descanso · ${b.vueltas||3} vueltas${Number(b.pausa)?` · ${b.pausa}" entre vueltas`:''}`:(b.series?`· ${b.series} series`:'');
+        if(bt)p.text(M+6+tw(bn,bz,true),t+BH*0.72,bt,bz*0.95,false,0.3);
         p.line(M,t+BH,M+CW,t+BH,0.35,0.6);t+=BH;
         for(const it of b.items){
           const k=kgFn(it);const pad=3;

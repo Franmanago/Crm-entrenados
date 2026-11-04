@@ -185,6 +185,12 @@ details summary{cursor:pointer;font-weight:600}
 .t-ctl{width:100%;max-width:520px}
 .t-ctl button{flex:1;border:0;background:rgba(255,255,255,.22);color:#fff;border-radius:14px;padding:14px 8px;font-weight:700;font-size:16px;white-space:nowrap}
 .t-ctl .t-pp{background:#fff;color:#15201D;flex:1.3}
+.bl-timer{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:var(--accent-soft);border-bottom:1px solid var(--line);font-size:14px}
+.bl-go{border:0;background:var(--ok);color:#fff;border-radius:10px;padding:10px 16px;font-weight:700;font-size:16px}
+.t-plan{background:var(--accent-soft);color:var(--ink);border-radius:12px;padding:10px 12px;font-size:14.5px}
+.t-ejs ol{margin:6px 0 0;padding-left:22px;color:var(--ink)}.t-ejs li{margin:2px 0}.t-ejs li span{color:var(--muted);font-weight:600}
+.t-kg{font-family:var(--display);font-size:clamp(28px,9vw,44px);font-weight:700;background:rgba(255,255,255,.2);border-radius:12px;padding:2px 16px}
+.t-sig b{font-weight:700}
 </style>
 </head>
 <body>
@@ -345,7 +351,7 @@ function render(){
   if(!dia){h+='<div class="card msg"><p class="hint">Esta sección no tiene días cargados.</p></div>'}
   else for(const b of dia.bloques||[]){
     if(!(b.items||[]).length)continue;
-    h+=`<section class="card"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span><span class="bl-r">${b.series?`<span class="series"><b>${esc(b.series)}</b> series</span>`:''}<button class="bl-tm" data-tmrbl="${esc(b.uid||'')}" title="Timer para este bloque">⏱</button></span></div>`;
+    h+=`<section class="card"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span><span class="bl-r">${b.modo==='timer'?`<span class="series"><b>${esc(b.trabajo||40)}"</b>/${esc(b.descanso||20)}" · <b>${esc(b.vueltas||3)}</b> ${String(b.vueltas)==='1'?'vuelta':'vueltas'}</span>`:`${b.series?`<span class="series"><b>${esc(b.series)}</b> series</span>`:''}<button class="bl-tm" data-tmrbl="${esc(b.uid||'')}" title="Timer para este bloque">⏱</button>`}</span></div>${b.modo==='timer'?`<div class="bl-timer"><span>Bloque por tiempo: cada ejercicio ${esc(b.trabajo||40)}" de trabajo y ${esc(b.descanso||20)}" de descanso${Number(b.pausa)?`, ${esc(b.pausa)}" de pausa entre vueltas`:''}.</span><button class="bl-go" data-tmrbl="${esc(b.uid||'')}">▶ Empezar bloque</button></div>`:''}`;
     for(const it of b.items){
       const v=D.videos[it.ej],yt=ytId(v),k=kg(it),last=regsFor(it.uid),hoyReg=last.find(r=>r.fecha===fSel());
       const o=open[it.uid]||{};
@@ -353,7 +359,7 @@ function render(){
       const mK=String(vk)!==String(k||''),mR=String(vr)!==String(it.reps||''),ok=!!hoyReg;
       h+=`<div class="ej${ok?' hecho':''}" data-uid="${esc(it.uid)}">
         <div class="ej-top"><button class="chk" data-chk="${esc(it.uid)}" aria-pressed="${ok}" aria-label="${ok?'Hecho. Tocá para desmarcar':'Marcar como hecho'}" title="${ok?'Hecho':'Marcar como hecho'}">✓</button><div class="ej-n">${esc(it.nombre)}</div>${v?`<button class="vbtn" data-video="${esc(it.uid)}" aria-expanded="${!!o.video}">${o.video?'Cerrar':'▶ Video'}</button>`:''}</div>
-        <div class="campos"><label class="campo">Kg<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label><span class="x">×</span><label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="—" class="${mR?'mod':''}" autocomplete="off"></label>${it.pct?`<span class="pc">${esc(it.pct)}% de tu máximo</span>`:''}${mK||mR?`<span class="tag-mod">Cambiado</span>`:''}</div>
+        <div class="campos"><label class="campo">Kg<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label><span class="x">×</span><label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="${b.modo==='timer'?'máx':'—'}" class="${mR?'mod':''}" autocomplete="off"></label>${it.pct?`<span class="pc">${esc(it.pct)}% de tu máximo</span>`:''}${mK||mR?`<span class="tag-mod">Cambiado</span>`:''}</div>
         ${it.notas?`<div class="nota">${esc(it.notas)}</div>`:''}
         ${o.video&&v?(yt?`<div class="video ${yt.short?'v916':'v169'}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(yt.id)}?rel=0&playsinline=1" title="Video de ${esc(it.nombre)}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`:'')+`<a class="yt" href="${esc(v)}" target="_blank" rel="noopener">Abrir en YouTube</a>`:''}
         <div class="ej-pie">${(()=>{const pv=last.find(r=>r.fecha<fSel());return pv?`<span class="ult">Última vez (${fmt(pv.fecha)}): ${pv.kg?esc(pv.kg)+' kg':''}${pv.reps?' × '+esc(pv.reps):''}${pv.cansancio?' · cansancio '+pv.cansancio:''}</span>`:'<span></span>'})()}<span class="guardando" data-st="${esc(it.uid)}"></span>${o.log?'':`<button class="mas" data-log="${esc(it.uid)}">${hoyReg&&(hoyReg.cansancio||(hoyReg.nota&&hoyReg.nota!=='Hecho'))?'Cansancio / comentario ✓':'+ Cansancio / comentario'}</button>`}</div>
@@ -444,54 +450,65 @@ document.addEventListener('change',async ev=>{
 document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('[data-in]')){ev.preventDefault();ev.target.blur()}});
 const Timer=(()=>{
   const PRE=[['tabata','Tabata 20/10',{w:20,r:10,n:8}],['4020','40/20',{w:40,r:20,n:8}],['3030','30/30',{w:30,r:30,n:10}],['emom','EMOM 60',{w:60,r:0,n:10}]];
-  let c=Object.assign({w:20,r:10,n:8,p:10,pre:'tabata'},JSON.parse(store.get('tmr')||'{}')),ejs=[],titulo='Timer',fases=[],fi=0,fin=0,rest=0,pausa=false,iv=null,lock=null,ac=null,ultS=-1;
+  const libre=Object.assign({w:20,r:10,n:8,p:10,rv:0,pre:'tabata'},JSON.parse(store.get('tmr')||'{}'));
+  let c=libre,ejs=[],titulo='Timer',plan=false,fases=[],fi=0,fin=0,rest=0,pausa=false,iv=null,lock=null,ac=null,ultS=-1;
   const el=()=>$('#tmr');
   const mmss=s=>{s=Math.max(0,Math.ceil(s));return s>=60?Math.floor(s/60)+':'+pad(s%60):String(s)};
-  const total=()=>c.p+c.n*c.w+Math.max(0,c.n-1)*c.r;
+  const K=()=>Math.max(1,ejs.length);
+  const total=()=>{const g=c.n*K()-1;return c.p+c.n*K()*c.w+Math.max(0,g-(c.n-1))*c.r+Math.max(0,c.n-1)*(c.rv||c.r)};
+  const durTxt=()=>mmss(total())+(total()>=60?' min':' seg');
   function beep(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='square';g.gain.value=.12;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
   const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
   async function wake(on){try{if(on&&'wakeLock' in navigator)lock=await navigator.wakeLock.request('screen');else if(lock){lock.release();lock=null}}catch(e){}}
+  const carga=x=>[x.kg?esc(x.kg)+' kg':'',x.reps?(x.kg?'× ':'')+esc(x.reps)+(/\d$/.test(x.reps)?' reps':''):''].filter(Boolean).join(' ');
   function abrir(blUid){
-    ejs=[];titulo='Timer';
-    if(blUid){for(const s2 of D.rutina?.secciones||[])for(const d of s2.dias||[])for(const b of d.bloques||[])if(b.uid===blUid){titulo=b.nombre||'Bloque';ejs=(b.items||[]).map(i=>i.nombre).filter(Boolean);const n=parseInt(b.series);if(n>0&&n<=50){const v=Math.min(99,n*Math.max(1,ejs.length));if(v!==c.n){c.n=v;c.pre=''}}}}
+    ejs=[];titulo='Timer';plan=false;c=libre;
+    if(blUid){for(const s2 of D.rutina?.secciones||[])for(const d of s2.dias||[])for(const b of d.bloques||[])if(b.uid===blUid){
+      titulo=b.nombre||'Bloque';
+      ejs=(b.items||[]).filter(i=>i.nombre).map(i=>{const cur=document.querySelector(`.ej[data-uid="${CSS.escape(i.uid)}"]`)?valores(i.uid):null;return {nombre:i.nombre,kg:cur?cur.kg:kg(i),reps:cur?cur.reps:(i.reps||'')}});
+      if(b.modo==='timer'){plan=true;const nn=(v,d)=>{const x=parseInt(v);return x>=0?x:d};c={w:Math.max(5,nn(b.trabajo,40)),r:nn(b.descanso,20),n:Math.max(1,nn(b.vueltas,3)),p:10,rv:nn(b.pausa,0),pre:''}}
+      else{const n=parseInt(b.series);c=Object.assign({},libre,{n:n>0&&n<=50?n:libre.n,rv:0})}}}
     el().hidden=false;document.body.style.overflow='hidden';cfg()}
   function cerrar(){stop();el().hidden=true;el().className='';document.body.style.overflow=''}
   function cfg(){
     el().className='';
-    const st=(k,l,sub,step,min,max)=>`<div class="t-row"><div><b>${l}</b><small>${sub}</small></div><div class="t-st"><button data-tst="${k}" data-d="${-step}" aria-label="Menos">−</button><output>${k==='n'?c[k]:mmss(c[k])+(c[k]<60?'"':'')}</output><button data-tst="${k}" data-d="${step}" aria-label="Más">+</button></div></div>`;
+    const st=(k,l,sub,step)=>`<div class="t-row"><div><b>${l}</b><small>${sub}</small></div><div class="t-st"><button data-tst="${k}" data-d="${-step}" aria-label="Menos">−</button><output>${k==='n'?c[k]:mmss(c[k])+(c[k]<60?'"':'')}</output><button data-tst="${k}" data-d="${step}" aria-label="Más">+</button></div></div>`;
     el().innerHTML=`<div class="t-top"><h2>⏱ ${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div>
-    <div class="t-cfg"><div class="t-pre">${PRE.map(([k,l])=>`<button data-tpre="${k}" aria-pressed="${c.pre===k}">${l}</button>`).join('')}</div>
-      ${st('w','Trabajo','segundos de esfuerzo',5,5,600)}${st('r','Descanso','entre rondas (0 = sin pausa)',5,0,600)}${st('n','Rondas','cantidad de intervalos',1,1,99)}${st('p','Preparación','antes de arrancar',5,0,60)}
-      ${ejs.length?`<div class="t-ejs"><b style="color:var(--ink)">Ejercicios en orden:</b> ${ejs.map(esc).join(' → ')}. Van rotando en cada ronda.</div>`:''}
-      <div class="t-tot">Duración total: <b>${mmss(total())} ${total()>=60?'min':'seg'}</b></div>
+    <div class="t-cfg">${plan?`<div class="t-plan">Planificado por tu entrenador: <b>${c.w}" de trabajo y ${c.r}" de descanso por ejercicio, ${c.n} ${c.n===1?'vuelta':'vueltas'}</b>${c.rv?` con ${c.rv}" de pausa entre vueltas`:''}. Si necesitás, podés ajustarlo.</div>`:`<div class="t-pre">${PRE.map(([k,l])=>`<button data-tpre="${k}" aria-pressed="${c.pre===k}">${l}</button>`).join('')}</div>`}
+      ${st('w','Trabajo',ejs.length?'segundos por ejercicio':'segundos de esfuerzo',5)}${st('r','Descanso',ejs.length?'entre ejercicios':'entre rondas (0 = sin pausa)',5)}${st('n',ejs.length?'Vueltas':'Rondas',ejs.length?`cada vuelta pasa por los ${ejs.length} ejercicios`:'cantidad de intervalos',1)}${ejs.length>1?st('rv','Pausa entre vueltas','0 = igual que el descanso',15):''}${st('p','Preparación','antes de arrancar',5)}
+      ${ejs.length?`<div class="t-ejs"><b style="color:var(--ink)">En cada vuelta:</b><ol>${ejs.map(x=>`<li>${esc(x.nombre)}${carga(x)?` <span>${carga(x)}</span>`:''}</li>`).join('')}</ol></div>`:''}
+      <div class="t-tot">Duración total: <b>${durTxt()}</b></div>
       <button class="t-go" data-tgo="1">Empezar</button>
       <p class="hint" style="text-align:center">Subí el volumen: suena al cambiar de fase y en los últimos 3 segundos.</p></div>`}
-  function armar(){fases=[];if(c.p)fases.push({t:'prep',d:c.p});for(let i=0;i<c.n;i++){fases.push({t:'work',d:c.w,i,ej:ejs.length?ejs[i%ejs.length]:''});if(c.r&&i<c.n-1)fases.push({t:'rest',d:c.r,i,ej:ejs.length?ejs[(i+1)%ejs.length]:''})}}
-  function go(){store.set('tmr',JSON.stringify(c));armar();fi=0;pausa=false;wake(true);beep(660,.08);iniciar(fases[0].d);iv=setInterval(tick,100);dibujar()}
+  function armar(){fases=[];if(c.p)fases.push({t:'prep',d:c.p});const k=K(),N=c.n*k;
+    for(let x=0;x<N;x++){const v=Math.floor(x/k),j=x%k;fases.push({t:'work',d:c.w,v,j,ej:ejs[j]});
+      if(x<N-1){const fv=j===k-1;const d=fv&&c.rv?c.rv:c.r;if(d)fases.push({t:'rest',d,v,j,fv,ej:ejs[(j+1)%k]})}}}
+  function go(){if(!plan&&!ejs.length){Object.assign(libre,c);store.set('tmr',JSON.stringify(libre))}armar();fi=0;pausa=false;wake(true);beep(660,.08);iniciar(fases[0].d);clearInterval(iv);iv=setInterval(tick,100);dibujar()}
   function iniciar(d){fin=performance.now()+d*1000;ultS=-1}
   function stop(){clearInterval(iv);iv=null;wake(false)}
   function sig(){fi++;if(fi>=fases.length){stop();terminado();return}const f=fases[fi];beep(f.t==='work'?1046:520,f.t==='work'?.35:.25);vib(f.t==='work'?[200,80,200]:300);iniciar(f.d);dibujar()}
   function tick(){if(pausa)return;const r=(fin-performance.now())/1000;if(r<=0){sig();return}const s=Math.ceil(r);if(s!==ultS){ultS=s;if(s<=3)beep(880,.09);const n=el().querySelector('.t-num');if(n)n.textContent=mmss(r);}
     const b=el().querySelector('.t-bar i');if(b)b.style.width=(1-r/fases[fi].d)*100+'%'}
-  function dibujar(){const f=fases[fi];const r=pausa?rest:(fin-performance.now())/1000;
+  function dibujar(){const f=fases[fi];const r=pausa?rest:(fin-performance.now())/1000;const k=K();
     el().className='run f-'+f.t;
-    const L={prep:'Preparate',work:'¡Trabajo!',rest:'Descanso'}[f.t];
+    const L={prep:'Preparate',work:'¡Trabajo!',rest:f.fv&&c.rv?'Pausa':'Descanso'}[f.t];
+    const pos=f.t==='prep'?(ejs.length?`${c.n} ${c.n===1?'vuelta':'vueltas'} · ${ejs.length} ejercicios · ${c.w}" / ${c.r}"`:`${c.n} rondas · ${c.w}" / ${c.r}"`):(ejs.length?`Vuelta ${f.v+1} de ${c.n}${k>1?` · Ejercicio ${f.j+1} de ${k}`:''}`:`Ronda ${f.v+1} de ${c.n}`);
+    const ej=f.t==='work'&&f.ej?`<div class="t-ej">${esc(f.ej.nombre)}</div>${carga(f.ej)?`<div class="t-kg">${carga(f.ej)}</div>`:''}`:f.t==='rest'&&f.ej?`<div class="t-sig">${f.fv?'Arranca la vuelta '+(f.v+2)+' con:':'Sigue:'} <b>${esc(f.ej.nombre)}</b>${carga(f.ej)?' · '+carga(f.ej):''}</div>`:f.t==='prep'&&ejs.length?`<div class="t-sig">Primero: <b>${esc(ejs[0].nombre)}</b>${carga(ejs[0])?' · '+carga(ejs[0]):''}</div>`:'';
     el().innerHTML=`<div class="t-top"><h2>${esc(titulo)}</h2><button class="t-x" data-tx="1">Salir</button></div>
     <div class="t-run"><div class="t-fase">${pausa?'En pausa':L}</div><div class="t-num">${mmss(r)}</div>
-      <div class="t-rnd">${f.t==='prep'?`${c.n} rondas · ${c.w}" / ${c.r}"`:`Ronda ${f.i+1} de ${c.n}`}</div>
-      ${f.ej?`<div class="${f.t==='work'?'t-ej':'t-sig'}">${f.t==='work'?esc(f.ej):'Sigue: '+esc(f.ej)}</div>`:(f.t==='prep'&&ejs.length?`<div class="t-sig">Primero: ${esc(ejs[0])}</div>`:'')}
+      <div class="t-rnd">${pos}</div>${ej}
       <div class="t-bar"><i style="width:${(1-r/f.d)*100}%"></i></div>
       <div class="t-ctl"><button data-tctl="reset">↺ Reiniciar</button><button class="t-pp" data-tctl="pp">${pausa?'▶ Seguir':'❚❚ Pausa'}</button><button data-tctl="skip">Saltar ⏭</button></div></div>`}
   function terminado(){beep(1046,.2);setTimeout(()=>beep(1318,.4),250);vib([300,100,300,100,500]);el().className='run f-fin';
-    el().innerHTML=`<div class="t-top"><h2>${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div><div class="t-run"><div class="t-fase">¡Terminaste!</div><div class="t-rnd">${c.n} rondas · ${mmss(total())} ${total()>=60?'min':'seg'}</div><div class="t-ctl"><button class="t-pp" data-tctl="otra">Otra vez</button><button data-tctl="cfg">Cambiar tiempos</button></div></div>`}
+    el().innerHTML=`<div class="t-top"><h2>${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div><div class="t-run"><div class="t-fase">¡Terminaste!</div><div class="t-rnd">${ejs.length?`${c.n} ${c.n===1?'vuelta':'vueltas'} · ${ejs.length} ejercicios`:c.n+' rondas'} · ${durTxt()}</div>${ejs.length?'<div class="t-sig">Volvé a la rutina para tildar los ejercicios.</div>':''}<div class="t-ctl"><button class="t-pp" data-tctl="otra">Otra vez</button><button data-tctl="cfg">Cambiar tiempos</button></div></div>`}
   document.addEventListener('click',ev=>{const t=ev.target;if(!t.closest||!t.closest('#tmr'))return;let b;
     if(b=t.closest('[data-tx]')){cerrar();return}
     if(b=t.closest('[data-tpre]')){const p=PRE.find(x=>x[0]===b.dataset.tpre);Object.assign(c,p[2],{pre:p[0]});cfg();return}
-    if(b=t.closest('[data-tst]')){const k=b.dataset.tst,lim={w:[5,600],r:[0,600],n:[1,99],p:[0,60]}[k];c[k]=Math.min(lim[1],Math.max(lim[0],c[k]+Number(b.dataset.d)));c.pre='';cfg();return}
+    if(b=t.closest('[data-tst]')){const k=b.dataset.tst,lim={w:[5,600],r:[0,600],n:[1,99],p:[0,60],rv:[0,600]}[k];c[k]=Math.min(lim[1],Math.max(lim[0],(c[k]||0)+Number(b.dataset.d)));c.pre='';cfg();return}
     if(b=t.closest('[data-tgo]')){go();return}
     if(b=t.closest('[data-tctl]')){const a=b.dataset.tctl;
       if(a==='pp'){if(!pausa){rest=(fin-performance.now())/1000;pausa=true}else{pausa=false;fin=performance.now()+rest*1000}dibujar()}
-      else if(a==='skip'){if(!pausa)sig();else{pausa=false;sig()}}
+      else if(a==='skip'){pausa=false;sig()}
       else if(a==='reset'){stop();go()}
       else if(a==='otra'){go()}else if(a==='cfg'){cfg()}}});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iv)wake(true)});
