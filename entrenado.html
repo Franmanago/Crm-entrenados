@@ -191,6 +191,35 @@ details summary{cursor:pointer;font-weight:600}
 .t-ejs ol{margin:6px 0 0;padding-left:22px;color:var(--ink)}.t-ejs li{margin:2px 0}.t-ejs li span{color:var(--muted);font-weight:600}
 .t-kg{font-family:var(--display);font-size:clamp(28px,9vw,44px);font-weight:700;background:rgba(255,255,255,.2);border-radius:12px;padding:2px 16px}
 .t-sig b{font-weight:700}
+body.tmr-full{overflow:hidden}
+body.tmr-on .tmr-fab{display:none}
+body.tmr-on:not(.tmr-full) main{padding-bottom:150px}
+.t-modos{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.t-modos button{flex:1;border:0;background:none;border-radius:9px;padding:10px 4px;font-weight:700;font-size:14px;color:var(--muted)}
+.t-modos button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.t-vista{display:flex;gap:10px;align-items:center;font-size:14.5px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.t-vista input{width:20px;height:20px}
+.t-tb{display:flex;gap:6px}
+.t-top h2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-tb .t-x{padding:8px 11px}
+.t-tb .t-x{white-space:nowrap}
+#tmr.f-cr{background:#15201D}
+.t-num-cr{font-size:clamp(90px,28vw,200px)}
+.t-laps{list-style:none;margin:14px 0 0;padding:0;width:100%;max-width:420px;max-height:30vh;overflow:auto}
+.t-laps li{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.18);font-size:16px}
+.t-laps b{font-family:var(--display);font-size:22px}.t-laps small{opacity:.7}
+.t-ctl button:disabled{opacity:.45}
+#tmr.mini{inset:auto 8px max(8px,env(safe-area-inset-bottom,0px)) 8px;padding:0;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+.tm-mini{display:flex;align-items:center;gap:10px;padding:10px 12px 14px;position:relative;flex-wrap:wrap}
+.tm-l{flex:1;min-width:0;display:flex;flex-direction:column}
+.tm-mini .t-fl{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.92;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tm-mini .t-num{font-family:var(--display);font-size:46px;font-weight:700;line-height:1}
+.tm-mini .t-ejm{font-size:14.5px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tm-b{display:flex;gap:5px}
+.tm-b button{width:42px;height:42px;border:0;border-radius:12px;background:rgba(255,255,255,.22);color:#fff;font-size:18px;font-weight:700}
+.tm-b button:first-child{background:#fff;color:#15201D}
+.tm-b button:disabled{opacity:.45}
+.tm-mini .t-bar{position:absolute;left:0;right:0;bottom:0;margin:0;height:5px;border-radius:0;max-width:none}
 </style>
 </head>
 <body>
@@ -351,7 +380,7 @@ function render(){
   if(!dia){h+='<div class="card msg"><p class="hint">Esta sección no tiene días cargados.</p></div>'}
   else for(const b of dia.bloques||[]){
     if(!(b.items||[]).length)continue;
-    h+=`<section class="card"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span><span class="bl-r">${b.modo==='timer'?`<span class="series"><b>${esc(b.trabajo||40)}"</b>/${esc(b.descanso||20)}" · <b>${esc(b.vueltas||3)}</b> ${String(b.vueltas)==='1'?'vuelta':'vueltas'}</span>`:`${b.series?`<span class="series"><b>${esc(b.series)}</b> series</span>`:''}<button class="bl-tm" data-tmrbl="${esc(b.uid||'')}" title="Timer para este bloque">⏱</button>`}</span></div>${b.modo==='timer'?`<div class="bl-timer"><span>Bloque por tiempo: cada ejercicio ${esc(b.trabajo||40)}" de trabajo y ${esc(b.descanso||20)}" de descanso${Number(b.pausa)?`, ${esc(b.pausa)}" de pausa entre vueltas`:''}.</span><button class="bl-go" data-tmrbl="${esc(b.uid||'')}">▶ Empezar bloque</button></div>`:''}`;
+    h+=`<section class="card"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span><span class="bl-r">${b.modo==='timer'?`<span class="series"><b>${esc(b.trabajo||40)}"</b>/${esc(b.descanso||20)}" · <b>${esc(b.vueltas||3)}</b> ${String(b.vueltas)==='1'?'vuelta':'vueltas'}</span>`:`${b.series?`<span class="series"><b>${esc(b.series)}</b> series</span>`:''}<button class="bl-tm" data-tmrbl="${esc(b.uid||'')}" title="Timer para este bloque">⏱</button>`}</span></div>${b.modo==='timer'?`<div class="bl-timer"><span>Circuito por tiempo: cada ejercicio ${esc(b.trabajo||40)}" de trabajo y ${esc(b.descanso||20)}" de descanso${Number(b.pausa)?`, ${esc(b.pausa)}" de pausa entre vueltas`:''}. Al terminar el timer se tildan solos.</span><button class="bl-go" data-tmrbl="${esc(b.uid||'')}">▶ Empezar bloque</button></div>`:''}`;
     for(const it of b.items){
       const v=D.videos[it.ej],yt=ytId(v),k=kg(it),last=regsFor(it.uid),hoyReg=last.find(r=>r.fecha===fSel());
       const o=open[it.uid]||{};
@@ -359,7 +388,7 @@ function render(){
       const mK=String(vk)!==String(k||''),mR=String(vr)!==String(it.reps||''),ok=!!hoyReg;
       h+=`<div class="ej${ok?' hecho':''}" data-uid="${esc(it.uid)}">
         <div class="ej-top"><button class="chk" data-chk="${esc(it.uid)}" aria-pressed="${ok}" aria-label="${ok?'Hecho. Tocá para desmarcar':'Marcar como hecho'}" title="${ok?'Hecho':'Marcar como hecho'}">✓</button><div class="ej-n">${esc(it.nombre)}</div>${v?`<button class="vbtn" data-video="${esc(it.uid)}" aria-expanded="${!!o.video}">${o.video?'Cerrar':'▶ Video'}</button>`:''}</div>
-        <div class="campos"><label class="campo">Kg<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label><span class="x">×</span><label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="${b.modo==='timer'?'máx':'—'}" class="${mR?'mod':''}" autocomplete="off"></label>${it.pct?`<span class="pc">${esc(it.pct)}% de tu máximo</span>`:''}${mK||mR?`<span class="tag-mod">Cambiado</span>`:''}</div>
+        <div class="campos"><label class="campo">Kg<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label>${b.modo==='timer'?'':`<span class="x">×</span><label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="—" class="${mR?'mod':''}" autocomplete="off"></label>`}${it.pct?`<span class="pc">${esc(it.pct)}% de tu máximo</span>`:''}${mK||(mR&&b.modo!=='timer')?`<span class="tag-mod">Cambiado</span>`:''}</div>
         ${it.notas?`<div class="nota">${esc(it.notas)}</div>`:''}
         ${o.video&&v?(yt?`<div class="video ${yt.short?'v916':'v169'}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(yt.id)}?rel=0&playsinline=1" title="Video de ${esc(it.nombre)}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`:'')+`<a class="yt" href="${esc(v)}" target="_blank" rel="noopener">Abrir en YouTube</a>`:''}
         <div class="ej-pie">${(()=>{const pv=last.find(r=>r.fecha<fSel());return pv?`<span class="ult">Última vez (${fmt(pv.fecha)}): ${pv.kg?esc(pv.kg)+' kg':''}${pv.reps?' × '+esc(pv.reps):''}${pv.cansancio?' · cansancio '+pv.cansancio:''}</span>`:'<span></span>'})()}<span class="guardando" data-st="${esc(it.uid)}"></span>${o.log?'':`<button class="mas" data-log="${esc(it.uid)}">${hoyReg&&(hoyReg.cansancio||(hoyReg.nota&&hoyReg.nota!=='Hecho'))?'Cansancio / comentario ✓':'+ Cansancio / comentario'}</button>`}</div>
@@ -450,67 +479,118 @@ document.addEventListener('change',async ev=>{
 document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('[data-in]')){ev.preventDefault();ev.target.blur()}});
 const Timer=(()=>{
   const PRE=[['tabata','Tabata 20/10',{w:20,r:10,n:8}],['4020','40/20',{w:40,r:20,n:8}],['3030','30/30',{w:30,r:30,n:10}],['emom','EMOM 60',{w:60,r:0,n:10}]];
-  const libre=Object.assign({w:20,r:10,n:8,p:10,rv:0,pre:'tabata'},JSON.parse(store.get('tmr')||'{}'));
-  let c=libre,ejs=[],titulo='Timer',plan=false,fases=[],fi=0,fin=0,rest=0,pausa=false,iv=null,lock=null,ac=null,ultS=-1;
+  const CDP=[60,180,300,600];
+  const libre=Object.assign({w:20,r:10,n:8,p:10,rv:0,pre:'tabata',modo:'int',cd:180},JSON.parse(store.get('tmr')||'{}'));
+  let c=libre,ejs=[],titulo='Timer',plan=false,blUid=null,fases=[],fi=0,fin=0,rest=0,pausa=false,iv=null,lock=null,ac=null,ultS=-1,estado='cfg';
+  let mini=store.get('tmrmini')==='1',cr={run:false,base:0,t0:0,laps:[]};
   const el=()=>$('#tmr');
   const mmss=s=>{s=Math.max(0,Math.ceil(s));return s>=60?Math.floor(s/60)+':'+pad(s%60):String(s)};
+  const crTxt=ms=>{const t=Math.floor(ms/100),d=t%10,sg=Math.floor(t/10)%60,m=Math.floor(t/600);return (m?m+':'+pad(sg):String(sg))+'.'+d};
   const K=()=>Math.max(1,ejs.length);
-  const total=()=>{const g=c.n*K()-1;return c.p+c.n*K()*c.w+Math.max(0,g-(c.n-1))*c.r+Math.max(0,c.n-1)*(c.rv||c.r)};
+  const total=()=>{if(c.modo==='cd')return c.cd;const g=c.n*K()-1;return c.p+c.n*K()*c.w+Math.max(0,g-(c.n-1))*c.r+Math.max(0,c.n-1)*(c.rv||c.r)};
   const durTxt=()=>mmss(total())+(total()>=60?' min':' seg');
   function beep(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='square';g.gain.value=.12;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
   const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
   async function wake(on){try{if(on&&'wakeLock' in navigator)lock=await navigator.wakeLock.request('screen');else if(lock){lock.release();lock=null}}catch(e){}}
   const carga=x=>[x.kg?esc(x.kg)+' kg':'',x.reps?(x.kg?'× ':'')+esc(x.reps)+(/\d$/.test(x.reps)?' reps':''):''].filter(Boolean).join(' ');
-  function abrir(blUid){
-    ejs=[];titulo='Timer';plan=false;c=libre;
-    if(blUid){for(const s2 of D.rutina?.secciones||[])for(const d of s2.dias||[])for(const b of d.bloques||[])if(b.uid===blUid){
-      titulo=b.nombre||'Bloque';
-      ejs=(b.items||[]).filter(i=>i.nombre).map(i=>{const cur=document.querySelector(`.ej[data-uid="${CSS.escape(i.uid)}"]`)?valores(i.uid):null;return {nombre:i.nombre,kg:cur?cur.kg:kg(i),reps:cur?cur.reps:(i.reps||'')}});
-      if(b.modo==='timer'){plan=true;const nn=(v,d)=>{const x=parseInt(v);return x>=0?x:d};c={w:Math.max(5,nn(b.trabajo,40)),r:nn(b.descanso,20),n:Math.max(1,nn(b.vueltas,3)),p:10,rv:nn(b.pausa,0),pre:''}}
-      else{const n=parseInt(b.series);c=Object.assign({},libre,{n:n>0&&n<=50?n:libre.n,rv:0})}}}
-    el().hidden=false;document.body.style.overflow='hidden';cfg()}
-  function cerrar(){stop();el().hidden=true;el().className='';document.body.style.overflow=''}
+  function abrir(uid){
+    ejs=[];titulo='Timer';plan=false;blUid=null;c=libre;
+    if(uid){for(const s2 of D.rutina?.secciones||[])for(const d of s2.dias||[])for(const b of d.bloques||[])if(b.uid===uid){
+      titulo=b.nombre||'Bloque';const tm=b.modo==='timer';
+      ejs=(b.items||[]).filter(i=>i.nombre).map(i=>{const cur=document.querySelector(`.ej[data-uid="${CSS.escape(i.uid)}"]`)?valores(i.uid):null;return {uid:i.uid,nombre:i.nombre,kg:cur?cur.kg:kg(i),reps:tm?'':(cur?cur.reps:(i.reps||''))}});
+      if(tm){plan=true;blUid=uid;const nn=(v,d)=>{const x=parseInt(v);return x>=0?x:d};c={w:Math.max(5,nn(b.trabajo,40)),r:nn(b.descanso,20),n:Math.max(1,nn(b.vueltas,3)),p:10,rv:nn(b.pausa,0),pre:'',modo:'int'}}
+      else{const n=parseInt(b.series);c=Object.assign({},libre,{n:n>0&&n<=50?n:libre.n,rv:0,modo:'int'})}}}
+    el().hidden=false;document.body.classList.add('tmr-on');cfg()}
+  function cerrar(){stop();cr.run=false;el().hidden=true;el().className='';document.body.classList.remove('tmr-on','tmr-full');estado='cfg'}
+  function full(on){document.body.classList.toggle('tmr-full',!!on)}
   function cfg(){
-    el().className='';
+    estado='cfg';full(true);el().className='';
     const st=(k,l,sub,step)=>`<div class="t-row"><div><b>${l}</b><small>${sub}</small></div><div class="t-st"><button data-tst="${k}" data-d="${-step}" aria-label="Menos">−</button><output>${k==='n'?c[k]:mmss(c[k])+(c[k]<60?'"':'')}</output><button data-tst="${k}" data-d="${step}" aria-label="Más">+</button></div></div>`;
-    el().innerHTML=`<div class="t-top"><h2>⏱ ${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div>
-    <div class="t-cfg">${plan?`<div class="t-plan">Planificado por tu entrenador: <b>${c.w}" de trabajo y ${c.r}" de descanso por ejercicio, ${c.n} ${c.n===1?'vuelta':'vueltas'}</b>${c.rv?` con ${c.rv}" de pausa entre vueltas`:''}. Si necesitás, podés ajustarlo.</div>`:`<div class="t-pre">${PRE.map(([k,l])=>`<button data-tpre="${k}" aria-pressed="${c.pre===k}">${l}</button>`).join('')}</div>`}
+    const modos=!plan&&!ejs.length?`<div class="t-modos" role="tablist">${[['int','Intervalos'],['cd','Cuenta regresiva'],['cr','Cronómetro']].map(([k,l])=>`<button data-tmodo="${k}" aria-pressed="${c.modo===k}">${l}</button>`).join('')}</div>`:'';
+    let body='';
+    if(c.modo==='cr')body=`<div class="t-plan">Cuenta hacia arriba desde 0. Podés marcar vueltas para ver cuánto tardás en cada una.</div>`;
+    else if(c.modo==='cd')body=`<div class="t-pre">${CDP.map(v=>`<button data-tcd="${v}" aria-pressed="${c.cd===v}">${v/60} min</button>`).join('')}</div>
+      <div class="t-row"><div><b>Minutos</b></div><div class="t-st"><button data-tst="cd" data-d="-60">−</button><output>${Math.floor(c.cd/60)}</output><button data-tst="cd" data-d="60">+</button></div></div>
+      <div class="t-row"><div><b>Segundos</b></div><div class="t-st"><button data-tst="cd" data-d="-5">−</button><output>${pad(c.cd%60)}</output><button data-tst="cd" data-d="5">+</button></div></div>
+      <div class="t-tot">Duración: <b>${durTxt()}</b></div>`;
+    else body=`${plan?`<div class="t-plan">Circuito planificado por tu entrenador: <b>${c.w}" de trabajo y ${c.r}" de descanso por ejercicio, ${c.n} ${c.n===1?'vuelta':'vueltas'}</b>${c.rv?` con ${c.rv}" de pausa entre vueltas`:''}. Al terminar se tildan solos los ejercicios.</div>`:`<div class="t-pre">${PRE.map(([k,l])=>`<button data-tpre="${k}" aria-pressed="${c.pre===k}">${l}</button>`).join('')}</div>`}
       ${st('w','Trabajo',ejs.length?'segundos por ejercicio':'segundos de esfuerzo',5)}${st('r','Descanso',ejs.length?'entre ejercicios':'entre rondas (0 = sin pausa)',5)}${st('n',ejs.length?'Vueltas':'Rondas',ejs.length?`cada vuelta pasa por los ${ejs.length} ejercicios`:'cantidad de intervalos',1)}${ejs.length>1?st('rv','Pausa entre vueltas','0 = igual que el descanso',15):''}${st('p','Preparación','antes de arrancar',5)}
       ${ejs.length?`<div class="t-ejs"><b style="color:var(--ink)">En cada vuelta:</b><ol>${ejs.map(x=>`<li>${esc(x.nombre)}${carga(x)?` <span>${carga(x)}</span>`:''}</li>`).join('')}</ol></div>`:''}
-      <div class="t-tot">Duración total: <b>${durTxt()}</b></div>
+      <div class="t-tot">Duración total: <b>${durTxt()}</b></div>`;
+    el().innerHTML=`<div class="t-top"><h2>⏱ ${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div>
+    <div class="t-cfg">${modos}${body}
+      <label class="t-vista"><input type="checkbox" data-tmini="1" ${mini?'checked':''}> Ver el timer reducido abajo, para seguir viendo la rutina</label>
       <button class="t-go" data-tgo="1">Empezar</button>
-      <p class="hint" style="text-align:center">Subí el volumen: suena al cambiar de fase y en los últimos 3 segundos.</p></div>`}
-  function armar(){fases=[];if(c.p)fases.push({t:'prep',d:c.p});const k=K(),N=c.n*k;
+      ${c.modo==='cr'?'':'<p class="hint" style="text-align:center">Subí el volumen: suena al cambiar de fase y en los últimos 3 segundos.</p>'}</div>`}
+  function armar(){fases=[];if(c.modo==='cd'){fases.push({t:'work',d:Math.max(5,c.cd),cd:true});return}
+    if(c.p)fases.push({t:'prep',d:c.p});const k=K(),N=c.n*k;
     for(let x=0;x<N;x++){const v=Math.floor(x/k),j=x%k;fases.push({t:'work',d:c.w,v,j,ej:ejs[j]});
       if(x<N-1){const fv=j===k-1;const d=fv&&c.rv?c.rv:c.r;if(d)fases.push({t:'rest',d,v,j,fv,ej:ejs[(j+1)%k]})}}}
-  function go(){if(!plan&&!ejs.length){Object.assign(libre,c);store.set('tmr',JSON.stringify(libre))}armar();fi=0;pausa=false;wake(true);beep(660,.08);iniciar(fases[0].d);clearInterval(iv);iv=setInterval(tick,100);dibujar()}
+  function go(){if(!plan&&!ejs.length){Object.assign(libre,c);store.set('tmr',JSON.stringify(libre))}
+    clearInterval(iv);wake(true);beep(660,.08);pausa=false;
+    if(c.modo==='cr'){estado='cr';cr={run:true,base:0,t0:performance.now(),laps:[]};iv=setInterval(tickCr,100);dibujar();return}
+    estado='run';armar();fi=0;iniciar(fases[0].d);iv=setInterval(tick,100);dibujar()}
   function iniciar(d){fin=performance.now()+d*1000;ultS=-1}
   function stop(){clearInterval(iv);iv=null;wake(false)}
   function sig(){fi++;if(fi>=fases.length){stop();terminado();return}const f=fases[fi];beep(f.t==='work'?1046:520,f.t==='work'?.35:.25);vib(f.t==='work'?[200,80,200]:300);iniciar(f.d);dibujar()}
   function tick(){if(pausa)return;const r=(fin-performance.now())/1000;if(r<=0){sig();return}const s=Math.ceil(r);if(s!==ultS){ultS=s;if(s<=3)beep(880,.09);const n=el().querySelector('.t-num');if(n)n.textContent=mmss(r);}
     const b=el().querySelector('.t-bar i');if(b)b.style.width=(1-r/fases[fi].d)*100+'%'}
-  function dibujar(){const f=fases[fi];const r=pausa?rest:(fin-performance.now())/1000;const k=K();
-    el().className='run f-'+f.t;
-    const L={prep:'Preparate',work:'¡Trabajo!',rest:f.fv&&c.rv?'Pausa':'Descanso'}[f.t];
-    const pos=f.t==='prep'?(ejs.length?`${c.n} ${c.n===1?'vuelta':'vueltas'} · ${ejs.length} ejercicios · ${c.w}" / ${c.r}"`:`${c.n} rondas · ${c.w}" / ${c.r}"`):(ejs.length?`Vuelta ${f.v+1} de ${c.n}${k>1?` · Ejercicio ${f.j+1} de ${k}`:''}`:`Ronda ${f.v+1} de ${c.n}`);
+  const crMs=()=>cr.base+(cr.run?performance.now()-cr.t0:0);
+  function tickCr(){const n=el().querySelector('.t-num');if(n)n.textContent=crTxt(crMs())}
+  const topBar=t=>`<div class="t-top"><h2>${esc(t)}</h2><span class="t-tb"><button class="t-x" data-tmin="1" title="Reducir">⤡ Reducir</button><button class="t-x" data-tx="1">Salir</button></span></div>`;
+  const ctl=(extra)=>`<div class="t-ctl"><button data-tctl="reset">↺ Reiniciar</button><button class="t-pp" data-tctl="pp">${pausa?'▶ Seguir':'❚❚ Pausa'}</button>${extra}</div>`;
+  function dibujar(){
+    if(estado==='cr'){const ms=crMs();full(!mini);el().className='run f-cr'+(mini?' mini':'');
+      const laps=cr.laps.map((l,i)=>`<li><span>Vuelta ${i+1}</span><b>${crTxt(l-(cr.laps[i-1]||0))}</b><small>${crTxt(l)}</small></li>`).reverse().join('');
+      if(mini){el().innerHTML=`<div class="tm-mini"><div class="tm-l"><span class="t-fl">Cronómetro${cr.laps.length?' · '+cr.laps.length+' vueltas':''}</span><span class="t-num">${crTxt(ms)}</span></div><div class="tm-b"><button data-tctl="pp" aria-label="Pausa">${cr.run?'❚❚':'▶'}</button><button data-tctl="lap" aria-label="Vuelta" ${cr.run?'':'disabled'}>⚑</button><button data-tfull="1" aria-label="Pantalla completa">⤢</button><button data-tx="1" aria-label="Cerrar">✕</button></div></div>`;return}
+      el().innerHTML=`${topBar('Cronómetro')}<div class="t-run"><div class="t-fase">${cr.run?'Corriendo':'En pausa'}</div><div class="t-num t-num-cr">${crTxt(ms)}</div>
+        <div class="t-ctl"><button data-tctl="reset">↺ Reiniciar</button><button class="t-pp" data-tctl="pp">${cr.run?'❚❚ Pausa':'▶ Seguir'}</button><button data-tctl="lap" ${cr.run?'':'disabled'}>⚑ Vuelta</button></div>
+        ${laps?`<ol class="t-laps">${laps}</ol>`:''}</div>`;return}
+    const f=fases[fi];const r=pausa?rest:(fin-performance.now())/1000;const k=K();
+    full(!mini);el().className='run f-'+f.t+(mini?' mini':'');
+    const L=f.cd?'Cuenta regresiva':{prep:'Preparate',work:'¡Trabajo!',rest:f.fv&&c.rv?'Pausa':'Descanso'}[f.t];
+    const pos=f.cd?'':f.t==='prep'?(ejs.length?`${c.n} ${c.n===1?'vuelta':'vueltas'} · ${ejs.length} ejercicios · ${c.w}" / ${c.r}"`:`${c.n} rondas · ${c.w}" / ${c.r}"`):(ejs.length?`Vuelta ${f.v+1} de ${c.n}${k>1?` · Ejercicio ${f.j+1} de ${k}`:''}`:`Ronda ${f.v+1} de ${c.n}`);
+    const ejT=f.t==='work'&&f.ej?f.ej:f.t!=='work'&&f.ej?f.ej:f.t==='prep'&&ejs.length?ejs[0]:null;
+    if(mini){const pc=(1-r/f.d)*100;
+      el().innerHTML=`<div class="tm-mini"><div class="tm-l"><span class="t-fl">${pausa?'En pausa':L}${pos?' · '+(ejs.length?`V${f.v!=null?f.v+1:1}/${c.n}${k>1&&f.j!=null?' · E'+(f.j+1)+'/'+k:''}`:f.v!=null?`R${f.v+1}/${c.n}`:''):''}</span><span class="t-num">${mmss(r)}</span>${ejT?`<span class="t-ejm">${f.t==='work'?'':'Sigue: '}${esc(ejT.nombre)}${ejT.kg?' · '+esc(ejT.kg)+' kg':''}</span>`:''}</div>
+        <div class="tm-b"><button data-tctl="pp" aria-label="Pausa">${pausa?'▶':'❚❚'}</button>${f.cd?'':'<button data-tctl="skip" aria-label="Saltar">⏭</button>'}<button data-tfull="1" aria-label="Pantalla completa">⤢</button><button data-tx="1" aria-label="Cerrar">✕</button></div>
+        <div class="t-bar"><i style="width:${pc}%"></i></div></div>`;return}
     const ej=f.t==='work'&&f.ej?`<div class="t-ej">${esc(f.ej.nombre)}</div>${carga(f.ej)?`<div class="t-kg">${carga(f.ej)}</div>`:''}`:f.t==='rest'&&f.ej?`<div class="t-sig">${f.fv?'Arranca la vuelta '+(f.v+2)+' con:':'Sigue:'} <b>${esc(f.ej.nombre)}</b>${carga(f.ej)?' · '+carga(f.ej):''}</div>`:f.t==='prep'&&ejs.length?`<div class="t-sig">Primero: <b>${esc(ejs[0].nombre)}</b>${carga(ejs[0])?' · '+carga(ejs[0]):''}</div>`:'';
-    el().innerHTML=`<div class="t-top"><h2>${esc(titulo)}</h2><button class="t-x" data-tx="1">Salir</button></div>
+    el().innerHTML=`${topBar(titulo)}
     <div class="t-run"><div class="t-fase">${pausa?'En pausa':L}</div><div class="t-num">${mmss(r)}</div>
-      <div class="t-rnd">${pos}</div>${ej}
+      ${pos?`<div class="t-rnd">${pos}</div>`:''}${ej}
       <div class="t-bar"><i style="width:${(1-r/f.d)*100}%"></i></div>
-      <div class="t-ctl"><button data-tctl="reset">↺ Reiniciar</button><button class="t-pp" data-tctl="pp">${pausa?'▶ Seguir':'❚❚ Pausa'}</button><button data-tctl="skip">Saltar ⏭</button></div></div>`}
-  function terminado(){beep(1046,.2);setTimeout(()=>beep(1318,.4),250);vib([300,100,300,100,500]);el().className='run f-fin';
-    el().innerHTML=`<div class="t-top"><h2>${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div><div class="t-run"><div class="t-fase">¡Terminaste!</div><div class="t-rnd">${ejs.length?`${c.n} ${c.n===1?'vuelta':'vueltas'} · ${ejs.length} ejercicios`:c.n+' rondas'} · ${durTxt()}</div>${ejs.length?'<div class="t-sig">Volvé a la rutina para tildar los ejercicios.</div>':''}<div class="t-ctl"><button class="t-pp" data-tctl="otra">Otra vez</button><button data-tctl="cfg">Cambiar tiempos</button></div></div>`}
+      ${ctl(f.cd?'':'<button data-tctl="skip">Saltar ⏭</button>')}</div>`}
+  async function autoTilde(){
+    const its=ejs.filter(x=>x.uid&&!regHoy(x.uid));let n=0;
+    for(const x of its){const r=await guardarEj(x.uid,{kg:x.kg||'',reps:''});if(!r.error)n++}
+    const d=diaDeItem(ejs[0]?.uid);if(d&&!regHoy('asis:'+d.uid)){const a=await logRpc({p_token:token,p_rutina:D.rutina.id,p_item:'asis:'+d.uid,p_fecha:fSel(),p_kg:'',p_reps:'',p_cansancio:null,p_nota:'Asistió',p_ej:'',p_nombre:d.nombre});if(!a.error){D.registros=D.registros.filter(x=>x.id!==a.data.id);D.registros.push(a.data)}}
+    render();return n}
+  async function terminado(){beep(1046,.2);setTimeout(()=>beep(1318,.4),250);vib([300,100,300,100,500]);estado='fin';
+    let msg=ejs.length?'Volvé a la rutina para tildar los ejercicios.':'';
+    if(plan){msg='Tildando los ejercicios…';pintaFin(msg);const n=await autoTilde();msg=n?`✓ Se tildaron los ${n} ejercicios del circuito.`:'✓ Los ejercicios ya estaban tildados.'}
+    pintaFin(msg)}
+  function pintaFin(msg){full(!mini);el().className='run f-fin'+(mini?' mini':'');
+    const res=c.modo==='cd'?durTxt():`${ejs.length?`${c.n} ${c.n===1?'vuelta':'vueltas'} · ${ejs.length} ejercicios`:c.n+' rondas'} · ${durTxt()}`;
+    if(mini){el().innerHTML=`<div class="tm-mini"><div class="tm-l"><span class="t-fl">¡Terminaste! · ${res}</span>${msg?`<span class="t-ejm">${esc(msg)}</span>`:''}</div><div class="tm-b"><button data-tctl="otra" aria-label="Otra vez">↺</button><button data-tx="1" aria-label="Cerrar">✕</button></div></div>`;return}
+    el().innerHTML=`<div class="t-top"><h2>${esc(titulo)}</h2><button class="t-x" data-tx="1">Cerrar</button></div><div class="t-run"><div class="t-fase">¡Terminaste!</div><div class="t-rnd">${res}</div>${msg?`<div class="t-sig">${esc(msg)}</div>`:''}<div class="t-ctl"><button class="t-pp" data-tctl="otra">Otra vez</button><button data-tctl="cfg">Cambiar tiempos</button></div></div>`}
+  function setMini(v){mini=v;store.set('tmrmini',v?'1':'0');if(estado==='fin')pintaFin(el().querySelector('.t-sig,.t-ejm')?.textContent||'');else if(estado!=='cfg')dibujar()}
   document.addEventListener('click',ev=>{const t=ev.target;if(!t.closest||!t.closest('#tmr'))return;let b;
     if(b=t.closest('[data-tx]')){cerrar();return}
+    if(b=t.closest('[data-tmin]')){setMini(true);return}
+    if(b=t.closest('[data-tfull]')){setMini(false);return}
+    if(b=t.closest('[data-tmodo]')){c.modo=b.dataset.tmodo;cfg();return}
+    if(b=t.closest('[data-tcd]')){c.cd=Number(b.dataset.tcd);cfg();return}
     if(b=t.closest('[data-tpre]')){const p=PRE.find(x=>x[0]===b.dataset.tpre);Object.assign(c,p[2],{pre:p[0]});cfg();return}
-    if(b=t.closest('[data-tst]')){const k=b.dataset.tst,lim={w:[5,600],r:[0,600],n:[1,99],p:[0,60],rv:[0,600]}[k];c[k]=Math.min(lim[1],Math.max(lim[0],(c[k]||0)+Number(b.dataset.d)));c.pre='';cfg();return}
+    if(b=t.closest('[data-tst]')){const k=b.dataset.tst,lim={w:[5,600],r:[0,600],n:[1,99],p:[0,60],rv:[0,600],cd:[5,5999]}[k];c[k]=Math.min(lim[1],Math.max(lim[0],(c[k]||0)+Number(b.dataset.d)));if(k!=='cd')c.pre='';cfg();return}
     if(b=t.closest('[data-tgo]')){go();return}
     if(b=t.closest('[data-tctl]')){const a=b.dataset.tctl;
+      if(estado==='cr'){if(a==='pp'){if(cr.run){cr.base=crMs();cr.run=false}else{cr.t0=performance.now();cr.run=true}}else if(a==='lap'&&cr.run){cr.laps.push(crMs());beep(880,.06)}else if(a==='reset'){cr={run:false,base:0,t0:0,laps:[]}}dibujar();return}
       if(a==='pp'){if(!pausa){rest=(fin-performance.now())/1000;pausa=true}else{pausa=false;fin=performance.now()+rest*1000}dibujar()}
       else if(a==='skip'){pausa=false;sig()}
       else if(a==='reset'){stop();go()}
       else if(a==='otra'){go()}else if(a==='cfg'){cfg()}}});
+  document.addEventListener('change',ev=>{const m=ev.target.closest&&ev.target.closest('[data-tmini]');if(m){mini=m.checked;store.set('tmrmini',mini?'1':'0')}});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iv)wake(true)});
   return {abrir};
 })();

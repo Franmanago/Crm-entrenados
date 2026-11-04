@@ -96,7 +96,7 @@ function build(r,e,kgFn){
         for(const it of b.items){
           const k=kgFn(it);const pad=3;
           const c0=fit(it.nombre,colsW[0]-2*pad,fz,false,Math.max(5.6,fz-1.8));p.text(colX[0]+pad,t+rowH*0.66,c0.s,c0.z,false);
-          const c1=fit(it.reps,colsW[1]-2*pad,fz,false,5.5);p.text(colX[1]+pad,t+rowH*0.66,c1.s,c1.z,false);
+          const c1=fit(b.modo==='timer'?'':it.reps,colsW[1]-2*pad,fz,false,5.5);p.text(colX[1]+pad,t+rowH*0.66,c1.s,c1.z,false);
           if(k){const kz=fz;const kt=fit(k,colsW[2]-2*pad-(it.pct?tw(it.pct+'%',fz*0.72,false)+2:0),kz,true,5.5);p.text(colX[2]+pad,t+rowH*0.66,kt.s,kt.z,true);
             if(it.pct)p.text(colX[2]+pad+tw(kt.s,kt.z,true)+2,t+rowH*0.66,it.pct+'%',fz*0.72,false,0.4)}
           else if(it.pct)p.text(colX[2]+pad,t+rowH*0.66,it.pct+'%',fz*0.85,false,0.3);
