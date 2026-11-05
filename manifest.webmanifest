@@ -1,12 +1,12 @@
 {
-  "name": "CRM Entrenados",
-  "short_name": "Entrenados",
+  "name": "entrená.",
+  "short_name": "entrená",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#EEF1F0",
-  "theme_color": "#2148B8",
+  "background_color": "#0C0F0E",
+  "theme_color": "#0C0F0E",
   "icons": [
-    {"src": "icono-192.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "icono-512.png", "sizes": "512x512", "type": "image/png"}
+    {"src": "icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
   ]
 }

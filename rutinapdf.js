@@ -22,6 +22,11 @@ function Page(){const ops=[];const y=v=>(H-v).toFixed(2);
     poly(pts,fill,stroke,lw,close){if(!pts.length)return;ops.push(`${(lw??0.5).toFixed(2)} w 1 J 1 j ${col(fill,true)}${col(stroke,false)}${pts.map((p,i)=>`${p[0].toFixed(2)} ${y(p[1])} ${i?'l':'m'}`).join(' ')} ${close===false?'':'h '}${fill!=null&&stroke!=null?'B':fill!=null?'f':'S'}`)},
     arc(cx,cy,r0,r1,a0,a1,fill){const n=Math.max(6,Math.ceil(Math.abs(a1-a0)/0.08));const pts=[];for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n;pts.push([cx+r1*Math.cos(a),cy+r1*Math.sin(a)])}
       for(let i=n;i>=0;i--){const a=a0+(a1-a0)*i/n;pts.push([cx+r0*Math.cos(a),cy+r0*Math.sin(a)])}this.poly(pts,fill,null)}}}
+// marca entrená. alineada a la derecha en xr
+function marca(p,xr,top,sz){const fs=sz*0.85,w1=tw('entrená',fs,true),w2=tw('.',fs,true);const x0=xr-(sz+4+w1+w2);
+  p.rect(x0,top,sz,sz,'#C8F23A',null);p.text(x0+sz*0.16,top+sz*0.8,'e',sz*1.02,true,'#0C0F0E');
+  const cx=x0+sz*0.82,cy=top+sz*0.73,r=sz*0.11,c=[];for(let i=0;i<20;i++){const a=i/20*Math.PI*2;c.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}p.poly(c,'#FFFFFF','#0C0F0E',Math.max(0.4,sz*0.04));
+  p.text(x0+sz+4,top+sz*0.82,'entrená',fs,true,'#0C0F0E');p.text(x0+sz+4+w1,top+sz*0.82,'.',fs,true,'#6E8A12');return x0}
 function pdfBytes(pages,title){
   const objs=[];const add=s=>{objs.push(s);return objs.length};
   const f1=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
@@ -78,8 +83,8 @@ function build(r,e,kgFn){
   const FOOT=18;
   function footer(p,n,total){
     const s='Cansancio (RPE): 1–3 muy fácil · 4–5 moderado · 6–7 difícil pero controlado · 8 muy difícil (quedan 2 reps) · 9 casi al máximo · 10 máximo';
-    p.line(M,H-M-FOOT+4,M+CW,H-M-FOOT+4,0.5,0.6);const f=fit(s,CW-50,6.8,false,5.5);p.text(M,H-M-FOOT+13,f.s,f.z,false,0.3);
-    if(total>1)p.text(M+CW-tw(`Hoja ${n} de ${total}`,6.8,false),H-M-FOOT+13,`Hoja ${n} de ${total}`,6.8,false,0.3);
+    p.line(M,H-M-FOOT+4,M+CW,H-M-FOOT+4,0.5,0.6);const xm=marca(p,M+CW,H-M-FOOT+6,10);const hj=total>1?`Hoja ${n} de ${total}`:'';
+    if(hj)p.text(xm-10-tw(hj,6.8,false),H-M-FOOT+13,hj,6.8,false,0.3);const f=fit(s,xm-M-(hj?tw(hj,6.8,false)+24:14),6.8,false,5);p.text(M,H-M-FOOT+13,f.s,f.z,false,0.3);
   }
   function drawDays(p,top,dias,rowH,fz){
     let t=top;const DH=Math.max(12,rowH*1.15),CH=Math.max(9,rowH*0.8),BH=Math.max(8.5,rowH*0.82);
@@ -243,7 +248,7 @@ function resumen(e,D){
       P.forEach((q,j)=>{const pts=[];all.forEach((a,i)=>{if(a.i===j)pts.push([X(i),Y(a.v)])});if(pts.length>1)p.poly(pts,null,col(j),1.8,false);pts.forEach(pt=>p.poly(circ(pt[0],pt[1],2.3),col(j),null))})}
     y+=wh+10}
   if(y<H-M-60&&D.vacio)T(M,y+14,D.vacio,8.4,false,C.muted);
-  p.line(M,H-M-10,M+CW,H-M-10,0.5,C.line);T(M,H-M,`Generado el ${D.generado} · Los datos de asistencia, kg, carga y bienestar los anota el entrenado en su link personal.`,6.8,false,C.muted);
+  p.line(M,H-M-10,M+CW,H-M-10,0.5,C.line);marca(p,M+CW,H-M-8,10);T(M,H-M,`Generado el ${D.generado} · Los datos de asistencia, kg, carga y bienestar los anota el entrenado en su link personal.`,6.8,false,C.muted);
   return pdfBytes([p],D.titulo+' - '+tc(e.nombre));
 }
 /* ===== Reporte mensual ===== */
