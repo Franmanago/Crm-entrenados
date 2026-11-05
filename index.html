@@ -6,9 +6,9 @@
 <title>entrená.</title>
 <meta name="theme-color" content="#F3F4F1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C0F0E" media="(prefers-color-scheme: dark)">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icono.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icono-180.png">
+<link rel="manifest" href="manifest.webmanifest?v=2">
+<link rel="icon" href="icono.svg?v=2" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icono2-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,7 +17,7 @@
 </head>
 <body>
 <div id="splash" aria-hidden="true"><div class="sp-in"><img src="icono.svg" alt="" width="132" height="132"><span class="sp-w">entrená<i>.</i></span></div></div>
-<script>window.splashOff=function(){var s=document.getElementById('splash');if(!s||s.dataset.off)return;s.dataset.off=1;var t=Math.max(0,700-(Date.now()-window.__sp0));setTimeout(function(){s.classList.add('off');setTimeout(function(){s.remove()},450)},t)};window.__sp0=Date.now();setTimeout(window.splashOff,7000);</script>
+<script>window.splashOff=function(){var s=document.getElementById('splash');if(!s||s.dataset.off)return;s.dataset.off=1;var mn=(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)?0:700;var t=Math.max(0,mn-(Date.now()-window.__sp0));setTimeout(function(){s.classList.add('off');setTimeout(function(){s.remove()},450)},t)};window.__sp0=Date.now();setTimeout(window.splashOff,7000);</script>
 <div id="login" class="login" hidden>
   <form id="login-form" class="card">
     <h1><img src="icono.svg" alt=""><span>entrená<i>.</i></span></h1>

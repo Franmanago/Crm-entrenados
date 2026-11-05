@@ -6,8 +6,8 @@
 <title>Mi rutina · entrená.</title>
 <meta name="theme-color" content="#0C0F0E">
 <meta name="robots" content="noindex">
-<link rel="icon" href="icono.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icono-180.png">
+<link rel="icon" href="icono.svg?v=2" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icono2-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700;900&display=swap">
 <style>
@@ -243,7 +243,7 @@ body.tmr-on:not(.tmr-full) main{padding-bottom:150px}
 </head>
 <body>
 <div id="splash" aria-hidden="true"><div class="sp-in"><img src="icono.svg" alt="" width="132" height="132"><span class="sp-w">entrená<i>.</i></span></div></div>
-<script>window.splashOff=function(){var s=document.getElementById('splash');if(!s||s.dataset.off)return;s.dataset.off=1;var t=Math.max(0,700-(Date.now()-window.__sp0));setTimeout(function(){s.classList.add('off');setTimeout(function(){s.remove()},450)},t)};window.__sp0=Date.now();setTimeout(window.splashOff,7000);</script>
+<script>window.splashOff=function(){var s=document.getElementById('splash');if(!s||s.dataset.off)return;s.dataset.off=1;var mn=(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)?0:700;var t=Math.max(0,mn-(Date.now()-window.__sp0));setTimeout(function(){s.classList.add('off');setTimeout(function(){s.remove()},450)},t)};window.__sp0=Date.now();setTimeout(window.splashOff,7000);</script>
 <header><div class="wrap"><div class="hrow"><div class="hola" id="hola">Cargando…</div><div class="pb"><img src="icono.svg" alt=""><span>entrená<i>.</i></span></div></div><h1 id="titulo">Mi rutina</h1><div class="meta" id="meta"></div></div></header>
 <div id="tmr" hidden aria-live="polite"></div>
 <main class="wrap" id="main"><div class="card msg"><p class="hint">Cargando tu rutina…</p></div></main>
