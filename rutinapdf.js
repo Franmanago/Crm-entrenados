@@ -7,7 +7,9 @@ const W=595.28,H=841.89,M=28;
 const SPECIAL={'€':128,'‚':130,'„':132,'…':133,'‘':145,'’':146,'“':147,'”':148,'•':149,'–':150,'—':151,'™':153};
 function enc(s){let o='';for(const ch of String(s??'')){let c=ch.codePointAt(0);if(SPECIAL[ch])c=SPECIAL[ch];else if(c>255||(c>=127&&c<160))c=63;
   const x=String.fromCharCode(c);o+=x==='('||x===')'||x==='\\'?'\\'+x:x}return o}
-function tw(s,size,bold){const t=bold?HBW:HW;let w=0;for(const ch of String(s??'')){let c=ch.codePointAt(0);if(SPECIAL[ch])c=SPECIAL[ch];else if(c>255)c=63;w+=t[c]||556}return w*size/1000}
+const FK=b=>b==='d'?'d':b==='k'?'k':b?'b':'r';
+const FONTS=()=>(typeof window!=='undefined'&&window.PDF_FONTS)||null;
+function tw(s,size,bold){const F=FONTS();const t=F?F[FK(bold)].w:(bold?HBW:HW);let w=0;for(const ch of String(s??'')){let c=ch.codePointAt(0);if(SPECIAL[ch])c=SPECIAL[ch];else if(c>255)c=63;w+=t[c]||(F?500:556)}return w*size/1000}
 function fit(s,maxW,size,bold,minSize){s=String(s??'');let z=size;while(z>minSize&&tw(s,z,bold)>maxW)z-=0.25;
   if(tw(s,z,bold)<=maxW)return {s,z};let t=s;while(t.length>1&&tw(t+'…',z,bold)>maxW)t=t.slice(0,-1);return {s:t+'…',z}}
 function wrap(s,maxW,size,bold){const words=String(s??'').split(/\s+/).filter(Boolean),lines=[];let cur='';
@@ -16,27 +18,37 @@ const hex=c=>{c=c.replace('#','');return [0,2,4].map(i=>parseInt(c.slice(i,i+2),
 const col=(c,f)=>{if(c==null)return '';if(typeof c==='string')c=hex(c);if(Array.isArray(c))return c.map(v=>v.toFixed(3)).join(' ')+(f?' rg ':' RG ');return c.toFixed(2)+(f?' g ':' G ')};
 function Page(){const ops=[];const y=v=>(H-v).toFixed(2);
   return {ops,
-    text(x,top,s,size,bold,gray){ops.push(`BT /${bold?'F2':'F1'} ${size.toFixed(2)} Tf ${col(gray??0,true)}${x.toFixed(2)} ${y(top)} Td (${enc(s)}) Tj ET`)},
+    text(x,top,s,size,bold,gray){ops.push(`BT /${({r:'F1',b:'F2',d:'F3',k:'F4'})[FK(bold)]} ${size.toFixed(2)} Tf ${col(gray??0,true)}${x.toFixed(2)} ${y(top)} Td (${enc(s)}) Tj ET`)},
     rect(x,top,w,h,fill,stroke,lw){ops.push(`${(lw??0.5).toFixed(2)} w ${col(fill,true)}${col(stroke,false)}${x.toFixed(2)} ${y(top+h)} ${w.toFixed(2)} ${h.toFixed(2)} re ${fill!=null&&stroke!=null?'B':fill!=null?'f':'S'}`)},
     line(x1,t1,x2,t2,lw,gray){ops.push(`${lw.toFixed(2)} w ${col(gray??0,false)}${x1.toFixed(2)} ${y(t1)} m ${x2.toFixed(2)} ${y(t2)} l S`)},
     poly(pts,fill,stroke,lw,close){if(!pts.length)return;ops.push(`${(lw??0.5).toFixed(2)} w 1 J 1 j ${col(fill,true)}${col(stroke,false)}${pts.map((p,i)=>`${p[0].toFixed(2)} ${y(p[1])} ${i?'l':'m'}`).join(' ')} ${close===false?'':'h '}${fill!=null&&stroke!=null?'B':fill!=null?'f':'S'}`)},
+    rrect(x,top,w,h,rd,fill,stroke,lw){const pts=[];const cr=(cx,cy,a0)=>{for(let i=0;i<=6;i++){const a=a0+i/6*Math.PI/2;pts.push([cx+rd*Math.cos(a),cy+rd*Math.sin(a)])}};
+      cr(x+w-rd,top+rd,-Math.PI/2);cr(x+w-rd,top+h-rd,0);cr(x+rd,top+h-rd,Math.PI/2);cr(x+rd,top+rd,Math.PI);this.poly(pts,fill,stroke,lw)},
     arc(cx,cy,r0,r1,a0,a1,fill){const n=Math.max(6,Math.ceil(Math.abs(a1-a0)/0.08));const pts=[];for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n;pts.push([cx+r1*Math.cos(a),cy+r1*Math.sin(a)])}
       for(let i=n;i>=0;i--){const a=a0+(a1-a0)*i/n;pts.push([cx+r0*Math.cos(a),cy+r0*Math.sin(a)])}this.poly(pts,fill,null)}}}
-// marca entrená. alineada a la derecha en xr
-function marca(p,xr,top,sz){const fs=sz*0.85,w1=tw('entrená',fs,true),w2=tw('.',fs,true);const x0=xr-(sz+4+w1+w2);
-  p.rect(x0,top,sz,sz,'#C8F23A',null);p.text(x0+sz*0.16,top+sz*0.8,'e',sz*1.02,true,'#0C0F0E');
-  const cx=x0+sz*0.82,cy=top+sz*0.73,r=sz*0.11,c=[];for(let i=0;i<20;i++){const a=i/20*Math.PI*2;c.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}p.poly(c,'#FFFFFF','#0C0F0E',Math.max(0.4,sz*0.04));
-  p.text(x0+sz+4,top+sz*0.82,'entrená',fs,true,'#0C0F0E');p.text(x0+sz+4+w1,top+sz*0.82,'.',fs,true,'#6E8A12');return x0}
+// marca entrená. alineada a la derecha en xr (ink: color del nombre)
+function marca(p,xr,top,sz,ink){ink=ink||'#0C0F0E';const fs=sz*0.95,w1=tw('entrená',fs,'k'),w2=tw('.',fs,'k');const x0=xr-(sz+5+w1+w2);
+  p.rrect(x0,top,sz,sz,sz*0.23,'#C8F23A',null);
+  const ez=sz*0.82,ew=tw('e',ez,'k'),r=sz*0.068,gap=sz*0.03,gw=ew+gap+2*r+sz*0.03;const sx=x0+(sz-gw)/2,base=top+sz*0.71;
+  p.text(sx,base,'e',ez,'k','#0C0F0E');
+  const cx=sx+ew+gap+r,cy=base-r-sz*0.005,c=[];for(let i=0;i<24;i++){const a=i/24*Math.PI*2;c.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}p.poly(c,'#FFFFFF','#0C0F0E',Math.max(0.35,sz*0.028));
+  p.text(x0+sz+5,top+sz*0.8,'entrená',fs,'k',ink);p.text(x0+sz+5+w1,top+sz*0.8,'.',fs,'k',ink==='#0C0F0E'?'#6E8A12':'#C8F23A');return x0}
+const K='#0C0F0E',LI='#C8F23A',LS='#F1F8DA',OL='#4D7A0C',G1='#ECEFE8',LN='#D5DBD2',MU='#5A635E',LN2='#AEB6AF';
 function pdfBytes(pages,title){
   const objs=[];const add=s=>{objs.push(s);return objs.length};
-  const f1=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
-  const f2=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+  const F=FONTS();let f1,f2,f3,f4;
+  if(F){const tt=k=>{const m=F[k];const bin=atob(m.data);const ff=add(`<< /Length ${bin.length} /Length1 ${bin.length} >>\nstream\n${bin}\nendstream`);
+      const fd=add(`<< /Type /FontDescriptor /FontName /${m.name} /Flags 32 /FontBBox [${m.bbox.join(' ')}] /ItalicAngle 0 /Ascent ${m.asc} /Descent ${m.desc} /CapHeight ${m.cap} /StemV 80 /FontFile2 ${ff} 0 R >>`);
+      return add(`<< /Type /Font /Subtype /TrueType /BaseFont /${m.name} /FirstChar 32 /LastChar 255 /Widths [${m.w.slice(32).map(v=>v||500).join(' ')}] /Encoding /WinAnsiEncoding /FontDescriptor ${fd} 0 R >>`)};
+    f1=tt('r');f2=tt('b');f3=tt('d');f4=tt('k')}
+  else{f1=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    f2=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');f3=f2;f4=f2}
   const pagesId=objs.length+1;objs.push(null);
   const kids=[];
   for(const p of pages){const c=p.ops.join('\n');const cid=add(`<< /Length ${c.length} >>\nstream\n${c}\nendstream`);
-    kids.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >> >> /Contents ${cid} 0 R >>`))}
+    kids.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R /F3 ${f3} 0 R /F4 ${f4} 0 R >> >> /Contents ${cid} 0 R >>`))}
   objs[pagesId-1]=`<< /Type /Pages /Kids [${kids.map(k=>k+' 0 R').join(' ')}] /Count ${kids.length} >>`;
-  const info=add(`<< /Title (${enc(title)}) /Producer (CRM Entrenados) >>`);
+  const info=add(`<< /Title (${enc(title)}) /Producer (entrená.) >>`);
   const cat=add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
   let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';const offs=[];
   objs.forEach((o,i)=>{offs.push(out.length);out+=`${i+1} 0 obj\n${o}\nendobj\n`});
@@ -58,12 +70,13 @@ function build(r,e,kgFn){
   const colsW=[0.34,0.08,0.09,0.19].map(f=>f*CW);const sW=(CW-colsW.reduce((a,b)=>a+b,0))/sem;
   const colX=[M];colsW.forEach(w=>colX.push(colX.at(-1)+w));for(let i=1;i<sem;i++)colX.push(colX.at(-1)+sW);colX.push(M+CW);
   function header(p,secTitle){
-    let t=M;
-    p.text(M,t+16,fit(tc(e.nombre),CW*0.62,19,true,12).s,fit(tc(e.nombre),CW*0.62,19,true,12).z,true);
+    const BH=M+56;p.rect(0,0,W,BH,K,null);p.rect(0,BH,W,3,LI,null);
+    const nm=fit(tc(e.nombre).toUpperCase(),CW*0.6,30,'d',16);p.text(M,M+18,nm.s,nm.z,'d','#FFFFFF');
+    const rn=fit(r.nombre||'Rutina',CW*0.6,11,true,8);p.text(M,M+36,rn.s,rn.z,true,LI);
+    marca(p,M+CW,M-12,15,'#FFFFFF');
     const tel=fmtTel(e.telefono);const right=[tel?'Tel: '+tel:'',[r.fechaEntrega||r.fechaSugerida?'Desde el '+fmtD(r.fechaEntrega||r.fechaSugerida):'',`${sem} semanas · ${nd} días`+(e.estimulos?` · ${e.estimulos} por semana`:'')].filter(Boolean).join(' · ')];
-    right.forEach((s,i)=>{if(!s)return;const z=8.3;p.text(M+CW-tw(s,z,i===0),t+9+i*11,s,z,i===0,i===0?0:0.25)});
-    const rn=fit(r.nombre||'Rutina',CW*0.62,10.5,true,8);p.text(M,t+30,rn.s,rn.z,true,0.15);
-    t+=37;p.line(M,t,M+CW,t,1.8,0);t+=7;
+    right.forEach((s2,i)=>{if(!s2)return;const z=8.3;p.text(M+CW-tw(s2,z,i===0),M+20+i*11,s2,z,i===0,i===0?'#FFFFFF':'#B9C2BC')});
+    let t=BH+3+9;
     // indicaciones
     const notes=(r.notas||'').trim();const dist=r.distribucion&&r.distribucion.length?r.distribucion:null;
     if(notes||dist){
@@ -71,51 +84,51 @@ function build(r,e,kgFn){
       const distTxt=dist?dist.map((w,i)=>`Sem ${i+1}: ${w.map(x=>(secs[0]?.dias[x]?.nombre)||('Día '+(x+1))).join(' y ')}`):[];
       const distLines=[];let cur='';for(const d of distTxt){const tt=cur?cur+'     '+d:d;if(tw(tt,z,false)<=CW-16)cur=tt;else{distLines.push(cur);cur=d}}if(cur)distLines.push(cur);
       const h=8+lines.length*10.5+(dist?11+distLines.length*10.5:0)+2;
-      p.rect(M,t,CW,h,0.95,0.6,0.6);p.rect(M,t,2.5,h,0,null);
-      let yy=t+11;lines.forEach(l=>{p.text(M+9,yy,l,z,false);yy+=10.5});
-      if(dist){if(lines.length)yy+=2;p.text(M+9,yy,'Qué día hacer cada semana',z,true);yy+=10.5;distLines.forEach(l=>{p.text(M+9,yy,l,z,false);yy+=10.5})}
+      p.rect(M,t,CW,h,LS,null);p.rect(M,t,3,h,'#9CC31F',null);
+      let yy=t+11;lines.forEach(l=>{p.text(M+9,yy,l,z,false,K);yy+=10.5});
+      if(dist){if(lines.length)yy+=2;p.text(M+9,yy,'Qué día hacer cada semana',z,true,K);yy+=10.5;distLines.forEach(l=>{p.text(M+9,yy,l,z,false,K);yy+=10.5})}
       t+=h+5;
     }
-    p.text(M,t+7,'En las columnas S1, S2… anotá los kg que usaste cada semana.',7.4,false,0.35);t+=12;
-    if(secTitle){p.text(M,t+10,secTitle.toUpperCase(),11,true);t+=13;p.line(M,t,M+CW,t,0.6,0);t+=4}
+    p.text(M,t+7,'En las columnas S1, S2… anotá los kg que usaste cada semana.',7.4,false,MU);t+=12;
+    if(secTitle){p.text(M,t+12,secTitle.toUpperCase(),15,'d',K);t+=15;p.rect(M,t,CW,1.6,LI,null);t+=5}
     return t;
   }
   const FOOT=18;
   function footer(p,n,total){
     const s='Cansancio (RPE): 1–3 muy fácil · 4–5 moderado · 6–7 difícil pero controlado · 8 muy difícil (quedan 2 reps) · 9 casi al máximo · 10 máximo';
-    p.line(M,H-M-FOOT+4,M+CW,H-M-FOOT+4,0.5,0.6);const xm=marca(p,M+CW,H-M-FOOT+6,10);const hj=total>1?`Hoja ${n} de ${total}`:'';
-    if(hj)p.text(xm-10-tw(hj,6.8,false),H-M-FOOT+13,hj,6.8,false,0.3);const f=fit(s,xm-M-(hj?tw(hj,6.8,false)+24:14),6.8,false,5);p.text(M,H-M-FOOT+13,f.s,f.z,false,0.3);
+    p.line(M,H-M-FOOT+4,M+CW,H-M-FOOT+4,0.5,LN);const xm=marca(p,M+CW,H-M-FOOT+6,10);const hj=total>1?`Hoja ${n} de ${total}`:'';
+    if(hj)p.text(xm-10-tw(hj,6.8,false),H-M-FOOT+13,hj,6.8,false,MU);const f=fit(s,xm-M-(hj?tw(hj,6.8,false)+24:14),6.8,false,5);p.text(M,H-M-FOOT+13,f.s,f.z,false,MU);
   }
   function drawDays(p,top,dias,rowH,fz){
     let t=top;const DH=Math.max(12,rowH*1.15),CH=Math.max(9,rowH*0.8),BH=Math.max(8.5,rowH*0.82);
     for(const d of dias){
-      p.rect(M,t,CW,DH,0,null);p.text(M+5,t+DH*0.72,(d.nombre||'').toUpperCase(),Math.min(10.5,DH*0.68),true,1);t+=DH;
-      p.rect(M,t,CW,CH,0.88,null);const hz=Math.min(6.6,CH*0.62);
-      ['EJERCICIO','REPS','KG','NOTAS'].concat(Array.from({length:sem},(_,i)=>'S'+(i+1))).forEach((h,i)=>{const x=i<4?colX[i]+3:colX[i]+(colX[i+1]-colX[i]-tw(h,hz,true))/2;p.text(x,t+CH*0.7,h,hz,true,0.2)});
+      p.rect(M,t,CW,DH,K,null);p.rect(M,t,4,DH,LI,null);p.text(M+9,t+DH*0.78,(d.nombre||'').toUpperCase(),Math.min(14,DH*0.86),'d','#FFFFFF');t+=DH;
+      p.rect(M,t,CW,CH,G1,null);const hz=Math.min(6.6,CH*0.62);
+      ['EJERCICIO','REPS','KG','NOTAS'].concat(Array.from({length:sem},(_,i)=>'S'+(i+1))).forEach((h,i)=>{const x=i<4?colX[i]+3:colX[i]+(colX[i+1]-colX[i]-tw(h,hz,true))/2;p.text(x,t+CH*0.7,h,hz,true,MU)});
       t+=CH;
       for(const b of d.bloques){
-        p.rect(M,t,CW,BH,0.94,null);const bz=Math.min(7.2,BH*0.68);const bn=(b.nombre||'').toUpperCase();p.text(M+3,t+BH*0.72,bn,bz,true,0.1);
+        p.rect(M,t,CW,BH,LS,null);const bz=Math.min(10,BH*0.86);const bn=(b.nombre||'').toUpperCase();p.text(M+4,t+BH*0.8,bn,bz,'d',K);
         const bt=b.modo==='timer'?`· POR TIEMPO: ${b.trabajo||40}" trabajo / ${b.descanso||20}" descanso · ${b.vueltas||3} vueltas${Number(b.pausa)?` · ${b.pausa}" entre vueltas`:''}`:(b.series?`· ${b.series} series`:'');
-        if(bt)p.text(M+6+tw(bn,bz,true),t+BH*0.72,bt,bz*0.95,false,0.3);
-        p.line(M,t+BH,M+CW,t+BH,0.35,0.6);t+=BH;
+        if(bt)p.text(M+8+tw(bn,bz,'d'),t+BH*0.76,bt,Math.min(7,BH*0.66),true,OL);
+        p.line(M,t+BH,M+CW,t+BH,0.35,LN);t+=BH;
         for(const it of b.items){
           const k=kgFn(it);const pad=3;
-          const c0=fit(it.nombre,colsW[0]-2*pad,fz,false,Math.max(5.6,fz-1.8));p.text(colX[0]+pad,t+rowH*0.66,c0.s,c0.z,false);
-          const c1=fit(b.modo==='timer'?'':it.reps,colsW[1]-2*pad,fz,false,5.5);p.text(colX[1]+pad,t+rowH*0.66,c1.s,c1.z,false);
-          if(k){const kz=fz;const kt=fit(k,colsW[2]-2*pad-(it.pct?tw(it.pct+'%',fz*0.72,false)+2:0),kz,true,5.5);p.text(colX[2]+pad,t+rowH*0.66,kt.s,kt.z,true);
-            if(it.pct)p.text(colX[2]+pad+tw(kt.s,kt.z,true)+2,t+rowH*0.66,it.pct+'%',fz*0.72,false,0.4)}
-          else if(it.pct)p.text(colX[2]+pad,t+rowH*0.66,it.pct+'%',fz*0.85,false,0.3);
-          const c3=fit(it.notas,colsW[3]-2*pad,fz*0.9,false,5.2);p.text(colX[3]+pad,t+rowH*0.66,c3.s,c3.z,false,0.25);
-          p.line(M,t+rowH,M+CW,t+rowH,0.35,0.6);t+=rowH;
+          const c0=fit(it.nombre,colsW[0]-2*pad,fz,false,Math.max(5.6,fz-1.8));p.text(colX[0]+pad,t+rowH*0.66,c0.s,c0.z,false,K);
+          const c1=fit(b.modo==='timer'?'':it.reps,colsW[1]-2*pad,fz,false,5.5);p.text(colX[1]+pad,t+rowH*0.66,c1.s,c1.z,false,K);
+          if(k){const kz=fz;const kt=fit(k,colsW[2]-2*pad-(it.pct?tw(it.pct+'%',fz*0.72,false)+2:0),kz,true,5.5);p.text(colX[2]+pad,t+rowH*0.66,kt.s,kt.z,true,K);
+            if(it.pct)p.text(colX[2]+pad+tw(kt.s,kt.z,true)+2,t+rowH*0.66,it.pct+'%',fz*0.72,false,MU)}
+          else if(it.pct)p.text(colX[2]+pad,t+rowH*0.66,it.pct+'%',fz*0.85,false,MU);
+          const c3=fit(it.notas,colsW[3]-2*pad,fz*0.9,false,5.2);p.text(colX[3]+pad,t+rowH*0.66,c3.s,c3.z,false,MU);
+          p.line(M,t+rowH,M+CW,t+rowH,0.35,LN);t+=rowH;
         }
       }
-      if(r.controlCarga){p.rect(M,t,CW,rowH,0.97,null);const cz=Math.min(fz,7.4);p.text(colX[0]+3,t+rowH*0.66,'Sesión: minutos / esfuerzo (1 a 10)',cz,true,0.15);p.text(colX[3]+3,t+rowH*0.66,'ej: 60 / 7',cz*0.9,false,0.45);p.line(M,t+rowH,M+CW,t+rowH,0.35,0.6);t+=rowH}
+      if(r.controlCarga){p.rect(M,t,CW,rowH,'#F6F7F3',null);const cz=Math.min(fz,7.4);p.text(colX[0]+3,t+rowH*0.66,'Sesión: minutos / esfuerzo (1 a 10)',cz,true,K);p.text(colX[3]+3,t+rowH*0.66,'ej: 60 / 7',cz*0.9,false,MU);p.line(M,t+rowH,M+CW,t+rowH,0.35,LN);t+=rowH}
       // verticales de la tabla del día
       const top0=t-(d.bloques.reduce((a,b)=>a+BH+b.items.length*rowH,0))-CH-(r.controlCarga?rowH:0);
-      colX.forEach((x,i)=>{if(i===0||i===colX.length-1)p.line(x,top0,x,t,0.6,0.35);else{
-        let yy=top0;p.line(x,yy,x,yy+CH,0.35,0.6);yy+=CH;for(const b of d.bloques){yy+=BH;p.line(x,yy,x,yy+b.items.length*rowH,0.35,0.6);yy+=b.items.length*rowH}
-        if(r.controlCarga&&i>=4)p.line(x,yy,x,yy+rowH,0.35,0.6)}});
-      p.line(M,t,M+CW,t,0.6,0.35);
+      colX.forEach((x,i)=>{if(i===0||i===colX.length-1)p.line(x,top0,x,t,0.6,LN2);else{
+        let yy=top0;p.line(x,yy,x,yy+CH,0.35,LN);yy+=CH;for(const b of d.bloques){yy+=BH;p.line(x,yy,x,yy+b.items.length*rowH,0.35,LN);yy+=b.items.length*rowH}
+        if(r.controlCarga&&i>=4)p.line(x,yy,x,yy+rowH,0.35,LN)}});
+      p.line(M,t,M+CW,t,0.6,LN2);
       t+=6;
     }
     return t;
@@ -160,21 +173,22 @@ function zip(files){
 }
 /* ===== Hoja resumen a color (1 período o comparativa de 2) ===== */
 function resumen(e,D){
-  const C={navy:'#17306E',ink:'#16202B',muted:'#5F6B7A',line:'#D5DBE5',soft:'#F2F5FA',p1:'#A9B7D3',p2:'#2148B8',ok:'#1E9E5A',okS:'#E3F4EA',warn:'#E0A100',bad:'#D64545',badS:'#FBE4E4',white:'#FFFFFF',pie:['#7CC4A0','#F2C14E','#EE8B3A','#D64545'],sc:['#E46A6A','#F09A5A','#F2C94C','#7DC37A']};
+  const C={navy:'#0C0F0E',ink:'#0C0F0E',muted:'#5A635E',line:'#D5DBD2',soft:'#EEF1EA',p1:'#B9C2BC',p2:'#0C0F0E',ok:'#4D7A0C',okS:'#EAF5C9',warn:'#E0A100',bad:'#D64545',badS:'#FBE4E4',white:'#FFFFFF',pie:['#7CC4A0','#F2C14E','#EE8B3A','#D64545'],sc:['#E46A6A','#F09A5A','#F2C94C','#7DC37A']};
   const p=Page();const CW=W-2*M;const P=D.periodos,two=P.length===2;const col=i=>two?(i?C.p2:C.p1):C.p2;
   const T=(x,y,s,z,b,c)=>p.text(x,y,String(s),z,b,c??C.ink);const TR=(x,y,s,z,b,c)=>T(x-tw(String(s),z,b),y,s,z,b,c);const TC=(x,y,s,z,b,c)=>T(x-tw(String(s),z,b)/2,y,s,z,b,c);
   const circ=(cx,cy,r)=>{const o=[];for(let i=0;i<24;i++){const a=i/24*Math.PI*2;o.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}return o};
-  const card=(x,y,w,h,t,desc)=>{p.rect(x,y,w,h,C.white,C.line,0.8);T(x+12,y+17,t.toUpperCase(),8.2,true,C.navy);if(!desc)return 0;const L=wrap(desc,w-24,6.9,false);L.forEach((l,i)=>T(x+12,y+28+i*8.4,l,6.9,false,C.muted));return L.length*8.4};
+  const card=(x,y,w,h,t,desc)=>{p.rect(x,y,w,h,C.white,C.line,0.8);p.rect(x,y,4,h,'#C8F23A',null);T(x+12,y+18,t.toUpperCase(),12,'d',C.navy);if(!desc)return 0;const L=wrap(desc,w-24,6.9,false);L.forEach((l,i)=>T(x+12,y+28+i*8.4,l,6.9,false,C.muted));return L.length*8.4};
   const fmtK=v=>v>=1000?(v/1000).toFixed(1)+'k':String(Math.round(v));
   const badge=(x,y,dl,suf)=>{const up=dl>=0;const t=(up?'+':'-')+Math.abs(dl)+suf;const bw=tw(t,8,true)+20;p.rect(x-bw,y,bw,13,up?C.okS:C.badS,null);const ax=x-bw+6,ay=y+9.5;
     if(up)p.poly([[ax,ay],[ax+6,ay],[ax+3,ay-5]],C.ok);else p.poly([[ax,ay-5],[ax+6,ay-5],[ax+3,ay]],C.bad);T(ax+9,ay,t,8,true,up?C.ok:C.bad)};
   // encabezado
-  p.rect(0,0,W,76,C.navy,null);
-  const nm=fit(tc(e.nombre).toUpperCase(),CW-170,22,true,13);T(M,32,nm.s,nm.z,true,C.white);
-  T(M,49,D.titulo,11.5,true,'#C9D6F5');const sb=fit(D.sub,CW-170,8.4,false,6);T(M,64,sb.s,sb.z,false,'#AFC0E8');
-  if(two)P.forEach((q,i)=>{const x=W-M-150+i*80;p.rect(x,26,10,10,col(i),'#FFFFFF',0.8);const f=fit(q.corto,62,9,true,6);T(x+15,35,f.s,f.z,true,C.white)});
-  const tel=fmtTel(e.telefono);if(tel)TR(W-M,two?60:35,'Tel: '+tel,8.2,true,'#C9D6F5');
-  let y=88;const L=P[P.length-1],F=P[0];
+  p.rect(0,0,W,76,C.navy,null);p.rect(0,76,W,3,'#C8F23A',null);
+  const nm=fit(tc(e.nombre).toUpperCase(),CW-190,30,'d',16);T(M,33,nm.s,nm.z,'d',C.white);
+  T(M,50,D.titulo,11.5,true,'#C8F23A');const sb=fit(D.sub,CW-190,8.4,false,6);T(M,64,sb.s,sb.z,false,'#B9C2BC');
+  marca(p,W-M,12,14,'#FFFFFF');
+  if(two)P.forEach((q,i)=>{const x=W-M-150+i*80;p.rect(x,36,10,10,col(i),'#FFFFFF',0.8);const f=fit(q.corto,62,9,true,6);T(x+15,45,f.s,f.z,true,C.white)});
+  const tel=fmtTel(e.telefono);if(tel)TR(W-M,two?64:50,'Tel: '+tel,8.2,true,'#FFFFFF');
+  let y=92;const L=P[P.length-1],F=P[0];
   // KPIs
   const kw=(CW-30)/4;
   const kp=[
@@ -182,7 +196,7 @@ function resumen(e,D){
     ['Fuerza promedio',D.fuerzaPct==null?'—':`${D.fuerzaPct>=0?'+':''}${D.fuerzaPct}%`,'',D.kg.length?`kg máximos · ${D.kg.length} ejercicios`:'sin kg anotados',null,''],
     ['Carga del mes',L.carga?fmtK(L.carga):'—',L.carga?'min × esfuerzo':'',two?`${F.corto}: ${F.carga?fmtK(F.carga):'—'}`:(L.sesiones?`${L.sesiones} sesiones anotadas`:'sin sesiones anotadas'),two&&F.carga&&L.carga?Math.round((L.carga-F.carga)/F.carga*100):null,'%'],
     ['Bienestar',L.bien.n?String(L.bien.tot):'—',L.bien.n?'de 15':'',two?`${F.corto}: ${F.bien.n?F.bien.tot:'—'}`:(L.bien.n?`${L.bien.n} respuestas`:'sin respuestas'),two&&F.bien.n&&L.bien.n?+(L.bien.tot-F.bien.tot).toFixed(1):null,'']];
-  kp.forEach(([l,v,u,s2,dl,suf],i)=>{const x=M+i*(kw+10);p.rect(x,y,kw,58,C.white,C.line,0.8);T(x+12,y+15,l.toUpperCase(),7.4,true,C.muted);T(x+12,y+38,v,20,true);if(u)T(x+14+tw(v,20,true),y+38,u,8,false,C.muted);
+  kp.forEach(([l,v,u,s2,dl,suf],i)=>{const x=M+i*(kw+10);p.rect(x,y,kw,58,C.white,C.line,0.8);T(x+12,y+15,l.toUpperCase(),7.4,true,C.muted);T(x+12,y+40,v,27,'d');if(u)T(x+14+tw(v,27,'d'),y+40,u,8,false,C.muted);
     const f=fit(s2,kw-(dl!=null?78:24),7.6,false,5.5);T(x+12,y+51,f.s,f.z,false,C.muted);if(dl!=null)badge(x+kw-10,y+41,dl,suf)});
   y+=68;
   // asistencia

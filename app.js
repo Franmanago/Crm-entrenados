@@ -1325,7 +1325,7 @@ show(location.hash.slice(1)||'panel');
   const db=await window.DBReady;
   S.db=db;
   const got={e:false,h:false,p:false,m:false,r:false,j:false,t:false,g:false};
-  const done=()=>{if(Object.values(got).every(Boolean))S.loaded=true;render()};
+  const done=()=>{if(Object.values(got).every(Boolean)){S.loaded=true;window.splashOff&&window.splashOff()}render()};
   const onErr=()=>banner('Se perdió la conexión con la base de datos. Recargá la página.');
   db.collection('entrenados').onSnapshot(s=>{const m={};s.docs.forEach(d=>{m[d.id]={...d.data(),id:d.id}});S.ents=m;got.e=true;done()},onErr);
   db.collection('historial').onSnapshot(s=>{S.hist=s.docs.map(d=>({...d.data(),_id:d.id}));got.h=true;done()},onErr);

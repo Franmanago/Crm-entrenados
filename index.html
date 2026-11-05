@@ -13,9 +13,11 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700;900&display=swap">
-<link rel="stylesheet" href="estilos.css?v=20261105a">
+<link rel="stylesheet" href="estilos.css?v=20261105b">
 </head>
 <body>
+<div id="splash" aria-hidden="true"><div class="sp-in"><img src="icono.svg" alt="" width="132" height="132"><span class="sp-w">entrená<i>.</i></span></div></div>
+<script>window.splashOff=function(){var s=document.getElementById('splash');if(!s||s.dataset.off)return;s.dataset.off=1;var t=Math.max(0,700-(Date.now()-window.__sp0));setTimeout(function(){s.classList.add('off');setTimeout(function(){s.remove()},450)},t)};window.__sp0=Date.now();setTimeout(window.splashOff,7000);</script>
 <div id="login" class="login" hidden>
   <form id="login-form" class="card">
     <h1><img src="icono.svg" alt=""><span>entrená<i>.</i></span></h1>
@@ -56,8 +58,9 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="db.js?v=20261105a"></script>
-<script src="rutinapdf.js?v=20261105a"></script>
-<script src="app.js?v=20261105a"></script>
+<script src="db.js?v=20261105b"></script>
+<script src="pdffonts.js?v=20261105b"></script>
+<script src="rutinapdf.js?v=20261105b"></script>
+<script src="app.js?v=20261105b"></script>
 </body>
 </html>

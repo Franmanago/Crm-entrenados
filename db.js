@@ -104,7 +104,7 @@
   window.DBReady = new Promise(resolve => {
     function fail(msg) { const b = document.getElementById('login-msg'); if (b) { b.textContent = msg; b.hidden = false } }
     if (!window.supabase || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY || /PEGAR/.test(cfg.SUPABASE_URL)) {
-      document.getElementById('login').hidden = false;
+      document.getElementById('login').hidden = false; window.splashOff && window.splashOff();
       fail('Falta configurar config.js con la URL y la clave de Supabase (ver la guía).');
       return;
     }
@@ -116,7 +116,7 @@
       const { data, error } = await sb.from('app_admins').select('email').limit(1);
       if (error || !data || !data.length) {
         await sb.auth.signOut();
-        login.hidden = false;
+        login.hidden = false; window.splashOff && window.splashOff();
         fail('Este usuario no tiene permiso. Cargá tu mail en 03_tu_usuario.sql (ver la guía).');
         return;
       }
@@ -125,7 +125,7 @@
       startRealtime(); resolve(DB);
     }
     sb.auth.getSession().then(({ data }) => {
-      if (data.session) enter(data.session); else login.hidden = false;
+      if (data.session) enter(data.session); else login.hidden = false; window.splashOff && window.splashOff();
     });
     document.getElementById('login-form').addEventListener('submit', async ev => {
       ev.preventDefault();
