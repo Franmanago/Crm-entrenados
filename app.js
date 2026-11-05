@@ -191,14 +191,14 @@ function renderPanel(){
   ${(()=>{const t=porForma(D.pagos),tot=t.ef+t.tr+t.nd;return `<h2 class="sec">Cobrado por forma de pago</h2>
   <div class="grid2"><div class="card"><div class="tbl-wrap"><table>
     <thead><tr><th></th><th>Cobrado</th><th>Tu parte</th></tr></thead>
-    <tbody><tr><td>Efectivo</td><td>${money(t.ef)}</td><td>${money(t.fef)}</td></tr>
-      <tr><td>Transferencia</td><td>${money(t.tr)}</td><td>${money(t.ftr)}</td></tr>
-      ${t.nd?`<tr><td>Sin forma cargada</td><td>${money(t.nd)}</td><td>${money(t.fnd)}</td></tr>`:''}
-      <tr class="total"><td>Total</td><td>${money(tot)}</td><td>${money(t.fef+t.ftr+t.fnd)}</td></tr></tbody></table></div></div>
+    <tbody><tr><td><button class="lnk-f" data-formas="ef">Efectivo <span aria-hidden="true">›</span></button></td><td>${money(t.ef)}</td><td>${money(t.fef)}</td></tr>
+      <tr><td><button class="lnk-f" data-formas="tr">Transferencia <span aria-hidden="true">›</span></button></td><td>${money(t.tr)}</td><td>${money(t.ftr)}</td></tr>
+      ${t.nd?`<tr><td><button class="lnk-f" data-formas="nd">Sin forma cargada <span aria-hidden="true">›</span></button></td><td>${money(t.nd)}</td><td>${money(t.fnd)}</td></tr>`:''}
+      <tr class="total"><td><button class="lnk-f" data-formas="all">Total <span aria-hidden="true">›</span></button></td><td>${money(tot)}</td><td>${money(t.fef+t.ftr+t.fnd)}</td></tr></tbody></table></div></div>
     <div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Efectivo vs transferencia</div></div>
-      <div class="split"><i style="width:${t.ef/(tot||1)*100}%;background:var(--ok)"></i><i style="width:${t.tr/(tot||1)*100}%;background:var(--accent)"></i>${t.nd?`<i style="width:${t.nd/(tot||1)*100}%;background:var(--line)"></i>`:''}</div>
-      <div class="legend"><span><i class="dot" style="background:var(--ok)"></i>Efectivo <b>${money(t.ef)}</b></span><span><i class="dot" style="background:var(--accent)"></i>Transferencia <b>${money(t.tr)}</b></span>${t.nd?`<span><i class="dot" style="background:var(--line)"></i>Sin dato <b>${money(t.nd)}</b></span>`:''}</div>
-      <p class="hint" style="margin-top:8px">En los pagos mixtos se suma a cada columna la parte que corresponde. “Tu parte” aplica el % de cada gimnasio.</p></div></div>`})()}
+      <div class="split"><i style="width:${t.ef/(tot||1)*100}%;background:var(--ok)" data-formas="ef" title="Ver pagos en efectivo"></i><i style="width:${t.tr/(tot||1)*100}%;background:var(--accent)" data-formas="tr" title="Ver pagos por transferencia"></i>${t.nd?`<i style="width:${t.nd/(tot||1)*100}%;background:var(--line)"></i>`:''}</div>
+      <div class="legend"><button class="lnk-f" data-formas="ef"><i class="dot" style="background:var(--ok)"></i>Efectivo <b>${money(t.ef)}</b></button><button class="lnk-f" data-formas="tr"><i class="dot" style="background:var(--accent)"></i>Transferencia <b>${money(t.tr)}</b></button>${t.nd?`<button class="lnk-f" data-formas="nd"><i class="dot" style="background:var(--line)"></i>Sin dato <b>${money(t.nd)}</b></button>`:''}</div>
+      <p class="hint" style="margin-top:8px">Tocá una forma de pago para ver quién pagó así. En los pagos mixtos se suma a cada columna la parte que corresponde. “Tu parte” aplica el % de cada gimnasio.</p></div></div>`})()}
   <h2 class="sec">${isCur?'Para hacer hoy':'Cuotas de '+mesLbl(M)}</h2>
   <div class="grid2">
     ${isCur?`<div class="card">${head(`Vencen hoy · ${fmtShort(iso(today()))}`,'hoy',hoyV.length)}
@@ -352,6 +352,8 @@ function renderSheet(){
   if(openId==='__ej'){ov.innerHTML=shell(S.ejEdit.id?'Ejercicio':'Nuevo ejercicio',ejHTML());bindEj();return}
   if(openId==='__copiar'){ov.innerHTML=shell('Copiar rutina de otro entrenado',copiarHTML(sheetArg));bindCopiar(sheetArg);return}
   if(openId==='__asig'){ov.innerHTML=shell('Asignar plantilla',asignarHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};bindAsignar(sheetArg);return}
+  if(openId==='__formas'){ov.innerHTML=shell('Pagos de '+mesLbl(sheetArg.mes),formasHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
+      const f=ev.target.closest('[data-formas]');if(f){sheetArg.f=f.dataset.formas;renderSheet();return}const o=ev.target.closest('[data-open]');if(o)openSheet(o.dataset.open)};return}
   if(openId==='__posp'){const r=S.rutinas.find(x=>x._id===sheetArg);if(!r){closeSheet();return}ov.innerHTML=shell('Posponer entrega',posponerHTML(r));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};bindPosponer(r);return}
   const isNew=openId==='__new';
   const e=isNew?{id:nextId(),nombre:'',telefono:'+549',gym:'LEVEL',estado:'Activo',plan:'Deportivo',estimulos:2,promo:0,pagoRegistrado:'Al día',modalidad:'Periodizada',inicio:iso(today()),ultPago:iso(today()),proxVenc:addMonth(iso(today())),ultRutina:'',obs:''}:S.ents[openId];
@@ -453,6 +455,21 @@ function partes(p){const m=Number(p.monto)||0;if(p.forma==='efectivo')return {ef
   if(p.forma==='mixto'){const ef=Math.min(m,Number(p.efectivo)||0);return {ef,tr:m-ef,nd:0}}return {ef:0,tr:0,nd:m}}
 function formaTxt(p){if(p.forma==='mixto'){const x=partes(p);return `Mixto: ${money(x.ef)} efectivo + ${money(x.tr)} transf.`}return p.forma==='efectivo'?'Efectivo':p.forma==='transferencia'?'Transferencia':''}
 function porForma(pagos){const t={ef:0,tr:0,nd:0,fef:0,ftr:0,fnd:0};pagos.forEach(p=>{const x=partes(p),k=p.pctFran??1;t.ef+=x.ef;t.tr+=x.tr;t.nd+=x.nd;t.fef+=x.ef*k;t.ftr+=x.tr*k;t.fnd+=x.nd*k});return t}
+function formasHTML(a){
+  const M=a.mes,f=a.f||'all',ps=monthData(M).pagos.slice().sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||'')||(x.nombre||'').localeCompare(y.nombre||'','es'));
+  const inF=p=>{const x=partes(p);return f==='all'||(f==='ef'&&x.ef>0)||(f==='tr'&&x.tr>0)||(f==='mx'&&p.forma==='mixto')||(f==='nd'&&x.nd>0)};
+  const val=p=>{const x=partes(p);return f==='ef'?x.ef:f==='tr'?x.tr:f==='nd'?x.nd:Number(p.monto)||0};
+  const L=ps.filter(inF),tot=L.reduce((a2,p)=>a2+val(p),0),tu=L.reduce((a2,p)=>a2+val(p)*(p.pctFran??1),0);
+  const cnt=k=>ps.filter(p=>{const x=partes(p);return k==='all'||(k==='ef'&&x.ef>0)||(k==='tr'&&x.tr>0)||(k==='mx'&&p.forma==='mixto')||(k==='nd'&&x.nd>0)}).length;
+  const chips=[['all','Todos'],['ef','Efectivo'],['tr','Transferencia'],['mx','Mixtos'],['nd','Sin forma']].filter(([k])=>k==='all'||cnt(k)).map(([k,l])=>`<button type="button" class="chip" data-formas="${k}" aria-pressed="${k===f}">${l} (${cnt(k)})</button>`).join('');
+  const tag=p=>p.forma==='mixto'?`<span class="pill p-mute">Mixto</span> <span class="hint" style="display:inline">${money(partes(p).ef)} ef. + ${money(partes(p).tr)} transf.</span>`:p.forma==='efectivo'?'<span class="pill p-ok">Efectivo</span>':p.forma==='transferencia'?'<span class="pill p-lv">Transferencia</span>':'<span class="pill p-mute">Sin dato</span>';
+  const tl=f==='all'?'Cobrado':f==='ef'?'En efectivo':f==='tr'?'Por transferencia':f==='mx'?'Pagos mixtos':'Sin forma cargada';
+  return `<div class="chips" style="margin-bottom:12px">${chips}</div>
+  <div class="fl-tot"><div><span>${tl}</span><b>${money(tot)}</b><small>${plural(L.length,'pago','pagos')}</small></div><div><span>Tu parte</span><b>${money(Math.round(tu))}</b><small>con el % de cada gimnasio</small></div></div>
+  ${L.length?`<ul class="fl">${L.map(p=>`<li><div class="fl-a"><button class="fl-n" data-open="${esc(p.entrenadoId)}">${esc(S.ents[p.entrenadoId]?name(S.ents[p.entrenadoId]):(p.nombre||'—'))}</button><b>${money(val(p))}</b></div>
+      <div class="fl-b"><span>${fmtShort(p.fecha)} · ${esc(GYM_LBL[p.gym]||p.gym||'')}</span>${tag(p)}<span class="fl-tu">tu parte ${money(Math.round(val(p)*(p.pctFran??1)))}</span></div></li>`).join('')}</ul>`:'<div class="empty">No hay pagos con esta forma en el mes.</div>'}
+  ${f==='nd'?'<p class="hint" style="margin-top:10px">Son pagos cargados antes de que existiera la forma de pago. Si querés, podés borrarlos y volver a registrarlos indicando la forma.</p>':''}`;
+}
 function pagoHTML(e){
   const sug=(e.pagoRegistrado==='Debe'&&parse(e.proxVenc)&&parse(e.proxVenc)>=today())?e.proxVenc:addMonth(e.proxVenc||iso(today()));
   const um=unpaidMeses(e.id),cm=curMes();
@@ -1307,11 +1324,12 @@ function handleRut(e){
   return false;
 }
 document.addEventListener('click',e=>{
-  if(e.target.closest('#overlay')&&['__rut','__ej','__asig','__posp','__copiar'].includes(openId))return;
+  if(e.target.closest('#overlay')&&['__rut','__ej','__asig','__posp','__copiar','__formas'].includes(openId))return;
   if(handleRut(e))return;
   if(e.target.closest('#overlay'))return;
   const m=e.target.closest('[data-msg]');if(m){openSheet(m.dataset.msg,'wa',m.dataset.kind);return}
   const b=e.target.closest('[data-bulk]');if(b){startBulk(b.dataset.bulk);return}
+  const fz=e.target.closest('[data-formas]');if(fz){openSheet('__formas','ver',{mes:S.mes,f:fz.dataset.formas});return}
   const mc=e.target.closest('[data-mes]');if(mc){S.mes=mc.dataset.mes;renderPanel();window.scrollTo(0,0);return}
   const ci=e.target.closest('[data-cerrar]');if(ci){if(ci.dataset.armed!=='1'){ci.dataset.armed='1';ci.textContent='Confirmar cierre';return}cerrarMes(ci.dataset.cerrar);return}
   const o=e.target.closest('[data-open]');if(o)openSheet(o.dataset.open);
