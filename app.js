@@ -147,7 +147,7 @@ function renderPanel(){
   const urg=pendInfo.filter(x=>x.cls!=='p-mute'&&x.e&&isAct(x.e));
   const hoyV=act.filter(e=>diasVenc(e)===0&&estadoPago(e)==='Al día');
   const aus=ausentes();const cargaAlta=act.map(e=>({e,a:acwr(e.id)})).filter(x=>x.a.ratio!=null&&x.a.ratio>S.cfg.alertas.acwr).sort((x,y)=>y.a.ratio-x.a.ratio);
-  const bienHoy=act.map(e=>({e,b:S.regs.find(r=>r.entrenadoId===e.id&&r.tipo==='bien'&&r.fecha===iso(today()))})).filter(x=>x.b&&bienTot(x.b.datos)<=8);
+  const bienHoy=act.map(e=>({e,b:S.regs.find(r=>r.entrenadoId===e.id&&r.tipo==='bien'&&r.fecha===iso(today())),st:estadoBien(e.id,iso(today()))})).filter(x=>x.b&&x.st&&x.st.k!=='verde').sort((a,b)=>(a.st.k==='rojo'?0:1)-(b.st.k==='rojo'?0:1));
   S._lists={deuda:urg.map(x=>x.e),prox,hoy:hoyV,ausentes:aus.map(x=>x.e)};
   const li=(e,meta,kind)=>`<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}</button><span class="meta">${meta}</span>${msgBtn(e,kind,'Avisar')}</li>`;
   const bulkBtn=(key,n)=>n>1?`<button class="btn" style="padding:5px 10px;font-size:13px" data-bulk="${key}">Avisar a los ${n}</button>`:'';
@@ -207,8 +207,8 @@ function renderPanel(){
       <ul class="alist">${aus.map(x=>li(x.e,`últ. ${fmtShort(x.ult)} · ${x.d} d`,'ausencia')).join('')}</ul><p class="hint pad" style="padding-top:6px">Solo entrenados que marcan asistencia en su link.</p></div>`:''}
     ${isCur&&cargaAlta.length?`<div class="card falta-card"><div class="pad" style="padding-bottom:6px"><b>Carga en aumento</b> <span class="pill p-bad">${cargaAlta.length}</span><p class="hint">La carga de los últimos 7 días es más de ${S.cfg.alertas.acwr} veces su promedio de las 4 semanas anteriores.</p></div>
       <ul class="alist">${cargaAlta.map(x=>`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}</button><span class="meta"><span class="pill p-bad">${x.a.ratio.toFixed(2)}</span> ${x.a.agudo} UA esta semana</span></li>`).join('')}</ul></div>`:''}
-    ${isCur&&bienHoy.length?`<div class="card"><div class="pad" style="padding-bottom:6px"><b>Hoy llegan cansados</b> <span class="pill p-warn">${bienHoy.length}</span><p class="hint">Bienestar de 8 o menos sobre 15 en el cuestionario de hoy.</p></div>
-      <ul class="alist">${bienHoy.map(x=>`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}</button><span class="meta">${bienTxt(x.b.datos)}</span></li>`).join('')}</ul></div>`:''}
+    ${isCur&&bienHoy.length?`<div class="card"><div class="pad" style="padding-bottom:6px"><b>Wellness de hoy: moderado o bajo</b> <span class="pill p-warn">${bienHoy.length}</span><p class="hint">Comparado con su propio promedio de las últimas 4 semanas. Si la rutina tiene el ajuste activado, ya entrenan con la carga reducida.</p></div>
+      <ul class="alist">${bienHoy.map(x=>`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}<br><span class="hint">${bienTxt(x.b.datos)}</span></button><span class="pill ${EST[x.st.k][1]}">${EST[x.st.k][0]}${activaDe(x.e.id)?.ajusteWellness?' · '+EST[x.st.k][2]+'%':''}</span></li>`).join('')}</ul></div>`:''}
     <div class="card">${head(isCur?`Cobros de ${mesLbl(M)} · ${D.pagos.length} pagaron`:`Sin pagar en ${mesLbl(M)}`,'deuda',urg.length)}
       ${pendInfo.length?`<ul class="alist">${pendInfo.map(x=>x.e?`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}</button><span class="meta"><span class="pill ${x.cls}">${esc(x.tag)}</span> ${money(x.r.monto)}</span>${msgBtn(x.e,x.kind,'Avisar')}</li>`:`<li><span class="nm">${esc(titleCase(x.r.nombre))}</span><span class="meta">${money(x.r.monto)}</span></li>`).join('')}</ul>`:'<div class="empty">Todos pagaron este mes.</div>'}
     </div>
@@ -685,8 +685,21 @@ function acwr(id,ref){
 }
 const acwrTxt=r=>r==null?'sin historial suficiente (se necesitan 3 semanas)':r>1.5?'carga muy alta, riesgo de sobrecarga':r>1.3?'en aumento':r<0.8?'carga baja':'zona adecuada';
 const acwrPill=r=>r==null?'p-mute':r>S.cfg.alertas.acwr?'p-bad':r>1.3||r<0.8?'p-warn':'p-ok';
-const bienTot=d=>(Number(d?.sueno)||0)+(Number(d?.cuerpo)||0)+(Number(d?.animo)||0);
-const bienTxt=d=>`Sueño ${d?.sueno||'-'} · Cuerpo ${d?.cuerpo||'-'} · Ánimo ${d?.animo||'-'} = ${bienTot(d)}/15`;
+/* wellness: 5 preguntas de 1 a 5 (las respuestas viejas traen "cuerpo", que cuenta como dolor) */
+const BK=[['sueno','Sueño'],['fatiga','Energía'],['dolor','Dolor'],['estres','Estrés'],['animo','Ánimo']];
+function bienVals(d){const o={};BK.forEach(([k])=>{let v=Number(d?.[k]);if(!v&&k==='dolor')v=Number(d?.cuerpo);if(v)o[k]=v});return o}
+function bienProm(d){const v=Object.values(bienVals(d));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null}
+const bienTot=d=>{const m=bienProm(d);return m==null?0:+m.toFixed(1)};
+function bienEstado(d,hist){const v=Object.values(bienVals(d));if(!v.length)return null;const m=bienProm(d);
+  const hs=(hist||[]).map(bienProm).filter(x=>x!=null);const base=hs.length>=7?hs.reduce((a,b)=>a+b,0)/hs.length:null;const mn=Math.min(...v),dif=base!=null?+(m-base).toFixed(2):0;
+  return {k:(mn<=1||(base!=null?dif<-1:m<3))?'rojo':(mn<=2||(base!=null?dif<-0.5:m<4))?'amarillo':'verde',m:+m.toFixed(1),base:base!=null?+base.toFixed(1):null}}
+function estadoBien(eid,fecha){const r=S.regs.find(x=>x.entrenadoId===eid&&x.tipo==='bien'&&x.fecha===fecha);if(!r)return null;if(r.datos?.estado)return {k:r.datos.estado,m:r.datos.prom,base:r.datos.base??null};
+  const d0=new Date(parse(fecha));d0.setDate(d0.getDate()-28);const ini=iso(d0);return bienEstado(r.datos,S.regs.filter(x=>x.entrenadoId===eid&&x.tipo==='bien'&&x.fecha<fecha&&x.fecha>=ini).map(x=>x.datos))}
+const EST={verde:['Óptimo','p-ok',0],amarillo:['Moderado','p-warn',-5],rojo:['Bajo','p-bad',-10]};
+const bienTxt=d=>{const v=bienVals(d);return BK.filter(([k])=>v[k]).map(([k,l])=>`${l} ${v[k]}`).join(' · ')+(Object.keys(v).length?` · prom. ${bienTot(d)}`:'')};
+/* kg que correspondía ese día (con el ajuste por wellness si la rutina lo usa) */
+function kgDia(it,e,fecha,rid){const k=kgItem(it,e);const r=rid&&S.rutinas.find(x=>x._id===rid);if(!r?.ajusteWellness||!(it.pct&&it.rm)||!k.calc)return k.txt;
+  const st=estadoBien(e.id,fecha);if(!st||st.k==='verde')return k.txt;return kgItem({...it,pct:Math.max(0,Number(it.pct)+EST[st.k][2])},e).txt}
 function ultAsis(id){return S.regs.filter(r=>r.entrenadoId===id&&String(r.item||'').startsWith('asis:')).map(r=>r.fecha).sort().pop()||null}
 function ausentes(){
   const n=S.cfg.alertas.dias;
@@ -704,7 +717,9 @@ function periodoData(e,M,corto){
   const cr=regs.filter(r=>r.tipo==='carga');const cd=cargaDias(e.id);
   const rpe=[0,0,0,0];cr.forEach(r=>{const v=Number(r.datos?.rpe)||0;if(v)rpe[v<=4?0:v<=6?1:v<=8?2:3]++});
   const bl=regs.filter(r=>r.tipo==='bien');const avg=k=>bl.length?+(bl.reduce((s2,r)=>s2+(Number(r.datos?.[k])||0),0)/bl.length).toFixed(1):0;
-  const bien={n:bl.length,sueno:avg('sueno'),cuerpo:avg('cuerpo'),animo:avg('animo')};bien.tot=+(bien.sueno+bien.cuerpo+bien.animo).toFixed(1);
+  const avgK=k=>{const v=bl.map(r=>bienVals(r.datos)[k]).filter(Boolean);return v.length?+(v.reduce((a2,b2)=>a2+b2,0)/v.length).toFixed(1):0};
+  const bien={n:bl.length};BK.forEach(([k])=>bien[k]=avgK(k));bien.tot=bl.length?+(bl.reduce((s2,r)=>s2+bienTot(r.datos),0)/bl.length).toFixed(1):0;
+  bien.est={verde:0,amarillo:0,rojo:0};bl.forEach(r=>{const st=estadoBien(e.id,r.fecha);if(st)bien.est[st.k]++});
   return {M,corto,hechos:new Set(asis.map(r=>r.fecha+r.item)).size,meta:Math.round(est*(fin.getDate()/7)),
     semanas:sem.map(([a,b])=>({lbl:fmtShort(iso(a)),v:cnt(a,b)})),
     carga:Math.round(cr.reduce((s2,r)=>s2+(Number(r.datos?.min)||0)*(Number(r.datos?.rpe)||0),0)),sesiones:cr.length,rpe,bien,
@@ -720,7 +735,7 @@ function kgPorEj(e,iI,iF){const g={};const rs=S.regs.filter(r=>r.entrenadoId===e
   const hecho=new Set();
   rs.filter(r=>!especial(r)).forEach(r=>{hecho.add(r.item+'|'+r.fecha);const it=r.rutinaId?itemDe(r.rutinaId,r.item):null;put(r.ej||it?.ej||keyN(r.nombre||it?.nombre||r.item),r.nombre||it?.nombre||'Ejercicio',r.fecha,numKg(r.kg),r.reps||it?.reps,false)});
   rs.filter(r=>String(r.item||'').startsWith('asis:')).forEach(a=>{const dia=diaDe(a.rutinaId,a.item.slice(5));if(!dia)return;
-    dia.bloques.forEach(b=>b.items.forEach(it=>{if(!String(it.nombre||'').trim()||hecho.has(it.uid+'|'+a.fecha))return;put(it.ej||keyN(it.nombre),it.nombre,a.fecha,numKg(kgItem(it,e).txt),it.reps,true)}))});
+    dia.bloques.forEach(b=>b.items.forEach(it=>{if(!String(it.nombre||'').trim()||hecho.has(it.uid+'|'+a.fecha))return;put(it.ej||keyN(it.nombre),it.nombre,a.fecha,numKg(kgDia(it,e,a.fecha,a.rutinaId)),it.reps,true)}))});
   return g}
 function diaDe(rid,uid){const r=S.rutinas.find(x=>x._id===rid);for(const s of r?.secciones||[])for(const d of s.dias||[])if(d.uid===uid)return d;return null}
 function itemDe(rid,uid){const r=S.rutinas.find(x=>x._id===rid);for(const s of r?.secciones||[])for(const d of s.dias||[])for(const b of d.bloques||[])for(const i of b.items||[])if(i.uid===uid)return i;return null}
@@ -823,7 +838,7 @@ function listadoPlanHTML(){
 /* cambios que hizo el entrenado respecto de lo indicado */
 function cambiosDe(e,dias){const desde=dias?iso(new Date(today().getTime()-dias*864e5)):'';
   return S.regs.filter(r=>r.entrenadoId===e.id&&!especial(r)&&(!desde||r.fecha>=desde)).sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||'')||(y.ts||0)-(x.ts||0)).map(r=>{
-    const it=r.rutinaId?itemDe(r.rutinaId,r.item):null;const pk=it?kgItem(it,e).txt:'',pr=it?String(it.reps||''):'';
+    const it=r.rutinaId?itemDe(r.rutinaId,r.item):null;const pk=it?kgDia(it,e,r.fecha,r.rutinaId):'',pr=it?String(it.reps||''):'';
     const dk=!!(it&&String(r.kg||'').trim()&&numKg(r.kg)!==numKg(pk)),dr=!!(it&&String(r.reps||'').trim()&&String(r.reps).trim().toLowerCase()!==pr.trim().toLowerCase());
     const nota=r.nota&&r.nota!=='Hecho'?r.nota:'';return {r,it,pk,pr,dk,dr,nota,c:r.cansancio,cambio:dk||dr||!!nota||!!r.cansancio,nombre:r.nombre||it?.nombre||'Ejercicio'}})}
 function cambiosHTML(e){
@@ -836,7 +851,7 @@ function cambiosHTML(e){
       ${ch.length>8?`<div class="pad" style="padding-top:0"><button class="btn" style="padding:5px 10px;font-size:13px" data-vercambios="${ver?'':esc(e.id)}">${ver?'Ver menos':'Ver los '+ch.length+' cambios'}</button></div>`:''}`:'<div class="pad hint" style="padding-top:0">Hizo todo como lo indicaste.</div>'}`;
 }
 function entBadge(it,path,e,tm){const rs=S.regs.filter(r=>r.entrenadoId===e.id&&r.item===it.uid).sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||''));const r=rs[0];if(!r)return '';
-  const pk=kgItem(it,e).txt,dk=String(r.kg||'').trim()&&numKg(r.kg)!==numKg(pk),dr=!tm&&String(r.reps||'').trim()&&String(r.reps).trim().toLowerCase()!==String(it.reps||'').trim().toLowerCase();
+  const pk=kgDia(it,e,r.fecha,r.rutinaId),dk=String(r.kg||'').trim()&&numKg(r.kg)!==numKg(pk),dr=!tm&&String(r.reps||'').trim()&&String(r.reps).trim().toLowerCase()!==String(it.reps||'').trim().toLowerCase();
   if(!dk&&!dr)return `<div class="it-ent ok">✓ El entrenado lo hizo como indicaste (${fmtShort(r.fecha)})</div>`;
   return `<div class="it-ent">El entrenado usó ${dr?`<b>${esc(r.reps)}${/\d$/.test(String(r.reps).trim())?' reps':''}</b>`:''}${dr&&dk?' × ':''}${dk?`<b>${esc(r.kg)} kg</b>`:''} el ${fmtShort(r.fecha)}${rs.length>1?` · ${rs.length} registros`:''}<button type="button" data-act="usarEnt" data-p="${path}" data-kg="${dk?esc(r.kg):''}" data-reps="${dr?esc(r.reps):''}">Usar en la rutina</button></div>`}
 function entregasCard(){
@@ -867,7 +882,7 @@ function renderRutinas(){
       <div class="card"><div class="pad" style="padding-bottom:6px"><b>Para entregar</b> <span class="pill p-ok">${listas.filter(okP).length}</span><p class="hint">Llegó la fecha. Confirmá o posponé.</p></div>
         ${listas.filter(okP).length?`<ul class="alist">${listas.filter(okP).map(r=>rowR(r,`<span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button></span>`)).join('')}</ul>`:'<div class="empty">Nada para entregar hoy.</div>'}</div>
       <div class="card"><div class="pad" style="padding-bottom:6px"><b>En espera</b> <span class="pill p-warn">${espera.filter(okP).length}</span><p class="hint">Planificadas para más adelante o pospuestas.</p></div>
-        ${espera.filter(okP).length?`<ul class="alist">${espera.filter(okP).map(r=>rowR(r,`<button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button>`)).join('')}</ul>`:'<div class="empty">Sin rutinas en espera.</div>'}</div>
+        ${espera.filter(okP).length?`<ul class="alist">${espera.filter(okP).map(r=>rowR(r,`<span class="actions" style="flex-wrap:nowrap">${r.fechaSugerida?`<a class="btn" style="padding:5px 8px;font-size:13px" target="_blank" rel="noopener" href="${esc(gcalUrl('Entregar rutina · '+name(S.ents[r.entrenadoId]),r.fechaSugerida,r.nombre||'Rutina'))}" title="Agendar en Google Calendar">Agendar</a>`:''}<button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button></span>`)).join('')}</ul>`:'<div class="empty">Sin rutinas en espera.</div>'}</div>
       <div class="card"><div class="pad" style="padding-bottom:6px"><b>Sin próxima planificada</b> <span class="pill p-mute">${sinProx.filter(x=>okP(x.e)).length}</span><p class="hint">Ordenados por la rutina más vieja.</p></div>
         ${sinProx.filter(x=>okP(x.e)).length?`<ul class="alist">${sinProx.filter(x=>okP(x.e)).map(({e,a})=>`<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}${pgP(e)}<br><span class="hint">${a?esc(a.nombre||'Rutina')+' · desde '+fmtShort(a.fechaEntrega):'Sin rutina en la app'+(e.ultRutina?' · últ. '+fmtShort(e.ultRutina):'')}</span></button><button class="btn" style="padding:5px 8px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Planificar</button></li>`).join('')}</ul>`:'<div class="empty">Todos tienen la próxima en cola.</div>'}</div>
     </div>`}
@@ -890,6 +905,14 @@ function renderRutinas(){
   const bq=$('#bq');if(bq){bq.addEventListener('input',()=>{S.bq=bq.value;const p=bq.selectionStart;renderRutinas();const n=$('#bq');n.focus();n.setSelectionRange(p,p)})}
 }
 
+/* ----- Google Calendar: abre el evento ya cargado (día completo) ----- */
+function gcalUrl(t,f,det){const d=parse(f);if(!d)return '';const n=new Date(d);n.setDate(n.getDate()+1);return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t)}&dates=${iso(d).replace(/-/g,'')}/${iso(n).replace(/-/g,'')}&details=${encodeURIComponent(det||'')}`}
+const gcalBtn=(lbl,t,f,det)=>{const u=gcalUrl(t,f,det);return u?`<a class="btn gcal" target="_blank" rel="noopener" href="${esc(u)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>${esc(lbl)}</a>`:''};
+function gcalFichaHTML(e){const a=activaDe(e.id),c=colaDe(e.id)[0];const tel=e.telefono?'Tel: '+e.telefono:'';const out=[];
+  if(e.proxVenc&&isAct(e))out.push(gcalBtn('Vencimiento de cuota · '+fmtShort(e.proxVenc),'Vence cuota · '+name(e),e.proxVenc,`Cuota de ${money(monto(e))} · ${GYM_LBL[e.gym]||e.gym||''}\n${tel}`));
+  if(c&&c.fechaSugerida)out.push(gcalBtn('Entrega de rutina · '+fmtShort(c.fechaSugerida),'Entregar rutina · '+name(e),c.fechaSugerida,`${c.nombre||'Rutina'}\n${tel}`));
+  if(a&&a.fechaEntrega){const f=new Date(parse(a.fechaEntrega));f.setDate(f.getDate()+(Number(a.duracionSemanas)||4)*7);out.push(gcalBtn('Fin de rutina · '+fmtShort(iso(f)),'Termina la rutina de '+name(e),iso(f),`${a.nombre||'Rutina'}: planificar la próxima.\n${tel}`))}
+  return out.length?`<div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Agendar en Google Calendar</div></div><p class="hint" style="margin:4px 0 8px">Se abre Google Calendar con el evento cargado: solo tocás Guardar.</p><div class="actions">${out.join('')}</div></div>`:''}
 /* ----- bloque de rutinas en la ficha ----- */
 function fichaRutinasHTML(e){
   const a=activaDe(e.id),c=colaDe(e.id),fin=rutDe(e.id).filter(r=>r.estado==='finalizada').sort((x,y)=>(y.fechaFin||'').localeCompare(x.fechaFin||'')).slice(0,3);
@@ -917,6 +940,7 @@ function fichaRutinasHTML(e){
     ${cargaFichaHTML(e,a)}
     ${cambiosHTML(e)}
   </div>
+  ${gcalFichaHTML(e)}
   ${(()=>{const ms=mesesDe(e);const def=ms.includes(mesShift(curMes(),-1))?mesShift(curMes(),-1):ms[0];const vs=ms.find(k=>k<def)||ms.find(k=>k!==def)||'';
     return `<div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Hoja resumen en PDF (a color)</div></div><p class="hint" style="margin:4px 0 8px">Asistencia, fuerza, carga y bienestar con gráficos y una explicación de cada dato. No incluye pagos.</p>
     <div class="actions" style="align-items:center"><select id="rep-tipo" class="search" style="flex:0 1 220px"><option value="mes">Resumen del mes</option><option value="comp">Comparativa entre dos meses</option></select>
@@ -941,7 +965,9 @@ function cargaFichaHTML(e,a){
   if(hayB||a?.bienestar){
     const bl=regs.filter(r=>r.tipo==='bien').sort((x,y)=>y.fecha.localeCompare(x.fecha)).slice(0,5);
     h+=`<div class="pad" style="border-top:1px solid var(--line)"><div class="kpi" style="padding:0"><div class="lbl">Bienestar antes de entrenar</div></div>
-      ${bl.length?`<ul class="alist" style="margin:4px -16px 0">${bl.map(r=>`<li><span class="nm">${fmtShort(r.fecha)}</span><span class="meta">${bienTxt(r.datos)}</span><span class="pill ${bienTot(r.datos)<=8?'p-bad':bienTot(r.datos)<=10?'p-warn':'p-ok'}">${bienTot(r.datos)}</span></li>`).join('')}</ul>`:'<p class="hint">Todavía no respondió el cuestionario.</p>'}</div>`;
+      ${bl.length?`<ul class="alist" style="margin:4px -16px 0">${bl.map(r=>{const st=estadoBien(e.id,r.fecha);return `<li><span class="nm">${fmtShort(r.fecha)}</span><span class="meta">${bienTxt(r.datos)}</span>${st?`<span class="pill ${EST[st.k][1]}">${EST[st.k][0]}</span>`:''}</li>`}).join('')}</ul>`:'<p class="hint">Todavía no respondió el cuestionario.</p>'}
+      ${a?.ajusteWellness?(()=>{const fal=[];(a.secciones||[]).forEach(s2=>s2.dias.forEach(d=>d.bloques.forEach(b=>b.items.forEach(i=>{if(i.pct&&i.rm&&kgItem(i,e).falta&&!fal.includes(i.rm))fal.push(i.rm)}))));const sinPct=[];(a.secciones||[]).forEach(s2=>s2.dias.forEach(d=>d.bloques.forEach(b=>{if(b.modo!=='timer')b.items.forEach(i=>{if(String(i.nombre||'').trim()&&!i.pct&&i.kg&&!sinPct.includes(i.nombre))sinPct.push(i.nombre)})})));
+        return `<div class="aj-info"><b>Ajuste de cargas por wellness: activado</b><span>Moderado −5% · Bajo −10% y una serie menos. Se ajustan los ejercicios con %RM; los circuitos por tiempo suman descanso o restan una vuelta.</span>${fal.length?`<span class="aj-falta">Faltan marcas para ajustar: <b>${fal.map(esc).join(', ')}</b>. Cargalas en "Marcas RM".</span>`:''}${sinPct.length?`<span class="hint">Con kg fijo (no se ajustan): ${sinPct.slice(0,6).map(esc).join(', ')}${sinPct.length>6?'…':''}</span>`:''}</div>`})():''}</div>`;
   }
   return h;
 }
@@ -1163,7 +1189,8 @@ function editorHTML(){
     <label>Duración (semanas)<input type="number" min="1" max="16" data-h="duracionSemanas" value="${esc(R.duracionSemanas||4)}" ${ro?'readonly':''}></label>
     <div class="full plan-box"><b>Opciones del link del entrenado</b><p class="hint">Solo aparecen en esta rutina si las activás.</p>
       <label class="plan-on"><input type="checkbox" data-opt="controlCarga" ${R.controlCarga?'checked':''} ${ro?'disabled':''}> <span><b>Control de carga:</b> al marcar el día hecho, anota cuántos minutos duró y qué tan dura fue (1 a 10). También sale una fila para anotarlo en el PDF.</span></label>
-      <label class="plan-on"><input type="checkbox" data-opt="bienestar" ${R.bienestar?'checked':''} ${ro?'disabled':''}> <span><b>Cuestionario de bienestar:</b> antes de entrenar responde cómo durmió, cómo tiene el cuerpo y el ánimo (1 a 5).</span></label></div>
+      <label class="plan-on"><input type="checkbox" data-opt="bienestar" ${R.bienestar?'checked':''} ${ro?'disabled':''}> <span><b>Wellness obligatorio:</b> antes de ver la rutina responde 5 preguntas (sueño, energía, dolor, estrés y ánimo, de 1 a 5).</span></label>
+      <label class="plan-on"><input type="checkbox" data-opt="ajusteWellness" ${R.ajusteWellness?'checked':''} ${ro?'disabled':''}> <span><b>Ajustar cargas según el wellness:</b> moderado −5%, bajo −10% y una serie menos (ejercicios con %RM). En circuitos, más descanso o una vuelta menos. Activa también el wellness.</span></label></div>
     <div class="full plan-box"><b>Indicaciones para el entrenado</b><p class="hint">Aparecen arriba de todo en su link y en el PDF.</p>
       <textarea data-h="notas" rows="2" placeholder="Ej: entrada en calor 10' antes: movilidad de cadera y hombros" ${ro?'readonly':''}>${esc(R.notas||'')}</textarea>
       ${planHTML(R,e,ro)}</div>
@@ -1299,7 +1326,7 @@ function bindEditor(){
   };
   ov.onchange=ev=>{
     const en=S.ents[R.entrenadoId];
-    if(ev.target.matches('[data-opt]')){R[ev.target.dataset.opt]=ev.target.checked;E.dirty=true;return}
+    if(ev.target.matches('[data-opt]')){const o=ev.target.dataset.opt;R[o]=ev.target.checked;if(o==='ajusteWellness'&&R[o])R.bienestar=true;if(o==='bienestar'&&!R[o])R.ajusteWellness=false;E.dirty=true;if(o==='ajusteWellness'||o==='bienestar')rerenderEditor();return}
     if(ev.target.matches('[data-planon]')){const nd=(R.secciones?.[0]?.dias||[]).length;R.distribucion=ev.target.checked?(rotacion(nd,Number(en?.estimulos)||nd,R.duracionSemanas)||Array.from({length:R.duracionSemanas||4},()=>Array.from({length:nd},(_,i)=>i))):null;E.dirty=true;rerenderEditor();return}
     const pl=ev.target.closest('[data-plan]');if(pl){const [w,d]=pl.dataset.plan.split(',').map(Number);const a=new Set(R.distribucion[w]);pl.checked?a.add(d):a.delete(d);R.distribucion[w]=[...a].sort((x,y)=>x-y);E.dirty=true;rerenderEditor();return}
     if(ev.target.matches('[data-h=duracionSemanas]')){rerenderEditor();return}

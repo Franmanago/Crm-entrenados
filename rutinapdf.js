@@ -195,7 +195,7 @@ function resumen(e,D){
     ['Entrenamientos',String(L.hechos),L.meta?`de ${L.meta}`:'',two?`${F.corto}: ${F.hechos}`:'marcados en el link',two?L.hechos-F.hechos:null,''],
     ['Fuerza promedio',D.fuerzaPct==null?'—':`${D.fuerzaPct>=0?'+':''}${D.fuerzaPct}%`,'',D.kg.length?`kg máximos · ${D.kg.length} ejercicios`:'sin kg anotados',null,''],
     ['Carga del mes',L.carga?fmtK(L.carga):'—',L.carga?'min × esfuerzo':'',two?`${F.corto}: ${F.carga?fmtK(F.carga):'—'}`:(L.sesiones?`${L.sesiones} sesiones anotadas`:'sin sesiones anotadas'),two&&F.carga&&L.carga?Math.round((L.carga-F.carga)/F.carga*100):null,'%'],
-    ['Bienestar',L.bien.n?String(L.bien.tot):'—',L.bien.n?'de 15':'',two?`${F.corto}: ${F.bien.n?F.bien.tot:'—'}`:(L.bien.n?`${L.bien.n} respuestas`:'sin respuestas'),two&&F.bien.n&&L.bien.n?+(L.bien.tot-F.bien.tot).toFixed(1):null,'']];
+    ['Wellness',L.bien.n?String(L.bien.tot):'—',L.bien.n?'de 5':'',two?`${F.corto}: ${F.bien.n?F.bien.tot:'—'}`:(L.bien.n?`${L.bien.n} respuestas`:'sin respuestas'),two&&F.bien.n&&L.bien.n?+(L.bien.tot-F.bien.tot).toFixed(1):null,'']];
   kp.forEach(([l,v,u,s2,dl,suf],i)=>{const x=M+i*(kw+10);p.rect(x,y,kw,58,C.white,C.line,0.8);T(x+12,y+15,l.toUpperCase(),7.4,true,C.muted);T(x+12,y+40,v,27,'d');if(u)T(x+14+tw(v,27,'d'),y+40,u,8,false,C.muted);
     const f=fit(s2,kw-(dl!=null?78:24),7.6,false,5.5);T(x+12,y+51,f.s,f.z,false,C.muted);if(dl!=null)badge(x+kw-10,y+41,dl,suf)});
   y+=68;
@@ -245,10 +245,10 @@ function resumen(e,D){
       lbls.forEach((l,k)=>{const lx=cx+R+12,ly2=cy-30+k*20;p.rect(lx,ly2-8,9,9,C.pie[k],null);T(lx+13,ly2,l,7.8,true);T(lx+13,ly2+9,`${q.rpe[k]} · ${tot?Math.round(q.rpe[k]/tot*100):0}%`,7.2,false,C.muted)})}
     y+=ch+10}
   // bienestar
-  if(P.some(q=>q.bien.n)){const wh=Math.min(150,H-M-24-y);
-    const d6=card(M,y,CW,wh,'Bienestar mensual (promedio, escala de 1 a 5)','Promedio de lo que respondés antes de entrenar. Dormir mal, llegar dolorido o estresado baja tu rendimiento: con este dato ajustamos la carga de cada día.');
+  if(P.some(q=>q.bien.n)){const BKS=[['sueno','Sueño'],['fatiga','Energía'],['dolor','Dolor muscular'],['estres','Estrés'],['animo','Ánimo']].filter(([k])=>P.some(q=>q.bien[k]));const wh=Math.min(56+BKS.length*22+26,H-M-24-y);
+    const d6=card(M,y,CW,wh,'Wellness mensual (promedio, escala de 1 a 5)','Promedio de lo que respondés antes de entrenar (5 es lo mejor). Dormir mal, llegar cansado, dolorido o estresado baja tu rendimiento: con este dato ajustamos la carga de cada día.');
     const x0=M+108,bw=CW*0.40,seg=bw/4;
-    [['sueno','Sueño'],['cuerpo','Cuerpo / dolor'],['animo','Ánimo / estrés']].forEach(([k,l],i)=>{const yy=y+40+d6+i*25;T(M+12,yy+4,l,8.8,true);
+    BKS.forEach(([k,l],i)=>{const yy=y+40+d6+i*22;T(M+12,yy+4,l,8.8,true);
       for(let s2=0;s2<4;s2++)p.rect(x0+s2*seg,yy-3,seg-2,8,C.sc[s2],null);[1,2,3,4,5].forEach(n=>TC(x0+(n-1)*seg,yy+14,n,6.4,false,C.muted));
       const pos=v=>x0+(v-1)*seg;const vals=P.map(q=>q.bien.n?q.bien[k]:null);
       vals.forEach((v,j)=>{if(v==null)return;if(two&&!j)p.poly(circ(pos(v),yy+1,5.5),C.white,C.p1,2);else p.poly(circ(pos(v),yy+1,5.5),C.p2,C.white,1.5)});
@@ -256,9 +256,9 @@ function resumen(e,D){
       else{const v=vals.filter(x=>x!=null).pop();if(v!=null)T(x0+bw+14,yy+4,v+' de 5',8.6,true)}});
     if(two){const ly=y+wh-10;p.poly(circ(M+16,ly-3,4),C.white,C.p1,1.6);T(M+24,ly,F.corto,7.4,false,C.muted);p.poly(circ(M+90,ly-3,4),C.p2,null);T(M+98,ly,L.corto,7.4,false,C.muted)}
     const all=P.flatMap((q,i)=>q.bienSem.map(v=>({v,i}))).filter(x=>x.v!=null);
-    if(all.length>1){const tx=x0+bw+110,tw0=M+CW-14-tx,top=y+42+d6,hh=wh-42-d6-34;T(tx,top-2,'Total semanal (de 15)',7.2,true,C.muted);
-      const lo=Math.max(3,Math.floor(Math.min(...all.map(a=>a.v))-1)),hi=15;const X=i=>tx+8+i*(tw0-8)/(all.length-1),Y=v=>top+8+hh-(v-lo)/(hi-lo)*hh;
-      [lo,Math.round((lo+hi)/2),hi].forEach(v=>{p.line(tx+8,Y(v),tx+tw0,Y(v),0.4,C.line);TR(tx+5,Y(v)+2.5,v,6.4,false,C.muted)});
+    if(all.length>1){const tx=x0+bw+110,tw0=M+CW-14-tx,top=y+42+d6,hh=wh-42-d6-34;T(tx,top-2,'Promedio semanal (de 5)',7.2,true,C.muted);
+      const lo=Math.max(1,Math.floor(Math.min(...all.map(a=>a.v))-0.5)),hi=5;const X=i=>tx+8+i*(tw0-8)/(all.length-1),Y=v=>top+8+hh-(v-lo)/(hi-lo)*hh;
+      [lo,+((lo+hi)/2).toFixed(1),hi].forEach(v=>{p.line(tx+8,Y(v),tx+tw0,Y(v),0.4,C.line);TR(tx+5,Y(v)+2.5,v,6.4,false,C.muted)});
       P.forEach((q,j)=>{const pts=[];all.forEach((a,i)=>{if(a.i===j)pts.push([X(i),Y(a.v)])});if(pts.length>1)p.poly(pts,null,col(j),1.8,false);pts.forEach(pt=>p.poly(circ(pt[0],pt[1],2.3),col(j),null))})}
     y+=wh+10}
   if(y<H-M-60&&D.vacio)T(M,y+14,D.vacio,8.4,false,C.muted);
