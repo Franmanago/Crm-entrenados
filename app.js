@@ -788,6 +788,57 @@ function entregasData(){
     .sort((x,y)=>(x.a?.fechaEntrega||'0').localeCompare(y.a?.fechaEntrega||'0'));
   return {listas,espera,sinProx};
 }
+/* estado del plan de cada entrenado (rutina + pago) */
+function estadoPlan(e){const t=iso(today()),a=activaDe(e.id),c=colaDe(e.id),lista=c.find(r=>(r.fechaSugerida||t)<=t),esp=c.find(r=>(r.fechaSugerida||t)>t);
+  let k,txt,cls,sub='';
+  if(lista){k='entregar';txt='Para entregar';cls='p-ok';sub=lista.nombre||'Rutina'}
+  else if(a){const dur=Number(a.duracionSemanas)||4,fin=new Date(parse(a.fechaEntrega)||today());fin.setDate(fin.getDate()+dur*7);const resta=days(fin,today());
+    sub=`${a.nombre||'Rutina'} · semana ${Math.min(dur,semanaActual(a)+1)} de ${dur}`;
+    if(resta<0){k='vencida';txt=`Terminó hace ${-resta} d`;cls='p-bad'}else if(resta<=7){k='porterminar';txt=`Termina en ${resta} d`;cls='p-warn'}else{k='activa';txt='Activa';cls='p-ok'}}
+  else if(esp){k='espera';txt='En espera';cls='p-warn';sub=`${esp.nombre||'Rutina'} · ${fmtShort(esp.fechaSugerida)}`}
+  else{k='sin';txt='Sin rutina';cls='p-mute';sub=e.ultRutina?'últ. '+fmtShort(e.ultRutina):''}
+  const prox=esp&&k!=='espera'?`Próxima: ${fmtShort(esp.fechaSugerida)}`:'';
+  return {k,txt,cls,sub,prox}}
+function pagoMes(e){const M=curMes();const ps=S.pagos.filter(p=>p.entrenadoId===e.id&&p.mes===M).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));return ps[0]||null}
+const PLAN_F=[['todos','Todos'],['activa','Activa'],['porterminar','Por terminar'],['vencida','Rutina terminada'],['entregar','Para entregar'],['espera','En espera'],['sin','Sin rutina']];
+const PAGO_F=[['todos','Todos'],['Pagó','Pagaron este mes'],['Al día','Al día sin pago del mes'],['Pendiente','Pendientes'],['Vencido','Vencidos']];
+const pagoEst=e=>pagoMes(e)?'Pagó':estadoPago(e);
+const pagoEstPill=k=>k==='Pagó'?'p-ok':pagoPill(k);
+function listadoPlanHTML(){
+  const fp=S.lpPago||'todos',fr=S.lpPlan||'todos';
+  const rows=Object.values(S.ents).filter(isAct).map(e=>({e,pl:estadoPlan(e),pg:pagoEst(e),pm:pagoMes(e),ch:cambiosDe(e,7).filter(x=>x.cambio).length})).sort((a,b)=>name(a.e).localeCompare(name(b.e),'es'));
+  const cP=k=>rows.filter(x=>(k==='todos'||x.pg===k)&&(fr==='todos'||x.pl.k===fr)).length,cR=k=>rows.filter(x=>(fp==='todos'||x.pg===fp)&&(k==='todos'||x.pl.k===k)).length;
+  const L=rows.filter(x=>(fp==='todos'||x.pg===fp)&&(fr==='todos'||x.pl.k===fr));
+  return `<div class="card pad lp-f"><div><span class="lbl-s">Pago del mes</span><div class="chips">${PAGO_F.map(([k,l])=>`<button class="chip" data-lppago="${k}" aria-pressed="${k===fp}">${l} (${cP(k)})</button>`).join('')}</div></div>
+    <div><span class="lbl-s">Estado de la rutina</span><div class="chips">${PLAN_F.filter(([k])=>k==='todos'||cR(k)).map(([k,l])=>`<button class="chip" data-lpplan="${k}" aria-pressed="${k===fr}">${l} (${cR(k)})</button>`).join('')}</div></div></div>
+  <p class="count">${plural(L.length,'entrenado','entrenados')}</p>
+  <div class="card tbl-wrap"><table class="lp"><thead><tr><th>Entrenado</th><th>Pago del mes</th><th>Rutina</th><th>Cambios del entrenado</th><th></th></tr></thead><tbody>
+  ${L.map(({e,pl,pg,pm,ch})=>`<tr><td><button class="fl-n" data-open="${esc(e.id)}">${esc(name(e))}</button><div class="hint">${gymTag(e)} ${e.estimulos?e.estimulos+' estímulos':''}</div></td>
+    <td><span class="pill ${pagoEstPill(pg)}">${pg}</span><div class="hint">${pm?`${fmtShort(pm.fecha)} · ${money(pm.monto)}${pm.forma?' · '+esc(pm.forma):''}`:pg==='Vencido'?'venció '+fmtShort(e.proxVenc):'vence '+fmtShort(e.proxVenc)}</div></td>
+    <td><span class="pill ${pl.cls}">${esc(pl.txt)}</span><div class="hint">${esc(pl.sub)}${pl.prox?' · '+esc(pl.prox):''}</div></td>
+    <td>${ch?`<span class="pill p-warn">${ch} esta semana</span>`:'<span class="hint">—</span>'}</td>
+    <td class="lp-a">${pl.k==='entregar'?`<button class="wa" data-entregar="${esc(colaDe(e.id)[0]._id)}">Entregar</button>`:pl.k==='sin'||pl.k==='vencida'||pl.k==='porterminar'?`<button class="btn" style="padding:5px 10px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Planificar</button>`:activaDe(e.id)?`<button class="btn" style="padding:5px 10px;font-size:13px" data-editrut="${esc(activaDe(e.id)._id)}">Abrir rutina</button>`:''}</td></tr>`).join('')||`<tr><td colspan="5" class="empty">Nadie en este filtro.</td></tr>`}
+  </tbody></table></div>`;
+}
+/* cambios que hizo el entrenado respecto de lo indicado */
+function cambiosDe(e,dias){const desde=dias?iso(new Date(today().getTime()-dias*864e5)):'';
+  return S.regs.filter(r=>r.entrenadoId===e.id&&!especial(r)&&(!desde||r.fecha>=desde)).sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||'')||(y.ts||0)-(x.ts||0)).map(r=>{
+    const it=r.rutinaId?itemDe(r.rutinaId,r.item):null;const pk=it?kgItem(it,e).txt:'',pr=it?String(it.reps||''):'';
+    const dk=!!(it&&String(r.kg||'').trim()&&numKg(r.kg)!==numKg(pk)),dr=!!(it&&String(r.reps||'').trim()&&String(r.reps).trim().toLowerCase()!==pr.trim().toLowerCase());
+    const nota=r.nota&&r.nota!=='Hecho'?r.nota:'';return {r,it,pk,pr,dk,dr,nota,c:r.cansancio,cambio:dk||dr||!!nota||!!r.cansancio,nombre:r.nombre||it?.nombre||'Ejercicio'}})}
+function cambiosHTML(e){
+  const all=cambiosDe(e,30),ch=all.filter(x=>x.cambio),ver=S.verCambios===e.id,L=ver?ch:ch.slice(0,8);
+  const nk=new Set(ch.filter(x=>x.dk).map(x=>x.r.item)).size,nr=new Set(ch.filter(x=>x.dr).map(x=>x.r.item)).size,nn=ch.filter(x=>x.nota).length;
+  if(!all.length)return '';
+  return `<div class="pad" style="border-top:1px solid var(--line)"><b style="font-size:14px">Cambios del entrenado en la rutina</b><p class="hint" style="margin:2px 0 8px">Lo que modificó respecto de lo que indicaste, en los últimos 30 días.</p>
+    <div class="chips" style="gap:6px"><span class="pill p-mute">${plural(all.length,'ejercicio tildado','ejercicios tildados')}</span>${nk?`<span class="pill p-warn">Kg distinto en ${plural(nk,'ejercicio','ejercicios')}</span>`:''}${nr?`<span class="pill p-warn">Reps distintas en ${nr}</span>`:''}${nn?`<span class="pill p-lv">${plural(nn,'comentario','comentarios')}</span>`:''}</div></div>
+    ${ch.length?`<ul class="timeline ch-tl">${L.map(x=>`<li><span class="d">${fmtShort(x.r.fecha)}</span><span class="t"><b>${esc(x.nombre)}</b>${x.dk?` · Kg <s>${esc(x.pk||'—')}</s> → <b class="ch-v">${esc(x.r.kg)}</b>`:''}${x.dr?` · Reps <s>${esc(x.pr||'—')}</s> → <b class="ch-v">${esc(x.r.reps)}</b>`:''}${x.c?` · Cansancio <b>${x.c}</b>`:''}${x.nota?` · <i>“${esc(x.nota)}”</i>`:''}</span><span></span></li>`).join('')}</ul>
+      ${ch.length>8?`<div class="pad" style="padding-top:0"><button class="btn" style="padding:5px 10px;font-size:13px" data-vercambios="${ver?'':esc(e.id)}">${ver?'Ver menos':'Ver los '+ch.length+' cambios'}</button></div>`:''}`:'<div class="pad hint" style="padding-top:0">Hizo todo como lo indicaste.</div>'}`;
+}
+function entBadge(it,path,e,tm){const rs=S.regs.filter(r=>r.entrenadoId===e.id&&r.item===it.uid).sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||''));const r=rs[0];if(!r)return '';
+  const pk=kgItem(it,e).txt,dk=String(r.kg||'').trim()&&numKg(r.kg)!==numKg(pk),dr=!tm&&String(r.reps||'').trim()&&String(r.reps).trim().toLowerCase()!==String(it.reps||'').trim().toLowerCase();
+  if(!dk&&!dr)return `<div class="it-ent ok">✓ El entrenado lo hizo como indicaste (${fmtShort(r.fecha)})</div>`;
+  return `<div class="it-ent">El entrenado usó ${dr?`<b>${esc(r.reps)}${/\d$/.test(String(r.reps).trim())?' reps':''}</b>`:''}${dr&&dk?' × ':''}${dk?`<b>${esc(r.kg)} kg</b>`:''} el ${fmtShort(r.fecha)}${rs.length>1?` · ${rs.length} registros`:''}<button type="button" data-act="usarEnt" data-p="${path}" data-kg="${dk?esc(r.kg):''}" data-reps="${dr?esc(r.reps):''}">Usar en la rutina</button></div>`}
 function entregasCard(){
   const {listas}=entregasData();
   return `<div class="card"><div class="pad" style="padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px"><b>Rutinas para entregar</b><button class="btn" style="padding:5px 10px;font-size:13px" data-goto="rutinas">Ver tablero</button></div>
@@ -801,17 +852,25 @@ function renderRutinas(){
   let body='';
   if(S.rsub==='entregas'){
     const {listas,espera,sinProx}=entregasData();
-    const rowR=(r,btns)=>{const e=S.ents[r.entrenadoId];return `<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}<br><span class="hint">${esc(r.nombre||'Rutina')}${r.fechaSugerida?' · '+fmtShort(r.fechaSugerida):''}${faltaPill(r)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></button>${btns}</li>`};
-    body=`<div class="actions" style="margin-bottom:12px"><button class="btn pri" data-asignar="">Asignar plantilla a entrenados o grupo</button></div>
+    const rowR=(r,btns)=>{const e=S.ents[r.entrenadoId];return `<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}${pgP(e)}<br><span class="hint">${esc(r.nombre||'Rutina')}${r.fechaSugerida?' · '+fmtShort(r.fechaSugerida):''}${faltaPill(r)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></button>${btns}</li>`};
+    const vista=S.evista||'tablero';
+    const fp=S.ePago||'todos',okP=r=>{const e=S.ents[r.entrenadoId||r.id];return fp==='todos'||(e&&pagoEst(e)===fp)};
+    const cnt=k=>Object.values(S.ents).filter(e=>isAct(e)&&(k==='todos'||pagoEst(e)===k)).length;
+    const pgP=e=>{const pg=pagoEst(e);return ` <span class="pill ${pagoEstPill(pg)}">${pg}</span>`};
+    const top=`<div class="actions" style="margin-bottom:12px;justify-content:space-between;flex-wrap:wrap"><button class="btn pri" data-asignar="">Asignar plantilla a entrenados o grupo</button>
+      <div class="chips"><button class="chip" data-evista="tablero" aria-pressed="${vista==='tablero'}">Tablero</button><button class="chip" data-evista="listado" aria-pressed="${vista==='listado'}">Listado de todos</button></div></div>`;
+    if(vista==='listado'){body=top+listadoPlanHTML()}else{
+    body=top+`<div class="chips" style="margin-bottom:12px;align-items:center"><span class="lbl-s" style="margin:0 4px 0 0">Pago del mes</span>${PAGO_F.map(([k,l])=>`<button class="chip" data-epago="${k}" aria-pressed="${k===fp}">${l} (${cnt(k)})</button>`).join('')}</div>`;
+    body+=`
     ${sinTerminarCard(false)?`<div style="margin-bottom:12px">${sinTerminarCard(false)}</div>`:''}
     <div class="grid3">
-      <div class="card"><div class="pad" style="padding-bottom:6px"><b>Para entregar</b> <span class="pill p-ok">${listas.length}</span><p class="hint">Llegó la fecha. Confirmá o posponé.</p></div>
-        ${listas.length?`<ul class="alist">${listas.map(r=>rowR(r,`<span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button></span>`)).join('')}</ul>`:'<div class="empty">Nada para entregar hoy.</div>'}</div>
-      <div class="card"><div class="pad" style="padding-bottom:6px"><b>En espera</b> <span class="pill p-warn">${espera.length}</span><p class="hint">Planificadas para más adelante o pospuestas.</p></div>
-        ${espera.length?`<ul class="alist">${espera.map(r=>rowR(r,`<button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button>`)).join('')}</ul>`:'<div class="empty">Sin rutinas en espera.</div>'}</div>
-      <div class="card"><div class="pad" style="padding-bottom:6px"><b>Sin próxima planificada</b> <span class="pill p-mute">${sinProx.length}</span><p class="hint">Ordenados por la rutina más vieja.</p></div>
-        ${sinProx.length?`<ul class="alist">${sinProx.map(({e,a})=>`<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}<br><span class="hint">${a?esc(a.nombre||'Rutina')+' · desde '+fmtShort(a.fechaEntrega):'Sin rutina en la app'+(e.ultRutina?' · últ. '+fmtShort(e.ultRutina):'')}</span></button><button class="btn" style="padding:5px 8px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Planificar</button></li>`).join('')}</ul>`:'<div class="empty">Todos tienen la próxima en cola.</div>'}</div>
-    </div>`;
+      <div class="card"><div class="pad" style="padding-bottom:6px"><b>Para entregar</b> <span class="pill p-ok">${listas.filter(okP).length}</span><p class="hint">Llegó la fecha. Confirmá o posponé.</p></div>
+        ${listas.filter(okP).length?`<ul class="alist">${listas.filter(okP).map(r=>rowR(r,`<span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button></span>`)).join('')}</ul>`:'<div class="empty">Nada para entregar hoy.</div>'}</div>
+      <div class="card"><div class="pad" style="padding-bottom:6px"><b>En espera</b> <span class="pill p-warn">${espera.filter(okP).length}</span><p class="hint">Planificadas para más adelante o pospuestas.</p></div>
+        ${espera.filter(okP).length?`<ul class="alist">${espera.filter(okP).map(r=>rowR(r,`<button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button>`)).join('')}</ul>`:'<div class="empty">Sin rutinas en espera.</div>'}</div>
+      <div class="card"><div class="pad" style="padding-bottom:6px"><b>Sin próxima planificada</b> <span class="pill p-mute">${sinProx.filter(x=>okP(x.e)).length}</span><p class="hint">Ordenados por la rutina más vieja.</p></div>
+        ${sinProx.filter(x=>okP(x.e)).length?`<ul class="alist">${sinProx.filter(x=>okP(x.e)).map(({e,a})=>`<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}${pgP(e)}<br><span class="hint">${a?esc(a.nombre||'Rutina')+' · desde '+fmtShort(a.fechaEntrega):'Sin rutina en la app'+(e.ultRutina?' · últ. '+fmtShort(e.ultRutina):'')}</span></button><button class="btn" style="padding:5px 8px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Planificar</button></li>`).join('')}</ul>`:'<div class="empty">Todos tienen la próxima en cola.</div>'}</div>
+    </div>`}
   }else if(S.rsub==='imprimir'){
     body=imprimirHTML();
   }else if(S.rsub==='plantillas'){
@@ -856,7 +915,7 @@ function fichaRutinasHTML(e){
     </div>
     ${asisHTML}
     ${cargaFichaHTML(e,a)}
-    ${regs.length?`<div class="pad" style="border-top:1px solid var(--line);padding-bottom:4px"><b style="font-size:14px">Últimas cargas anotadas por el entrenado</b></div><ul class="timeline">${regs.map(r=>String(r.item).startsWith('asis:')?`<li><span class="d">${fmtShort(r.fecha)}</span><span class="t">✓ Marcó ${esc(r.nombre||'el día')} como hecho</span><span></span></li>`:`<li><span class="d">${fmtShort(r.fecha)}</span><span class="t">${esc(r.nombre||itemName(r.item))}: <b>${esc(r.kg||'—')}${r.kg?' kg':''}</b>${r.reps?' × '+esc(r.reps):''}${r.cansancio?` · cansancio ${r.cansancio}`:''}${r.nota?' · '+esc(r.nota):''}</span><span></span></li>`).join('')}</ul>`:''}
+    ${cambiosHTML(e)}
   </div>
   ${(()=>{const ms=mesesDe(e);const def=ms.includes(mesShift(curMes(),-1))?mesShift(curMes(),-1):ms[0];const vs=ms.find(k=>k<def)||ms.find(k=>k!==def)||'';
     return `<div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Hoja resumen en PDF (a color)</div></div><p class="hint" style="margin:4px 0 8px">Asistencia, fuerza, carga y bienestar con gráficos y una explicación de cada dato. No incluye pagos.</p>
@@ -1092,6 +1151,7 @@ function editorHTML(){
       <label class="it-n">Notas${inp(path,'notas',it.notas,'Tempo, RPE…')}</label>
       ${k&&it.pct?`<span class="pill ${k.falta?'p-warn':'p-ok'}" style="align-self:end">${k.falta?'Falta RM':'= '+k.txt+' kg'}</span>`:''}
       ${ro?'':`<span class="it-a"><button type="button" data-act="up" data-p="${path}" aria-label="Subir">↑</button><button type="button" data-act="down" data-p="${path}" aria-label="Bajar">↓</button><button type="button" data-act="delItem" data-p="${path}" aria-label="Quitar">✕</button></span>`}
+      ${isRut&&e&&it.uid&&!ro?entBadge(it,path,e,tm):''}
     </div>`}).join('');
   const fal=faltantes(R),falDia=(si,di)=>fal.find(x=>x.si===si&&x.di===di);
   return `<datalist id="dl-bl">${(S.cfg.bloques||[]).map(b=>`<option value="${esc(b)}">`).join('')}</datalist>
@@ -1165,6 +1225,7 @@ function bindEditor(){
         secciones:reuid(R.secciones).map(s=>({...s,dias:s.dias.map(dd=>({...dd,bloques:dd.bloques.map(bb=>({...bb,items:bb.items.filter(i=>(i.nombre||'').trim())}))}))}))};
       if(await write(()=>S.db.collection('plantillas').add(d)))toast('Guardada en Plantillas como “'+d.nombre+'”');return}
     if(act==='dupPlant'){const d=clone(R);d.nombre=(d.nombre||'')+' (copia)';if(await write(()=>S.db.collection('plantillas').add(d))){toast('Plantilla duplicada');closeSheet()}return}
+    if(act==='usarEnt'){const it=getPath(R,p);if(b.dataset.kg){it.kg=b.dataset.kg;it.pct=''}if(b.dataset.reps)it.reps=b.dataset.reps;E.dirty=true;rerenderEditor();toast('Listo: la rutina ahora usa lo que hizo el entrenado. Guardá para confirmar.');return}
     if(act==='pleg'){E.pleg=E.pleg||{};E.pleg[b.dataset.k]=!E.pleg[b.dataset.k];rerenderEditor();return}
     if(act==='plegDia'||act==='despDia'){E.pleg=E.pleg||{};const a=p.split(',').map(Number);getPath(R,p).bloques.forEach((bl,i)=>{E.pleg[bl.uid||`${a[0]},${a[1]},${i}`]=act==='plegDia'});rerenderEditor();return}
     if(act==='clearDia'||act==='clearSec'){
@@ -1320,6 +1381,11 @@ function handleRut(e){
   if(b=g('data-newej')){openEjSheet(null,{nombre:S.bq||''});return true}
   if(b=g('data-pdf')){descargarPDFs([b.dataset.pdf]);return true}
   if(b=g('data-rsub')){S.rsub=b.dataset.rsub;renderRutinas();return true}
+  if(b=g('data-evista')){S.evista=b.dataset.evista;renderRutinas();return true}
+  if(b=g('data-epago')){S.ePago=b.dataset.epago;renderRutinas();return true}
+  if(b=g('data-lppago')){S.lpPago=b.dataset.lppago;renderRutinas();return true}
+  if(b=g('data-lpplan')){S.lpPlan=b.dataset.lpplan;renderRutinas();return true}
+  if(b=g('data-vercambios')){S.verCambios=b.dataset.vercambios||null;renderSheet();return true}
   if(b=g('data-goto')){location.hash=b.dataset.goto;return true}
   return false;
 }

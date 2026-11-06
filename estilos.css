@@ -281,3 +281,15 @@ input.falta::placeholder{color:var(--bad);opacity:.85}
 .fl-b{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:13px;color:var(--muted)}
 .fl-b .hint{margin:0}
 .fl-tu{margin-left:auto}
+/* listado del plan */
+.lp-f{display:flex;flex-direction:column;gap:12px;margin-bottom:12px}
+.lp td{vertical-align:top}
+.lp .hint{margin:3px 0 0;display:block}
+.lp-a{text-align:right;white-space:nowrap}
+/* cambios del entrenado */
+.ch-tl s{color:var(--muted)}
+.ch-v{color:var(--warn)}
+.it-ent{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px;background:var(--warn-soft);color:var(--ink);border-radius:8px;padding:6px 10px}
+.it-ent.ok{background:var(--ok-soft);color:var(--ok)}
+.it-ent button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 10px;font-weight:700;font-size:12.5px;cursor:pointer;margin-left:auto}
+.lp th,.lp td{text-align:left}
