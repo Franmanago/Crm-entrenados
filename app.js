@@ -10,7 +10,7 @@ const DEF_CFG={online:40000,gyms:{
 const AVISOS_DEF={pagoOn:true,rutinaOn:true,diasPago:3,diasRutina:5,
   pago:'Hola {nombre}! Tu cuota vence {cuando} ({fecha}). El valor es {monto}. Podés abonar en efectivo o por transferencia. ¡Gracias!',
   rutina:'Tu mes de entrenamiento se completa {cuando} ({fecha}). Con la renovación de la cuota te preparo la próxima rutina para que no cortes la continuidad.',
-  alias:'',wa:'',gyms:{LEVEL:true,ONLINE:true,CROSSFORCE:false}};
+  alias:'',banco:'',wa:'',gyms:{LEVEL:true,ONLINE:true,CROSSFORCE:false}};
 const avisoAuto=e=>{const g=gymOf(e);const m={...AVISOS_DEF.gyms,...(S.cfg.avisos?.gyms||{})};return m[g]!==false};
 const avisoOn=e=>e.avisoPago==='si'?true:e.avisoPago==='no'?false:avisoAuto(e);
 function normCfg(raw){
@@ -331,11 +331,12 @@ function renderAjustes(){
   </form>
   <h2 class="sec">Avisos en el link del entrenado</h2>
   <form class="card pad form" id="cfga">
-    <p class="hint full" style="margin:0">Se muestran solos según la fecha de vencimiento de cada entrenado y desaparecen cuando registrás el pago. Podés usar {nombre}, {fecha}, {cuando} y {monto}.</p>
+    <p class="hint full" style="margin:0">Se muestran solos según la fecha de vencimiento de cada entrenado y desaparecen cuando registrás el pago. Podés usar {nombre}, {fecha}, {cuando}, {monto} y {banco}.</p>
     <div class="full"><span class="lbl-s">Mostrar los avisos a los entrenados de</span><div class="chips">${[['LEVEL','Level'],['ONLINE','Online'],['CROSSFORCE','CrossForce']].map(([g,l])=>`<label class="chip av-g"><input type="checkbox" data-avg="${g}" ${c.avisos.gyms[g]!==false?'checked':''}> ${l}</label>`).join('')}</div><p class="hint" style="margin:6px 0 0">Si un gimnasio cobra directamente (como CrossForce), dejalo sin tildar. En la ficha de cada entrenado podés hacer una excepción.</p></div>
     <label class="plan-on full"><input type="checkbox" id="av-pon" ${c.avisos.pagoOn?'checked':''}> <span><b>Aviso de pago:</b> aparece antes del wellness (o antes de ver la rutina) desde <input id="av-pd" type="number" min="1" max="10" value="${esc(c.avisos.diasPago)}" style="width:56px"> días antes del vencimiento. Lo ve una vez por día y tiene que tocar “Entendido”.</span></label>
     <label class="full">Texto del aviso de pago<textarea id="av-p" rows="3">${esc(c.avisos.pago)}</textarea></label>
     <label>Alias o CBU para transferir (opcional)<input id="av-al" value="${esc(c.avisos.alias)}" placeholder="ej: fran.entrena.mp"></label>
+    <label>Banco o billetera virtual<input id="av-bco" value="${esc(c.avisos.banco||'')}" placeholder="ej: Mercado Pago" list="dl-bancos"><datalist id="dl-bancos"><option>Mercado Pago</option><option>Ualá</option><option>Naranja X</option><option>Brubank</option><option>Banco Nación</option><option>Banco Galicia</option><option>Banco Santander</option><option>Banco Provincia</option><option>BBVA</option><option>Macro</option></datalist></label>
     <label>Tu WhatsApp para el comprobante (opcional)<input id="av-wa" value="${esc(c.avisos.wa)}" placeholder="+54911..."></label>
     <label class="plan-on full"><input type="checkbox" id="av-ron" ${c.avisos.rutinaOn?'checked':''}> <span><b>Aviso de rutina:</b> aparece arriba de la rutina desde <input id="av-rd" type="number" min="1" max="15" value="${esc(c.avisos.diasRutina)}" style="width:56px"> días antes del vencimiento.</span></label>
     <label class="full">Texto del aviso de rutina<textarea id="av-r" rows="3">${esc(c.avisos.rutina)}</textarea></label>
@@ -352,7 +353,7 @@ function renderAjustes(){
   });
   $('#cfga').addEventListener('submit',async ev=>{ev.preventDefault();
     const av={pagoOn:$('#av-pon').checked,rutinaOn:$('#av-ron').checked,diasPago:Math.min(10,Math.max(1,Number($('#av-pd').value)||3)),diasRutina:Math.min(15,Math.max(1,Number($('#av-rd').value)||5)),
-      pago:$('#av-p').value.trim()||AVISOS_DEF.pago,rutina:$('#av-r').value.trim()||AVISOS_DEF.rutina,alias:$('#av-al').value.trim(),wa:$('#av-wa').value.replace(/[^\d+]/g,''),gyms:Object.fromEntries([...document.querySelectorAll('[data-avg]')].map(x=>[x.dataset.avg,x.checked]))};
+      pago:$('#av-p').value.trim()||AVISOS_DEF.pago,rutina:$('#av-r').value.trim()||AVISOS_DEF.rutina,alias:$('#av-al').value.trim(),banco:$('#av-bco').value.trim(),wa:$('#av-wa').value.replace(/[^\d+]/g,''),gyms:Object.fromEntries([...document.querySelectorAll('[data-avg]')].map(x=>[x.dataset.avg,x.checked]))};
     if(await write(()=>S.db.doc('config/general').set({...S.cfgRaw,avisos:av})))toast('Avisos guardados');
   });
   const readDefs=()=>[...document.querySelectorAll('#rmdefs tbody tr')].map(tr=>{const mov=tr.querySelector('[data-rd=mov]').value.trim().toUpperCase();const base=tr.querySelector('[data-rd=base]').value;const f=Number(tr.querySelector('[data-rd=factor]').value);return mov?{mov,...(base&&base!==mov?{base,factor:f||1}:{})}:null}).filter(Boolean);

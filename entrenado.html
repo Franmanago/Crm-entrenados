@@ -278,7 +278,7 @@ body.tmr-on:not(.tmr-full) main{padding-bottom:150px}
 .av-monto b{font-family:var(--display);font-weight:400;font-size:40px;line-height:1.05}
 .av-monto small{color:var(--muted);font-size:13px}
 .av-alias{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;border:1px dashed var(--line);border-radius:12px;padding:10px 14px}
-.av-alias b{font-size:17px;grid-column:1}.av-alias span{grid-column:1}.av-alias .av-cp{grid-column:2;grid-row:1/3}
+.av-alias b{font-size:17px;grid-column:1}.av-alias span{grid-column:1}.av-alias small{grid-column:1;font-size:13px;color:var(--muted)}.av-alias .av-cp{grid-column:2;grid-row:1/4}
 .av-cp{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px}
 .av-acc{display:flex;flex-direction:column;gap:8px}
 .av-ok{border:0;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:15px;font-weight:700;font-size:17px}
@@ -312,7 +312,7 @@ const fmt=s=>{const d=parse(s);return d?pad(d.getDate())+'/'+pad(d.getMonth()+1)
 const titleCase=s=>String(s||'').toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
 const token=new URLSearchParams(location.search).get('t')||location.hash.slice(1);
 /* ---- avisos de cuota y de rutina ---- */
-const AV_DEF={pagoOn:true,rutinaOn:true,diasPago:3,diasRutina:5,pago:'Hola {nombre}! Tu cuota vence {cuando} ({fecha}). El valor es {monto}. Podés abonar en efectivo o por transferencia. ¡Gracias!',rutina:'Tu mes de entrenamiento se completa {cuando} ({fecha}). Con la renovación de la cuota te preparo la próxima rutina para que no cortes la continuidad.',alias:'',wa:''};
+const AV_DEF={pagoOn:true,rutinaOn:true,diasPago:3,diasRutina:5,pago:'Hola {nombre}! Tu cuota vence {cuando} ({fecha}). El valor es {monto}. Podés abonar en efectivo o por transferencia. ¡Gracias!',rutina:'Tu mes de entrenamiento se completa {cuando} ({fecha}). Con la renovación de la cuota te preparo la próxima rutina para que no cortes la continuidad.',alias:'',banco:'',wa:''};
 const moneyAR=n=>'$'+Math.round(n).toLocaleString('es-AR');
 function cuotaMonto(){const E=D.entrenado,c=D.cuotas||{};const g=['LEVEL','CROSSFORCE','ONLINE'].includes(E.gym)?E.gym:'LEVEL';if(g==='ONLINE')return Number(c.online)||0;
   const t=c.gyms&&c.gyms[g]&&c.gyms[g].tarifas;const b=t?Number(t[String(E.estimulos)])||0:0;return Math.round(b*(1-(Number(E.promo)||0)))}
@@ -320,7 +320,7 @@ function avisoInfo(){const E=D.entrenado;if(!D.avisos||!E||!E.proxVenc||(E.estad
   const A={...AV_DEF,...D.avisos};const g=['LEVEL','CROSSFORCE','ONLINE'].includes(E.gym)?E.gym:'LEVEL';
   const on=E.avisoPago==='si'?true:E.avisoPago==='no'?false:((A.gyms||{LEVEL:true,ONLINE:true,CROSSFORCE:false})[g]!==false);if(!on)return null;const dias=Math.round((v-today())/864e5);
   const cuando=dias>1?`en ${dias} días`:dias===1?'mañana':dias===0?'hoy':`hace ${-dias} ${dias===-1?'día':'días'}`;
-  const m=cuotaMonto();const fill=t=>{let x=String(t).replace(/\{nombre\}/g,titleCase(E.nombre).split(' ')[0]).replace(/\{fecha\}/g,fmt(E.proxVenc)).replace(/\{cuando\}/g,cuando).replace(/\{monto\}/g,m?moneyAR(m):'el de tu plan');if(dias<0)x=x.replace(/\bvence\b/,'venció').replace(/\bse completa\b/,'se completó');return x};
+  const m=cuotaMonto();const fill=t=>{let x=String(t).replace(/\{nombre\}/g,titleCase(E.nombre).split(' ')[0]).replace(/\{fecha\}/g,fmt(E.proxVenc)).replace(/\{cuando\}/g,cuando).replace(/\{monto\}/g,m?moneyAR(m):'el de tu plan').replace(/\{banco\}/g,A.banco||'');if(dias<0)x=x.replace(/\bvence\b/,'venció').replace(/\bse completa\b/,'se completó');return x};
   return {A,dias,m,pago:A.pagoOn&&dias<=A.diasPago?fill(A.pago):'',rutina:A.rutinaOn&&dias<=A.diasRutina?fill(A.rutina):''}}
 const avKey=()=>'avPago:'+token+':'+iso(today());
 function avisoPagoHTML(av){const E=D.entrenado,A=av.A;const wa=A.wa?`https://api.whatsapp.com/send?phone=${encodeURIComponent(A.wa.replace(/[^\d]/g,''))}&text=${encodeURIComponent('Hola! Te paso el comprobante de la cuota de '+titleCase(E.nombre))}`:'';
@@ -328,7 +328,7 @@ function avisoPagoHTML(av){const E=D.entrenado,A=av.A;const wa=A.wa?`https://api
   return `<div class="card pad av-pago${av.dias<0?' venc':''}"><div class="av-ic" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg></div>
     <h2>${av.dias<0?'Tu cuota está vencida':'Recordatorio de cuota'}</h2><p>${esc(av.pago)}</p>
     ${av.m?`<div class="av-monto"><span>Cuota</span><b>${moneyAR(av.m)}</b><small>${av.dias<0?'Venció':'Vence'} el ${fmt(E.proxVenc)}</small></div>`:''}
-    ${A.alias?`<div class="av-alias"><span>Alias / CBU</span><b>${esc(A.alias)}</b><button type="button" class="av-cp" data-copyalias="${esc(A.alias)}">Copiar</button></div>`:''}
+    ${A.alias?`<div class="av-alias"><span>Alias / CBU${A.banco?' · '+esc(A.banco):''}</span><b>${esc(A.alias)}</b>${A.banco?`<small>Cuenta en ${esc(A.banco)}</small>`:''}<button type="button" class="av-cp" data-copyalias="${esc(A.alias)}">Copiar</button></div>`:''}
     <div class="av-acc">${wa?`<a class="av-wa" href="${esc(wa)}" target="_blank" rel="noopener">Enviar comprobante por WhatsApp</a>`:''}<button type="button" class="av-ok" data-avok="1">${sig}</button></div>
     <p class="hint">Si ya pagaste, ignorá este mensaje: desaparece cuando tu entrenador registra el pago.</p></div>`}
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
@@ -497,7 +497,7 @@ function render(){window.splashOff&&window.splashOff();
   const dia=S0.dias[diaI];
   let h=vistaTabs();
   if(av&&av.rutina)h+=`<div class="card pad av-rut"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><div><b>${av.dias<0?'Tu mes de entrenamiento se completó':'Se acerca el cambio de rutina'}</b><span>${esc(av.rutina)}</span></div></div>`;
-  if(av&&av.pago)h+=`<div class="av-mini${av.dias<0?' venc':''}"><span>${av.dias<0?'Cuota vencida':'Cuota'}${av.m?' · <b>'+moneyAR(av.m)+'</b>':''} · ${av.dias<0?'venció el':'vence el'} ${fmt(D.entrenado.proxVenc)}</span>${av.A.alias?`<button type="button" class="av-cp" data-copyalias="${esc(av.A.alias)}">Copiar alias</button>`:''}</div>`;
+  if(av&&av.pago)h+=`<div class="av-mini${av.dias<0?' venc':''}"><span>${av.dias<0?'Cuota vencida':'Cuota'}${av.m?' · <b>'+moneyAR(av.m)+'</b>':''} · ${av.dias<0?'venció el':'vence el'} ${fmt(D.entrenado.proxVenc)}</span>${av.A.alias?`<button type="button" class="av-cp" data-copyalias="${esc(av.A.alias)}">Copiar alias${av.A.banco?' ('+esc(av.A.banco)+')':''}</button>`:''}</div>`;
   if(R.notas)h+=`<div class="card pad"><p class="hint" style="color:var(--ink)">${esc(R.notas)}</p></div>`;
   h+=planSemanaHTML(S0,dist);
   if(secs.length>1)h+=`<div class="tabs" role="group" aria-label="Semanas">${secs.map((s,i)=>`<button class="tab" data-sec="${i}" aria-pressed="${i===secI}">${esc(s.titulo||'Sección '+(i+1))}</button>`).join('')}</div>`;
