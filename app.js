@@ -7,9 +7,15 @@ const GYM_VAR={LEVEL:'--accent',CROSSFORCE:'--cf',ONLINE:'--online'};
 const DEF_CFG={online:40000,gyms:{
   LEVEL:{pctFran:0.7,tarifas:{"1":51000,"2":60000,"3":69000,"4":75000,"5":89000}},
   CROSSFORCE:{pctFran:0.6,tarifas:{"1":55000,"2":62000,"3":70000,"4":77000,"5":84000}}}};
+const AVISOS_DEF={pagoOn:true,rutinaOn:true,diasPago:3,diasRutina:5,
+  pago:'Hola {nombre}! Tu cuota vence {cuando} ({fecha}). El valor es {monto}. Podés abonar en efectivo o por transferencia. ¡Gracias!',
+  rutina:'Tu mes de entrenamiento se completa {cuando} ({fecha}). Con la renovación de la cuota te preparo la próxima rutina para que no cortes la continuidad.',
+  alias:'',wa:'',gyms:{LEVEL:true,ONLINE:true,CROSSFORCE:false}};
+const avisoAuto=e=>{const g=gymOf(e);const m={...AVISOS_DEF.gyms,...(S.cfg.avisos?.gyms||{})};return m[g]!==false};
+const avisoOn=e=>e.avisoPago==='si'?true:e.avisoPago==='no'?false:avisoAuto(e);
 function normCfg(raw){
   const c=JSON.parse(JSON.stringify(DEF_CFG));
-  if(!raw){c.alertas={dias:10,acwr:1.5};c.rmDefs=[];c.redondeo=2.5;c.posiciones=['Extremo','Pivote','Armador','Arquero'];c.bloques=['ZONA MEDIA','FUERZA 1','FUERZA 2','FUERZA 3','PLAYITA'];c.appUrl='';return c}
+  if(!raw){c.avisos={...AVISOS_DEF};c.alertas={dias:10,acwr:1.5};c.rmDefs=[];c.redondeo=2.5;c.posiciones=['Extremo','Pivote','Armador','Arquero'];c.bloques=['ZONA MEDIA','FUERZA 1','FUERZA 2','FUERZA 3','PLAYITA'];c.appUrl='';return c}
   if(raw.online!=null)c.online=Number(raw.online)||0;
   if(raw.gyms){for(const g of ['LEVEL','CROSSFORCE'])if(raw.gyms[g])c.gyms[g]={...c.gyms[g],...raw.gyms[g]}}
   else{if(raw.tarifas)c.gyms.LEVEL.tarifas=raw.tarifas;if(raw.pctFran!=null)c.gyms.LEVEL.pctFran=raw.pctFran}
@@ -18,6 +24,7 @@ function normCfg(raw){
   c.bloques=Array.isArray(raw.bloques)?raw.bloques:['ZONA MEDIA','FUERZA 1','FUERZA 2','FUERZA 3','PLAYITA'];
   c.appUrl=raw.appUrl||'';
   c.alertas={dias:Number(raw.alertas?.dias)||10,acwr:Number(raw.alertas?.acwr)||1.5};
+  c.avisos={...AVISOS_DEF,...(raw.avisos||{}),gyms:{...AVISOS_DEF.gyms,...(raw.avisos?.gyms||{})}};
   return c;
 }
 const S={ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
@@ -207,6 +214,8 @@ function renderPanel(){
       <ul class="alist">${aus.map(x=>li(x.e,`últ. ${fmtShort(x.ult)} · ${x.d} d`,'ausencia')).join('')}</ul><p class="hint pad" style="padding-top:6px">Solo entrenados que marcan asistencia en su link.</p></div>`:''}
     ${isCur&&cargaAlta.length?`<div class="card falta-card"><div class="pad" style="padding-bottom:6px"><b>Carga en aumento</b> <span class="pill p-bad">${cargaAlta.length}</span><p class="hint">La carga de los últimos 7 días es más de ${S.cfg.alertas.acwr} veces su promedio de las 4 semanas anteriores.</p></div>
       <ul class="alist">${cargaAlta.map(x=>`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}</button><span class="meta"><span class="pill p-bad">${x.a.ratio.toFixed(2)}</span> ${x.a.agudo} UA esta semana</span></li>`).join('')}</ul></div>`:''}
+    ${isCur?(()=>{const wd=((today().getDay()+6)%7)+1;const L=act.flatMap(e=>(e.horarios||[]).filter(h=>Number(h.dia)===wd).map(h=>({e,h}))).sort((x,y)=>x.h.hora.localeCompare(y.h.hora));
+      return L.length?`<div class="card"><div class="pad" style="padding-bottom:6px"><b>Hoy entrenan</b> <span class="pill p-ok">${L.length}</span><p class="hint">Según los horarios cargados en cada ficha.</p></div><ul class="alist">${L.map(({e,h})=>`<li><span class="hor-h">${esc(h.hora)}</span><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}</button><span class="meta">${gymTag(e)}${ultAsis(e.id)===iso(today())?' <span class="pill p-ok">✓ Ya marcó</span>':''}</span></li>`).join('')}</ul></div>`:''})():''}
     ${isCur&&bienHoy.length?`<div class="card"><div class="pad" style="padding-bottom:6px"><b>Wellness de hoy: moderado o bajo</b> <span class="pill p-warn">${bienHoy.length}</span><p class="hint">Comparado con su propio promedio de las últimas 4 semanas. Si la rutina tiene el ajuste activado, ya entrenan con la carga reducida.</p></div>
       <ul class="alist">${bienHoy.map(x=>`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}<br><span class="hint">${bienTxt(x.b.datos)}</span></button><span class="pill ${EST[x.st.k][1]}">${EST[x.st.k][0]}${activaDe(x.e.id)?.ajusteWellness?' · '+EST[x.st.k][2]+'%':''}</span></li>`).join('')}</ul></div>`:''}
     <div class="card">${head(isCur?`Cobros de ${mesLbl(M)} · ${D.pagos.length} pagaron`:`Sin pagar en ${mesLbl(M)}`,'deuda',urg.length)}
@@ -320,6 +329,18 @@ function renderAjustes(){
     </tbody></table></div>
     <div class="full actions"><button class="btn" type="button" id="rd-add">+ Marca</button><button class="btn pri" type="submit">Guardar ajustes de rutinas</button></div>
   </form>
+  <h2 class="sec">Avisos en el link del entrenado</h2>
+  <form class="card pad form" id="cfga">
+    <p class="hint full" style="margin:0">Se muestran solos según la fecha de vencimiento de cada entrenado y desaparecen cuando registrás el pago. Podés usar {nombre}, {fecha}, {cuando} y {monto}.</p>
+    <div class="full"><span class="lbl-s">Mostrar los avisos a los entrenados de</span><div class="chips">${[['LEVEL','Level'],['ONLINE','Online'],['CROSSFORCE','CrossForce']].map(([g,l])=>`<label class="chip av-g"><input type="checkbox" data-avg="${g}" ${c.avisos.gyms[g]!==false?'checked':''}> ${l}</label>`).join('')}</div><p class="hint" style="margin:6px 0 0">Si un gimnasio cobra directamente (como CrossForce), dejalo sin tildar. En la ficha de cada entrenado podés hacer una excepción.</p></div>
+    <label class="plan-on full"><input type="checkbox" id="av-pon" ${c.avisos.pagoOn?'checked':''}> <span><b>Aviso de pago:</b> aparece antes del wellness (o antes de ver la rutina) desde <input id="av-pd" type="number" min="1" max="10" value="${esc(c.avisos.diasPago)}" style="width:56px"> días antes del vencimiento. Lo ve una vez por día y tiene que tocar “Entendido”.</span></label>
+    <label class="full">Texto del aviso de pago<textarea id="av-p" rows="3">${esc(c.avisos.pago)}</textarea></label>
+    <label>Alias o CBU para transferir (opcional)<input id="av-al" value="${esc(c.avisos.alias)}" placeholder="ej: fran.entrena.mp"></label>
+    <label>Tu WhatsApp para el comprobante (opcional)<input id="av-wa" value="${esc(c.avisos.wa)}" placeholder="+54911..."></label>
+    <label class="plan-on full"><input type="checkbox" id="av-ron" ${c.avisos.rutinaOn?'checked':''}> <span><b>Aviso de rutina:</b> aparece arriba de la rutina desde <input id="av-rd" type="number" min="1" max="15" value="${esc(c.avisos.diasRutina)}" style="width:56px"> días antes del vencimiento.</span></label>
+    <label class="full">Texto del aviso de rutina<textarea id="av-r" rows="3">${esc(c.avisos.rutina)}</textarea></label>
+    <div class="full actions"><button class="btn pri" type="submit">Guardar avisos</button></div>
+  </form>
   <h2 class="sec">Períodos de renovación de rutina</h2>
   <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Período</th><th>Días del mes</th></tr></thead><tbody>
   <tr><td>Periodo A</td><td>1 – 5</td></tr><tr><td>Periodo B</td><td>6 – 15</td></tr><tr><td>Periodo C</td><td>16 – 22</td></tr><tr><td>Periodo D</td><td>23 – 31</td></tr></tbody></table></div></div>`;
@@ -328,6 +349,11 @@ function renderAjustes(){
     for(const g of ['LEVEL','CROSSFORCE']){const t={};[1,2,3,4,5].forEach(n=>t[String(n)]=Number($(`#t-${g}-${n}`).value)||0);
       nc.gyms[g]={tarifas:t,pctFran:Math.min(100,Math.max(0,Number($('#p-'+g).value)||0))/100}}
     if(await write(()=>S.db.doc('config/general').set({...S.cfgRaw,...nc})))toast('Ajustes guardados');
+  });
+  $('#cfga').addEventListener('submit',async ev=>{ev.preventDefault();
+    const av={pagoOn:$('#av-pon').checked,rutinaOn:$('#av-ron').checked,diasPago:Math.min(10,Math.max(1,Number($('#av-pd').value)||3)),diasRutina:Math.min(15,Math.max(1,Number($('#av-rd').value)||5)),
+      pago:$('#av-p').value.trim()||AVISOS_DEF.pago,rutina:$('#av-r').value.trim()||AVISOS_DEF.rutina,alias:$('#av-al').value.trim(),wa:$('#av-wa').value.replace(/[^\d+]/g,''),gyms:Object.fromEntries([...document.querySelectorAll('[data-avg]')].map(x=>[x.dataset.avg,x.checked]))};
+    if(await write(()=>S.db.doc('config/general').set({...S.cfgRaw,avisos:av})))toast('Avisos guardados');
   });
   const readDefs=()=>[...document.querySelectorAll('#rmdefs tbody tr')].map(tr=>{const mov=tr.querySelector('[data-rd=mov]').value.trim().toUpperCase();const base=tr.querySelector('[data-rd=base]').value;const f=Number(tr.querySelector('[data-rd=factor]').value);return mov?{mov,...(base&&base!==mov?{base,factor:f||1}:{})}:null}).filter(Boolean);
   $('#rd-add').addEventListener('click',()=>{S.cfg.rmDefs=[...readDefs(),{mov:''}];renderAjustes()});
@@ -394,6 +420,7 @@ function fichaHTML(e){
     <div><dt>Última rutina</dt><dd>${fmtD(e.ultRutina)}${dr!==null?` <span class="hint" style="display:inline">(${dr} d · ${periodo(e)})</span>`:''}</dd></div>
     <div><dt>Fecha de inicio</dt><dd>${fmtD(e.inicio)}</dd></div>
     <div><dt>Pago registrado</dt><dd>${esc(e.pagoRegistrado)}</dd></div>
+    <div><dt>Avisos de cuota en su link</dt><dd><select data-avpago="${esc(e.id)}" class="av-sel"><option value="" ${!e.avisoPago?'selected':''}>Según gimnasio (${avisoAuto(e)?'sí':'no'})</option><option value="si" ${e.avisoPago==='si'?'selected':''}>Sí, mostrar</option><option value="no" ${e.avisoPago==='no'?'selected':''}>No mostrar</option></select></dd></div>
   </dl>
   ${e.obs?`<div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Observaciones</div></div><div style="margin-top:4px;overflow-wrap:anywhere">${esc(e.obs)}</div></div>`:''}
   ${fichaRutinasHTML(e)}
@@ -908,11 +935,34 @@ function renderRutinas(){
 /* ----- Google Calendar: abre el evento ya cargado (día completo) ----- */
 function gcalUrl(t,f,det){const d=parse(f);if(!d)return '';const n=new Date(d);n.setDate(n.getDate()+1);return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t)}&dates=${iso(d).replace(/-/g,'')}/${iso(n).replace(/-/g,'')}&details=${encodeURIComponent(det||'')}`}
 const gcalBtn=(lbl,t,f,det)=>{const u=gcalUrl(t,f,det);return u?`<a class="btn gcal" target="_blank" rel="noopener" href="${esc(u)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>${esc(lbl)}</a>`:''};
+const DSEM=[[1,'Lunes','Lun','MO'],[2,'Martes','Mar','TU'],[3,'Miércoles','Mié','WE'],[4,'Jueves','Jue','TH'],[5,'Viernes','Vie','FR'],[6,'Sábado','Sáb','SA'],[7,'Domingo','Dom','SU']];
+const dsem=n=>DSEM.find(x=>x[0]===Number(n))||DSEM[0];
+const pad2=n=>String(n).padStart(2,'0');
+/* evento semanal: un botón por cada horario distinto (los días con la misma hora van juntos) */
+function gcalSemanal(e,grp){const [hh,mm]=grp.hora.split(':').map(Number);const dur=Number(grp.dur)||60;
+  const hoy=today();let first=null;const ahora=new Date();for(let k=0;k<8&&!first;k++){const d=new Date(hoy);d.setDate(d.getDate()+k);const wd=((d.getDay()+6)%7)+1;const t=new Date(d);t.setHours(hh,mm,0,0);if(grp.dias.includes(wd)&&t>ahora)first=d}
+  const ini=new Date(first);ini.setHours(hh,mm,0,0);const fin=new Date(ini.getTime()+dur*60000);
+  const f=d=>`${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}T${pad2(d.getHours())}${pad2(d.getMinutes())}00`;
+  const det=[`Entrenamiento de ${name(e)}`,e.estimulos?`${e.estimulos} estímulos por semana`:'',e.telefono?'Tel: '+e.telefono:''].filter(Boolean).join('\n');
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Entrenamiento · '+name(e))}&dates=${f(ini)}/${f(fin)}&ctz=America/Argentina/Buenos_Aires&recur=${encodeURIComponent('RRULE:FREQ=WEEKLY;BYDAY='+grp.dias.map(d=>dsem(d)[3]).join(','))}&details=${encodeURIComponent(det)}&location=${encodeURIComponent(GYM_LBL[e.gym]||e.gym||'')}`}
+function horGrupos(hs){const g={};(hs||[]).filter(h=>h.dia&&/^\d{1,2}:\d{2}$/.test(h.hora||'')).forEach(h=>{const k=h.hora+'|'+(Number(h.dur)||60);(g[k]=g[k]||{hora:h.hora,dur:Number(h.dur)||60,dias:[]}).dias.push(Number(h.dia))});
+  return Object.values(g).map(x=>({...x,dias:[...new Set(x.dias)].sort()})).sort((a,b)=>a.dias[0]-b.dias[0]||a.hora.localeCompare(b.hora))}
+const horTxt=hs=>horGrupos(hs).map(g=>`${g.dias.map(d=>dsem(d)[2]).join(', ')} ${g.hora}`).join(' · ');
+function horariosHTML(e){const ed=S.horEdit&&S.horEdit.id===e.id;const hs=ed?S.horEdit.hs:(e.horarios||[]);
+  if(ed)return `<div class="card pad hor"><div class="kpi" style="padding:0"><div class="lbl">Días y horarios de entrenamiento</div></div>
+    <div class="hor-rows">${hs.map((h,i)=>`<div class="hor-r" data-hrow="${i}"><label>Día<select data-hd>${DSEM.map(([n,l])=>`<option value="${n}" ${Number(h.dia)===n?'selected':''}>${l}</option>`).join('')}</select></label><label>Hora<input type="time" data-hh value="${esc(h.hora||'')}"></label><label>Duración<select data-hm>${[45,60,75,90,120].map(m=>`<option value="${m}" ${(Number(h.dur)||60)===m?'selected':''}>${m} min</option>`).join('')}</select></label><button type="button" class="x-sm" data-hdel="${i}" aria-label="Quitar">Quitar</button></div>`).join('')}</div>
+    <div class="actions"><button type="button" class="btn" data-hadd="1">+ Agregar día</button><button type="button" class="btn pri" data-hsave="${esc(e.id)}">Guardar horarios</button><button type="button" class="btn" data-hcancel="1">Cancelar</button></div></div>`;
+  const gs=horGrupos(hs);
+  return `<div class="card pad hor"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div class="kpi" style="padding:0"><div class="lbl">Días y horarios de entrenamiento</div></div><button type="button" class="btn" style="padding:5px 10px;font-size:13px" data-hedit="${esc(e.id)}">${gs.length?'Cambiar':'Cargar horarios'}</button></div>
+    ${gs.length?`<ul class="hor-l">${gs.map(g=>`<li><b>${g.dias.map(d=>dsem(d)[1]).join(', ')}</b><span>${g.hora} hs · ${g.dur} min</span></li>`).join('')}</ul>
+      <p class="hint" style="margin:8px 0 6px">Creá los entrenamientos como eventos semanales en tu Google Calendar (uno por horario):</p>
+      <div class="actions">${gs.map(g=>`<a class="btn gcal" target="_blank" rel="noopener" href="${esc(gcalSemanal(e,g))}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Crear ${esc(g.dias.map(d=>dsem(d)[2]).join(' y '))} ${g.hora}</a>`).join('')}</div>
+      <p class="hint" style="margin-top:6px">Si después cambiás un horario, borrá o editá el evento viejo en Google Calendar: la app no lo modifica sola.</p>`:'<p class="hint" style="margin:6px 0 0">Cargá qué días y a qué hora entrena para verlo en “Hoy entrenan” y crear los eventos en Google Calendar.</p>'}</div>`}
 function gcalFichaHTML(e){const a=activaDe(e.id),c=colaDe(e.id)[0];const tel=e.telefono?'Tel: '+e.telefono:'';const out=[];
   if(e.proxVenc&&isAct(e))out.push(gcalBtn('Vencimiento de cuota · '+fmtShort(e.proxVenc),'Vence cuota · '+name(e),e.proxVenc,`Cuota de ${money(monto(e))} · ${GYM_LBL[e.gym]||e.gym||''}\n${tel}`));
   if(c&&c.fechaSugerida)out.push(gcalBtn('Entrega de rutina · '+fmtShort(c.fechaSugerida),'Entregar rutina · '+name(e),c.fechaSugerida,`${c.nombre||'Rutina'}\n${tel}`));
   if(a&&a.fechaEntrega){const f=new Date(parse(a.fechaEntrega));f.setDate(f.getDate()+(Number(a.duracionSemanas)||4)*7);out.push(gcalBtn('Fin de rutina · '+fmtShort(iso(f)),'Termina la rutina de '+name(e),iso(f),`${a.nombre||'Rutina'}: planificar la próxima.\n${tel}`))}
-  return out.length?`<div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Agendar en Google Calendar</div></div><p class="hint" style="margin:4px 0 8px">Se abre Google Calendar con el evento cargado: solo tocás Guardar.</p><div class="actions">${out.join('')}</div></div>`:''}
+  return horariosHTML(e)+(out.length?`<div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Recordatorios en Google Calendar</div></div><p class="hint" style="margin:4px 0 8px">Se abre Google Calendar con el evento cargado: solo tocás Guardar.</p><div class="actions">${out.join('')}</div></div>`:'')}
 /* ----- bloque de rutinas en la ficha ----- */
 function fichaRutinasHTML(e){
   const a=activaDe(e.id),c=colaDe(e.id),fin=rutDe(e.id).filter(r=>r.estado==='finalizada').sort((x,y)=>(y.fechaFin||'').localeCompare(x.fechaFin||'')).slice(0,3);
@@ -1393,6 +1443,7 @@ function render(){
 }
 document.querySelector('nav.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){if(location.hash!=='#'+b.dataset.view)location.hash=b.dataset.view;else show(b.dataset.view)}});
 window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+function horLeer(){if(!S.horEdit)return;document.querySelectorAll('[data-hrow]').forEach(r=>{const h=S.horEdit.hs[Number(r.dataset.hrow)];if(!h)return;h.dia=Number(r.querySelector('[data-hd]').value);h.hora=r.querySelector('[data-hh]').value;h.dur=Number(r.querySelector('[data-hm]').value)})}
 function handleRut(e){
   const g=k=>e.target.closest('['+k+']');let b;
   if(b=g('data-entregar')){entregar(b.dataset.entregar,b);return true}
@@ -1412,6 +1463,12 @@ function handleRut(e){
   if(b=g('data-epago')){S.ePago=b.dataset.epago;renderRutinas();return true}
   if(b=g('data-lppago')){S.lpPago=b.dataset.lppago;renderRutinas();return true}
   if(b=g('data-lpplan')){S.lpPlan=b.dataset.lpplan;renderRutinas();return true}
+  if(b=g('data-hedit')){const e2=S.ents[b.dataset.hedit];S.horEdit={id:e2.id,hs:clone(e2.horarios||[])};if(!S.horEdit.hs.length)S.horEdit.hs=[{dia:1,hora:'08:00',dur:60}];renderSheet();return true}
+  if(b=g('data-hadd')){horLeer();const u=S.horEdit.hs[S.horEdit.hs.length-1];S.horEdit.hs.push({dia:u?Math.min(7,Number(u.dia)+2):1,hora:u?.hora||'08:00',dur:u?.dur||60});renderSheet();return true}
+  if(b=g('data-hdel')){horLeer();S.horEdit.hs.splice(Number(b.dataset.hdel),1);renderSheet();return true}
+  if(b=g('data-hcancel')){S.horEdit=null;renderSheet();return true}
+  if(b=g('data-hsave')){horLeer();const hs=S.horEdit.hs.filter(h=>h.dia&&/^\d{1,2}:\d{2}$/.test(h.hora||'')).map(h=>({dia:Number(h.dia),hora:h.hora,dur:Number(h.dur)||60}));const id=b.dataset.hsave;
+    write(()=>S.db.collection('entrenados').doc(id).update({horarios:hs})).then(ok=>{if(ok){S.ents[id].horarios=hs;S.horEdit=null;toast('Horarios guardados');renderSheet()}});return true}
   if(b=g('data-vercambios')){S.verCambios=b.dataset.vercambios||null;renderSheet();return true}
   if(b=g('data-goto')){location.hash=b.dataset.goto;return true}
   return false;
@@ -1448,4 +1505,6 @@ show(location.hash.slice(1)||'panel');
   db.collection('registros').onSnapshot(s=>{S.regs=s.docs.map(d=>({...d.data(),_id:d.id}));got.g=true;done()},onErr);
   db.doc('config/general').onSnapshot(s=>{S.cfgRaw=s.exists?s.data():{};S.cfg=normCfg(s.exists?s.data():null);render()},onErr);
 })();
+document.addEventListener('change',async ev=>{const sel=ev.target.closest&&ev.target.closest('[data-avpago]');if(!sel)return;const id=sel.dataset.avpago,v=sel.value;
+  if(await write(()=>S.db.collection('entrenados').doc(id).update({avisoPago:v}))){if(S.ents[id])S.ents[id].avisoPago=v;toast(v==='no'?'No verá avisos de cuota':v==='si'?'Verá los avisos de cuota':'Avisos según su gimnasio')}});
 })();
