@@ -306,3 +306,11 @@ input.falta::placeholder{color:var(--bad);opacity:.85}
 .hor-l span{color:var(--muted)}
 .hor-h{font-family:var(--display);font-size:20px;min-width:54px}
 .form label.av-g{display:inline-flex;flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);padding:8px 14px}
+/* asistente con Claude: importar / copiar */
+.ia-bar{align-items:center;padding-bottom:4px;border-bottom:1px dashed var(--line);margin-bottom:2px}
+.ia-l{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.imp-box{display:flex;flex-direction:column;gap:8px;border:1.5px solid var(--ok-line,var(--accent));background:var(--ok-soft,var(--surface))}
+.imp-box textarea{width:100%;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-sizing:border-box;resize:vertical}
+.imp-box .hint{margin:0}
+.imp-err{margin:0;color:var(--bad);font-weight:600;font-size:14px}
+.imp-warn{margin:0;font-size:14px;color:var(--ink)}
