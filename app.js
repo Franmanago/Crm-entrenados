@@ -381,6 +381,10 @@ function renderSheet(){
   if(openId==='__asig'){ov.innerHTML=shell('Asignar plantilla',asignarHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};bindAsignar(sheetArg);return}
   if(openId==='__formas'){ov.innerHTML=shell('Pagos de '+mesLbl(sheetArg.mes),formasHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
       const f=ev.target.closest('[data-formas]');if(f){sheetArg.f=f.dataset.formas;renderSheet();return}const o=ev.target.closest('[data-open]');if(o)openSheet(o.dataset.open)};return}
+  if(openId==='__rv'){const r=S.rutinas.find(x=>x._id===sheetArg);if(!r){closeSheet();return}const e=S.ents[r.entrenadoId];
+    ov.innerHTML=shell((e?firstName(e)+' · ':'')+(r.nombre||'Rutina'),`<div class="actions" style="margin-bottom:10px"><button class="btn" type="button" data-open="${esc(r.entrenadoId)}">← Volver a la ficha</button></div>`+rutVistaHTML(r,e));ov.querySelector('.sheet').classList.add('wide');
+    ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}const o=ev.target.closest('[data-open]');if(o){openSheet(o.dataset.open);return}
+      const ia=ev.target.closest('[data-rvia]');if(ia){if(e)iaCopiar(e,r);return}handleRut(ev)};return}
   if(openId==='__posp'){const r=S.rutinas.find(x=>x._id===sheetArg);if(!r){closeSheet();return}ov.innerHTML=shell('Posponer entrega',posponerHTML(r));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};bindPosponer(r);return}
   const isNew=openId==='__new';
   const e=isNew?{id:nextId(),nombre:'',telefono:'+549',gym:'LEVEL',estado:'Activo',plan:'Deportivo',estimulos:2,promo:0,pagoRegistrado:'Al día',modalidad:'Periodizada',inicio:iso(today()),ultPago:iso(today()),proxVenc:addMonth(iso(today())),ultRutina:'',obs:''}:S.ents[openId];
@@ -970,7 +974,7 @@ function gcalFichaHTML(e){const a=activaDe(e.id),c=colaDe(e.id)[0];const tel=e.t
   return horariosHTML(e)+(out.length?`<div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">Recordatorios en Google Calendar</div></div><p class="hint" style="margin:4px 0 8px">Se abre Google Calendar con el evento cargado: solo tocás Guardar.</p><div class="actions">${out.join('')}</div></div>`:'')}
 /* ----- bloque de rutinas en la ficha ----- */
 function fichaRutinasHTML(e){
-  const a=activaDe(e.id),c=colaDe(e.id),fin=rutDe(e.id).filter(r=>r.estado==='finalizada').sort((x,y)=>(y.fechaFin||'').localeCompare(x.fechaFin||'')).slice(0,3);
+  const a=activaDe(e.id),c=colaDe(e.id),finT=rutDe(e.id).filter(r=>r.estado==='finalizada').sort((x,y)=>(y.fechaFin||'').localeCompare(x.fechaFin||'')||(y.fechaEntrega||'').localeCompare(x.fechaEntrega||'')),fin=S.finAll?finT:finT.slice(0,3);
   const url=portalUrl(e);
   const regs=S.regs.filter(r=>r.entrenadoId===e.id&&!especial(r)).sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||'')||(y.ts||0)-(x.ts||0)).slice(0,10);
   const asis=S.regs.filter(r=>r.entrenadoId===e.id&&String(r.item||'').startsWith('asis:'));
@@ -984,9 +988,11 @@ function fichaRutinasHTML(e){
     <div class="pad" style="padding-bottom:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><b>Rutinas</b>
       <span class="actions"><button class="btn" style="padding:5px 10px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Desde plantilla</button><button class="btn" style="padding:5px 10px;font-size:13px" data-copiarde="${esc(e.id)}">De otro entrenado</button><button class="btn" style="padding:5px 10px;font-size:13px" data-newrut="${esc(e.id)}">Vacía</button><button class="btn" style="padding:5px 10px;font-size:13px" data-iaimp="${esc(e.id)}">Importar de Claude</button><button class="btn" style="padding:5px 10px;font-size:13px" data-iaexp="${esc(e.id)}">Copiar para Claude</button>${a?`<button class="btn" style="padding:5px 10px;font-size:13px" data-duprut="${esc(a._id)}">Duplicar actual</button>`:''}</span></div>
     <ul class="alist">
-      ${a?`<li><span class="nm" style="white-space:normal"><span class="pill p-ok">Activa</span> <b>${esc(a.nombre||'Rutina')}</b>${warn(a)}${faltaPill(a)}<br><span class="hint">Entregada ${fmtD(a.fechaEntrega)} · semana ${semanaActual(a)+1} de ${a.duracionSemanas||'?'}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(a._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(a._id)}">Abrir</button></span></li>`:'<li><span class="nm hint">Sin rutina activa en la app.</span></li>'}
+      ${a?`<li><span class="nm" style="white-space:normal"><span class="pill p-ok">Activa</span> <b>${esc(a.nombre||'Rutina')}</b>${warn(a)}${faltaPill(a)}<br><span class="hint">Entregada ${fmtD(a.fechaEntrega)} · semana ${semanaActual(a)+1} de ${a.duracionSemanas||'?'}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(a._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-verrut="${esc(a._id)}">Ver</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(a._id)}">Abrir</button></span></li>`:'<li><span class="nm hint">Sin rutina activa en la app.</span></li>'}
       ${c.map(r=>`<li><span class="nm" style="white-space:normal"><span class="pill p-warn">En cola</span> <b>${esc(r.nombre||'Rutina')}</b>${warn(r)}${faltaPill(r)}<br><span class="hint">Entrega sugerida ${fmtD(r.fechaSugerida)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(r._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button></span></li>`).join('')}
-      ${fin.map(r=>`<li><span class="nm hint" style="white-space:normal"><span class="pill p-mute">Finalizada</span> ${esc(r.nombre||'Rutina')} · ${fmtShort(r.fechaEntrega)} a ${fmtShort(r.fechaFin)}</span><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Ver</button></li>`).join('')}
+      ${finT.length?`<li class="rv-sep"><b>Rutinas anteriores</b><span class="hint">${finT.length}</span></li>`:''}
+      ${fin.map(r=>`<li><span class="nm" style="white-space:normal"><span class="pill p-mute">Finalizada</span> ${esc(r.nombre||'Rutina')}<br><span class="hint">${fmtD(r.fechaEntrega)} al ${fmtD(r.fechaFin)}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(r._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-verrut="${esc(r._id)}">Ver</button></span></li>`).join('')}
+      ${finT.length>3?`<li><button class="lnk-f" type="button" data-finall="1">${S.finAll?'Ver menos':'Ver todas ('+finT.length+')'}</button></li>`:''}
     </ul>
     <div class="pad" style="border-top:1px solid var(--line)"><div class="kpi" style="padding:0"><div class="lbl">Link personal del entrenado</div></div>
       ${url?`<input id="portal-url" readonly value="${esc(url)}" style="width:100%;margin:6px 0;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:12px"><div class="actions"><button class="btn" id="portal-copy" type="button">Copiar link</button><a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="${esc(url)}">Abrir como entrenado</a><button class="btn" data-mode="wa" data-kindsel="link">Enviar por WhatsApp</button></div>`:`<p class="hint" style="margin:6px 0">Todavía no tiene link.</p><button class="btn" id="portal-gen" type="button">Crear link</button>`}
@@ -1208,6 +1214,31 @@ function bindCopiar(arg){
 }
 
 
+
+/* ----- ver rutinas anteriores (lo indicado y lo que anotó el entrenado) ----- */
+function rutVistaHTML(r,e,compact){
+  const regs=S.regs.filter(x=>x.rutinaId===r._id&&x.entrenadoId===r.entrenadoId);
+  const porItem={};regs.filter(x=>!especial(x)).forEach(x=>{(porItem[x.item]=porItem[x.item]||[]).push(x)});
+  const asisN=uid=>new Set(regs.filter(x=>x.item==='asis:'+uid).map(x=>x.fecha)).size;
+  const fmtKg=v=>String(v).replace('.',',');
+  const dias=(r.secciones||[]).flatMap((s,si)=>(s.dias||[]).map(d=>({s,si,d})));
+  const multi=(r.secciones||[]).length>1;
+  const per=r.fechaEntrega?`${fmtD(r.fechaEntrega)}${r.fechaFin?' al '+fmtD(r.fechaFin):r.estado==='activa'?' · en curso':''}`:'Sin entregar';
+  let h=compact?'':`<div class="card pad rv-h"><div class="actions" style="justify-content:space-between;align-items:center"><span><span class="pill ${r.estado==='activa'?'p-ok':r.estado==='cola'?'p-warn':'p-mute'}">${{activa:'Activa',cola:'En cola',finalizada:'Finalizada'}[r.estado]||r.estado}</span> <b>${esc(r.nombre||'Rutina')}</b></span><span class="hint">${per} · ${r.duracionSemanas||'?'} semanas</span></div>
+    ${r.notas?`<p class="rv-notas">${esc(r.notas)}</p>`:''}
+    <div class="actions"><button class="btn" type="button" data-pdf="${esc(r._id)}">PDF</button><button class="btn" type="button" data-duprut="${esc(r._id)}">Usar como base para una nueva</button><button class="btn" type="button" data-rvia="${esc(r._id)}">Copiar para Claude</button>${r.estado!=='finalizada'?`<button class="btn" type="button" data-editrut="${esc(r._id)}">Abrir en el editor</button>`:''}</div>
+    <p class="hint" style="margin:0">En verde, lo que anotó el entrenado. “Tildado” = lo hizo con lo indicado.</p></div>`;
+  h+=dias.map(({s,d})=>{const n=asisN(d.uid);
+    return `<div class="card rv-dia"><div class="rv-dh"><b>${multi?esc(s.titulo||'')+' · ':''}${esc(d.nombre||'Día')}</b>${r.estado!=='cola'?`<span class="pill ${n?'p-ok':'p-mute'}">${n?plural(n,'vez hecho','veces hecho'):'Sin marcar'}</span>`:''}</div>
+      ${(d.bloques||[]).map(b=>{const its=(b.items||[]).filter(i=>!itemVacio(i));if(!its.length)return '';const tm=b.modo==='timer';
+        return `<div class="rv-bl"><div class="rv-bn">${esc(b.nombre||'')}<span>${tm?`⏱ ${esc(b.trabajo||40)}" / ${esc(b.descanso||20)}" × ${esc(b.vueltas||3)} vueltas`:(b.series?esc(b.series)+' series':'')}</span></div>
+        ${its.map(it=>{const k=kgItem(it,e);const pres=[tm?'':esc(it.reps||''),it.pct?`${esc(it.pct)}%${k.txt?' = '+fmtKg(k.txt)+' kg':''}`:(it.kg?fmtKg(it.kg)+' kg':'')].filter(Boolean).join(' · ');
+          const rs=(porItem[it.uid]||[]);const conKg=rs.filter(x=>numKg(x.kg)>0);const best=conKg.reduce((m,x)=>!m||numKg(x.kg)>numKg(m.kg)?x:m,null);
+          const hecho=best?`<span class="rv-done">${fmtKg(best.kg)} kg${best.reps?' × '+esc(best.reps):''}${conKg.length>1?` <i>(${conKg.length} registros)</i>`:''}</span>`:rs.length?'<span class="rv-done">Tildado</span>':'';
+          return `<div class="rv-it"><span class="rv-n">${esc(it.nombre)}${it.notas?`<i>${esc(it.notas)}</i>`:''}</span><span class="rv-p">${pres}</span>${hecho}</div>`}).join('')}</div>`}).join('')}</div>`}).join('');
+  return h;
+}
+function rutAnterior(R,eid){return rutDe(eid).filter(r=>r._id!==S.edit?.id&&(r.estado==='finalizada'||r.estado==='activa')).sort((a,b)=>(b.fechaEntrega||'').localeCompare(a.fechaEntrega||''))[0]||null}
 /* ----- asistente con Claude: copiar para Claude / importar rutina ----- */
 function copyTxt(t){const fb=()=>{const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0;top:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(x){}ta.remove();return ok};
   const p=navigator.clipboard?.writeText(t);if(p)return p.then(()=>true,()=>fb());return Promise.resolve(fb())}
@@ -1313,9 +1344,12 @@ function editorHTML(){
       ${isRut&&e&&it.uid&&!ro?entBadge(it,path,e,tm):''}
     </div>`}).join('');
   const fal=faltantes(R),falDia=(si,di)=>fal.find(x=>x.si===si&&x.di===di);
-  const iaBar=ro?'':`<div class="full actions ia-bar"><span class="ia-l">Con Claude</span><button class="btn" type="button" data-act="imp">Importar rutina</button>${isRut&&e?'<button class="btn" type="button" data-act="iaexp">Copiar para Claude</button>':''}</div>`;
+  const prev=isRut&&e&&!ro?rutAnterior(R,e.id):null;
+  const iaBar=ro?'':`<div class="full actions ia-bar"><span class="ia-l">Con Claude</span><button class="btn" type="button" data-act="imp">Importar rutina</button>${isRut&&e?'<button class="btn" type="button" data-act="iaexp">Copiar para Claude</button>':''}${prev?`<button class="btn" type="button" data-act="prev" aria-pressed="${!!E.prev}">${E.prev?'Ocultar':'Ver'} rutina anterior</button>`:''}</div>`;
+  const prevHTML=prev&&E.prev?`<div class="card pad rv-prev"><div class="actions" style="justify-content:space-between"><b>Anterior: ${esc(prev.nombre||'Rutina')}</b><span class="hint">${prev.fechaEntrega?fmtD(prev.fechaEntrega):''}${prev.fechaFin?' al '+fmtD(prev.fechaFin):prev.estado==='activa'?' · activa':''}</span></div>${rutVistaHTML(prev,e,true)}</div>`:'';
   return `<datalist id="dl-bl">${(S.cfg.bloques||[]).map(b=>`<option value="${esc(b)}">`).join('')}</datalist>
   ${E.imp||E.impRes?impHTML(E,isRut,e):''}
+  ${prevHTML}
   <div class="form card pad" id="ed-head">
     ${iaBar}
     ${fal.length?`<div class="full falta-box"><b>Faltan completar ${plural(fal.length,'día','días')}</b>${fal.map(x=>`<span>${esc(x.lugar)}: ${esc(x.txt)}</span>`).join('')}</div>`:''}
@@ -1382,6 +1416,7 @@ function bindEditor(){
     const S0=R.secciones[E.sec];
     if(act==='save'){saveEditor();return}
     if(act==='imp'){E.imp=true;E.impRes=null;E.impErr='';rerenderEditor();setTimeout(()=>{const t=$('#imp-txt');if(t){t.focus();t.scrollIntoView({block:'center'})}},30);return}
+    if(act==='prev'){E.prev=!E.prev;rerenderEditor();return}
     if(act==='impX'){E.imp=false;E.impErr='';rerenderEditor();return}
     if(act==='impOk'){E.impRes=null;rerenderEditor();return}
     if(act==='iaexp'){const en=S.ents[R.entrenadoId];if(en)iaCopiar(en,{...R,estado:R.estado||'cola'});return}
@@ -1540,6 +1575,8 @@ function handleRut(e){
   if(b=g('data-entregar')){entregar(b.dataset.entregar,b);return true}
   if(b=g('data-posponer')){openSheet('__posp','edit',b.dataset.posponer);return true}
   if(b=g('data-editrut')){const r=S.rutinas.find(x=>x._id===b.dataset.editrut);if(r){const{_id,...d}=r;openEditor('rutinas',_id,d)}return true}
+  if(b=g('data-verrut')){openSheet('__rv','ver',b.dataset.verrut);return true}
+  if(b=g('data-finall')){S.finAll=!S.finAll;renderSheet();return true}
   if(b=g('data-iaexp')){const e2=S.ents[b.dataset.iaexp];if(e2)iaCopiar(e2,iaRutBase(e2.id));return true}
   if(b=g('data-iaimp')){const e2=S.ents[b.dataset.iaimp];openEditor('rutinas',null,{entrenadoId:e2.id,nombre:'Rutina '+mesLbl(curMes()),estado:'cola',fechaSugerida:iso(today()),duracionSemanas:4,secciones:[newSeccion(Number(e2.estimulos)||3)],creada:Date.now()});S.edit.imp=true;rerenderEditor();setTimeout(()=>$('#imp-txt')?.focus(),30);return true}
   if(b=g('data-newrut')){const e2=S.ents[b.dataset.newrut];openEditor('rutinas',null,{entrenadoId:e2.id,nombre:'Rutina '+mesLbl(curMes()),estado:'cola',fechaSugerida:iso(today()),duracionSemanas:4,secciones:[newSeccion(Number(e2.estimulos)||3)],creada:Date.now()});return true}
