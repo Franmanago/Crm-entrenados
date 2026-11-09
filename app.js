@@ -27,7 +27,7 @@ function normCfg(raw){
   c.avisos={...AVISOS_DEF,...(raw.avisos||{}),gyms:{...AVISOS_DEF.gyms,...(raw.avisos?.gyms||{})}};
   return c;
 }
-const S={ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
+const S={liqs:[],rends:[],pv:'ganado',ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
 const WA='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.5-.3Z"/></svg>';
 
 /* ---------- fechas ---------- */
@@ -114,11 +114,13 @@ function monthData(M){
   const pagos=S.pagos.filter(p=>p.mes===M);
   const paid=new Set(pagos.map(p=>p.entrenadoId));
   const G={};GYMS.forEach(g=>G[g]={n:0,f:0,c:0,p:0,ff:0,fc:0,fp:0});
-  roster.forEach(r=>{const g=G[r.gym]||G.LEVEL;g.n++;g.f+=r.monto;g.ff+=r.monto*r.pct;if(!paid.has(r.id)){g.p+=r.monto;g.fp+=r.monto*r.pct}});
+  const liq=liqMes(M);
+  roster.forEach(r=>{const g=G[r.gym]||G.LEVEL;g.n++;g.f+=r.monto;g.ff+=r.monto*r.pct;if(r.gym!=='CROSSFORCE'&&!paid.has(r.id)){g.p+=r.monto;g.fp+=r.monto*r.pct}});
   pagos.forEach(p=>{const g=G[p.gym]||G.LEVEL;g.c+=Number(p.monto)||0;g.fc+=(Number(p.monto)||0)*(p.pctFran??1)});
+  if(liq){const pc=pctFran('CROSSFORCE')||1;G.CROSSFORCE.fc+=Number(liq.monto)||0;G.CROSSFORCE.c+=(Number(liq.monto)||0)/pc;if(!G.CROSSFORCE.ff&&liq.esperado){G.CROSSFORCE.ff=Number(liq.esperado)||0;G.CROSSFORCE.f=G.CROSSFORCE.ff/pc}}
   const T={n:0,f:0,c:0,p:0,ff:0,fc:0,fp:0};GYMS.forEach(g=>Object.keys(T).forEach(k=>T[k]+=G[g][k]));
-  const pend=roster.filter(r=>!paid.has(r.id));
-  return {M,roster,pagos,paid,G,T,pend,cerrado:!!(doc&&doc.cerrado)};
+  const pend=roster.filter(r=>r.gym!=='CROSSFORCE'&&!paid.has(r.id));
+  return {M,roster,pagos,paid,G,T,pend,liq,cerrado:!!(doc&&doc.cerrado)};
 }
 const adeudados=id=>unpaidMeses(id).filter(k=>k<curMes());
 function unpaidMeses(id){
@@ -168,7 +170,8 @@ function renderPanel(){
   ${prevOpen?`<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>${mesLbl(prev)} terminó y todavía está abierto. Al cerrarlo se guarda quiénes estaban activos y cuánto pagaba cada uno.</span><button class="btn" data-cerrar="${prev}">Cerrar ${mesLbl(prev)}</button></div>`:''}
   <div class="chips" id="mesChips" style="margin-bottom:14px">${meses.map(k=>`<button class="chip" data-mes="${k}" aria-pressed="${k===M}">${mesLbl(k)}${S.meses[k]?.cerrado?' ✓':''}</button>`).join('')}</div>
   <h2 class="sec">${mesLbl(M)} ${D.cerrado?'<span class="pill p-mute">Cerrado</span>':isCur?'<span class="pill p-ok">En curso</span>':'<span class="pill p-warn">Abierto</span>'}</h2>
-  <div class="kpis">
+  <div class="seg" role="tablist"><button type="button" data-pv="ganado" aria-pressed="${S.pv!=='caja'}">Ganado</button><button type="button" data-pv="caja" aria-pressed="${S.pv==='caja'}">Caja</button></div>
+  ${S.pv==='caja'?cajaHTML(M):`<div class="kpis">
     <div class="card kpi hl"><div class="lbl">Tu ganancia cobrada</div><div class="val">${money(D.T.fc)}</div><div class="sub">de ${money(D.T.ff)} esperados</div></div>
     <div class="card kpi"><div class="lbl">Cobrado</div><div class="val">${money(D.T.c)}</div><div class="sub">${Math.round(pctCob*100)}% de ${money(D.T.f)}</div><div class="prog" style="margin-top:8px"><i style="width:${pctCob*100}%"></i></div></div>
     <div class="card kpi"><div class="lbl">Falta cobrar</div><div class="val" style="color:var(--bad)">${money(D.T.p)}</div><div class="sub">${plural(D.pend.length,'entrenado','entrenados')}</div></div>
@@ -181,7 +184,7 @@ function renderPanel(){
     <div class="card"><div class="tbl-wrap"><table>
       <thead><tr><th></th><th>Esperado</th><th>Cobrado</th><th>Falta</th></tr></thead>
       <tbody>
-        ${GYMS.map(g=>`<tr><td>Fran · ${GYM_LBL[g]} (${pct(pctFran(g))})</td><td>${money(D.G[g].ff)}</td><td>${money(D.G[g].fc)}</td><td>${money(D.G[g].fp)}</td></tr>`).join('')}
+        ${GYMS.map(g=>g==='CROSSFORCE'?`<tr><td>Fran · CrossForce (${pct(pctFran(g))}) ${D.liq?`<button class="lnk-f" type="button" data-liq="${esc(D.liq._id)}"><span class="pill p-ok">liquidado ${fmtShort(D.liq.fecha)}</span></button>`:'<span class="pill p-gymc">a liquidar</span>'}</td><td>${money(D.G[g].ff)}</td><td>${D.liq?money(D.G[g].fc):'—'}</td><td>${D.liq?`<span class="${D.G[g].fc-D.G[g].ff<0?'neg':''}">${D.G[g].fc-D.G[g].ff<0?'−':'+'}${money(Math.abs(D.G[g].fc-D.G[g].ff))}</span>`:'<button class="lnk-f" type="button" data-liqnew="'+M+'">Cargar liquidación ›</button>'}</td></tr>`:`<tr><td>Fran · ${GYM_LBL[g]} (${pct(pctFran(g))})</td><td>${money(D.G[g].ff)}</td><td>${money(D.G[g].fc)}</td><td>${money(D.G[g].fp)}</td></tr>`).join('')}
         <tr class="total"><td>Total Fran</td><td>${money(D.T.ff)}</td><td>${money(D.T.fc)}</td><td>${money(D.T.fp)}</td></tr>
         ${['LEVEL','CROSSFORCE'].map(g=>{const x=D.G[g];return `<tr><td>Gimnasio ${GYM_LBL[g]} (${pct(1-pctFran(g))})</td><td>${money(x.f-x.ff)}</td><td>${money(x.c-x.fc)}</td><td>${money(x.p-x.fp)}</td></tr>`}).join('')}
       </tbody></table></div></div>
@@ -206,6 +209,7 @@ function renderPanel(){
       <div class="split"><i style="width:${t.ef/(tot||1)*100}%;background:var(--ok)" data-formas="ef" title="Ver pagos en efectivo"></i><i style="width:${t.tr/(tot||1)*100}%;background:var(--accent)" data-formas="tr" title="Ver pagos por transferencia"></i>${t.nd?`<i style="width:${t.nd/(tot||1)*100}%;background:var(--line)"></i>`:''}</div>
       <div class="legend"><button class="lnk-f" data-formas="ef"><i class="dot" style="background:var(--ok)"></i>Efectivo <b>${money(t.ef)}</b></button><button class="lnk-f" data-formas="tr"><i class="dot" style="background:var(--accent)"></i>Transferencia <b>${money(t.tr)}</b></button>${t.nd?`<button class="lnk-f" data-formas="nd"><i class="dot" style="background:var(--line)"></i>Sin dato <b>${money(t.nd)}</b></button>`:''}</div>
       <p class="hint" style="margin-top:8px">Tocá una forma de pago para ver quién pagó así. En los pagos mixtos se suma a cada columna la parte que corresponde. “Tu parte” aplica el % de cada gimnasio.</p></div></div>`})()}
+`}
   <h2 class="sec">${isCur?'Para hacer hoy':'Cuotas de '+mesLbl(M)}</h2>
   <div class="grid2">
     ${isCur?`<div class="card">${head(`Vencen hoy · ${fmtShort(iso(today()))}`,'hoy',hoyV.length)}
@@ -267,11 +271,152 @@ async function cerrarMes(M){
 }
 
 
+
+/* ----- liquidaciones de CrossForce, rendiciones a LEVEL y caja ----- */
+const normN=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;let pr=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(pr[j]+1,c[j-1]+1,pr[j-1]+(a[i-1]===b[j-1]?0:1));pr=c}return pr[n]}
+function parseMonto(v){if(typeof v==='number')return v;let t=String(v||'').replace(/[^\d.,-]/g,'');if(!t)return 0;
+  const lc=t.lastIndexOf(','),ld=t.lastIndexOf('.');
+  if(lc>-1&&ld>-1){const dec=lc>ld?',':'.';t=t.split(dec==='.'?',':'.').join('');if(dec===',')t=t.replace(',','.')}
+  else if(lc>-1){t=/,\d{3}$/.test(t)?t.replace(/,/g,''):t.replace(',','.')}
+  else if(ld>-1&&/^-?\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
+  return Number(t)||0}
+function parseFechaCel(v){if(v instanceof Date&&!isNaN(v))return iso(v);if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Date.UTC(1899,11,30)+v*864e5);return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())}
+  const m=String(v||'').match(/(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?/);if(!m)return '';let y=m[3]?Number(m[3]):today().getFullYear();if(y<100)y+=2000;return y+'-'+pad(Number(m[2]))+'-'+pad(Number(m[1]))}
+function liqFilas(aoa){
+  const out=[];let fecha='';
+  for(const r of aoa){if(!r)continue;const cells=r.map(c=>c==null?'':c);
+    const nom=cells.find(c=>typeof c==='string'&&/[a-záéíóúñ]{2,}/i.test(c)&&!/\d/.test(c)&&!/^(fecha|personalizado|nombre|total|veces|fran|monto)/i.test(c.trim()));
+    if(!nom){const f0=cells.slice(0,1).map(parseFechaCel)[0];if(f0)fecha=f0;continue}
+    const idx=cells.indexOf(nom),rest=cells.slice(idx+1);
+    const f=cells.slice(0,idx).map(parseFechaCel).find(Boolean);if(f)fecha=f;
+    const veces=rest.find(c=>(typeof c==='number'&&c>=1&&c<=7&&Number.isInteger(c))||(/^\s*[1-7]\s*$/.test(String(c))));
+    const mon=rest.map(parseMonto).find(x=>x>=1000)||0;
+    out.push({fecha,nombre:String(nom).trim(),veces:veces==null?'':Number(veces),monto:mon,eid:''});
+  }
+  return out}
+function liqMatch(filas){
+  const cands=Object.values(S.ents).filter(e=>gymOf(e)==='CROSSFORCE').map(e=>({e,n:normN(e.nombre),t:normN(e.nombre).split(' ')}));
+  const used=new Set();
+  filas.forEach(f=>{const n=normN(f.nombre),t=n.split(' ');let best=null,how='';
+    const ex=cands.find(c=>c.n===n);if(ex){best=ex;how='ok'}
+    if(!best){const near=cands.map(c=>({c,d:lev(c.n,n)})).sort((a,b)=>a.d-b.d)[0];if(near&&near.d<=2){best=near.c;how='ok'}}
+    if(!best&&t.length>1){const ap=t[t.length-1];const L=cands.filter(c=>c.t.includes(ap)||c.t.some(x=>x.length>3&&lev(x,ap)<=1));
+      const L2=L.filter(c=>c.t[0].startsWith(t[0].slice(0,3))||t[0].startsWith(c.t[0].slice(0,3)));
+      const pick=L2.length===1?L2[0]:L.length===1?L[0]:null;if(pick){best=pick;how='ap'}}
+    if(best&&!used.has(best.e.id)){f.eid=best.e.id;f.how=how;used.add(best.e.id)}else{f.eid='';f.how=''}});
+  return filas}
+const liqsDe=g=>S.liqs.filter(l=>(l.gym||'CROSSFORCE')===g).sort((a,b)=>(b.mes||'').localeCompare(a.mes||''));
+const liqMes=M=>liqsDe('CROSSFORCE').find(l=>l.mes===M)||null;
+function liqDeEnt(eid){const L=liqsDe('CROSSFORCE');if(!L.length)return null;const ult=L[0];for(const l of L){const f=(l.filas||[]).find(x=>x.eid===eid);if(f)return {l,f,ultima:l===ult,ult}}return {l:null,f:null,ult}}
+function esperadoFila(f){const e=f.eid&&S.ents[f.eid];const pc=pctFran('CROSSFORCE');if(e)return Math.round(monto(e)*pc);const b=Number(S.cfg.gyms.CROSSFORCE.tarifas[String(f.veces)])||0;return Math.round(b*pc)}
+async function leerXLSX(buf){
+  const u8=new Uint8Array(buf),dv=new DataView(buf);let eo=-1;
+  for(let i=u8.length-22;i>=Math.max(0,u8.length-70000);i--)if(dv.getUint32(i,true)===0x06054b50){eo=i;break}
+  if(eo<0)throw new Error('El archivo no parece un Excel (.xlsx).');
+  const n=dv.getUint16(eo+10,true);let p=dv.getUint32(eo+16,true);const files={};const td=new TextDecoder();
+  for(let k=0;k<n;k++){if(dv.getUint32(p,true)!==0x02014b50)break;const meth=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    files[td.decode(u8.subarray(p+46,p+46+nl))]={meth,cs,lo};p+=46+nl+xl+cl}
+  const get=async name=>{const f=files[name];if(!f)return null;const ln=dv.getUint16(f.lo+26,true),le=dv.getUint16(f.lo+28,true),st=f.lo+30+ln+le,raw=u8.slice(st,st+f.cs);
+    if(f.meth===0)return td.decode(raw);const ds=new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));return await new Response(ds).text()};
+  const X=t=>new DOMParser().parseFromString(t,'application/xml');
+  const ss=[];const sst=await get('xl/sharedStrings.xml');if(sst)X(sst).querySelectorAll('si').forEach(si=>ss.push([...si.getElementsByTagName('t')].map(t=>t.textContent).join('')));
+  const hoja=files['xl/worksheets/sheet1.xml']?'xl/worksheets/sheet1.xml':Object.keys(files).filter(k=>/^xl\/worksheets\/[^/]+\.xml$/.test(k)).sort()[0];
+  if(!hoja)throw new Error('No encontré hojas en el Excel.');
+  const doc=X(await get(hoja)),aoa=[];
+  doc.querySelectorAll('sheetData > row').forEach(r=>{const ri=Number(r.getAttribute('r'))-1;const row=[];r.querySelectorAll('c').forEach(c=>{const ref=c.getAttribute('r')||'';let ci=0;for(const ch of ref.replace(/\d/g,''))ci=ci*26+ch.charCodeAt(0)-64;ci--;
+    const t=c.getAttribute('t'),v=c.querySelector('v')?.textContent;let val=null;
+    if(t==='s')val=ss[Number(v)]??'';else if(t==='inlineStr')val=[...c.getElementsByTagName('t')].map(x=>x.textContent).join('');else if(t==='str'||t==='e')val=v??'';else if(t==='b')val=v==='1';else if(v!=null&&v!=='')val=Number(v);
+    row[ci]=val});aoa[ri]=row});
+  return aoa}
+function liqNueva(){const prev=mesShift(curMes(),-1);return {id:null,mes:liqMes(prev)?curMes():prev,fecha:iso(today()),monto:'',forma:'efectivo',filas:[],archivo:'',msg:''}}
+function liqHTML(){
+  const L=S.lq,pc=pctFran('CROSSFORCE');
+  const cf=Object.values(S.ents).filter(e=>gymOf(e)==='CROSSFORCE').sort((a,b)=>name(a).localeCompare(name(b),'es'));
+  const tot=L.filas.reduce((a,f)=>a+(Number(f.monto)||0),0),esp=L.filas.reduce((a,f)=>a+esperadoFila(f),0),rec=Number(L.monto)||tot,dif=rec-esp;
+  const asig=new Set(L.filas.map(f=>f.eid).filter(Boolean));
+  const [y,m]=L.mes.split('-').map(Number),finMes=iso(new Date(y,m,0));
+  const faltan=cf.filter(e=>!asig.has(e.id)&&isAct(e)&&(!e.inicio||e.inicio<=finMes));
+  const nuevos=cf.filter(e=>!asig.has(e.id)&&isAct(e)&&e.inicio&&e.inicio>finMes);
+  const meses=[...new Set([mesShift(curMes(),-2),mesShift(curMes(),-1),curMes(),L.mes])].sort();
+  return `<div class="form card pad liq-f">
+    <label>Mes que liquida<select id="lq-mes">${meses.map(k=>`<option value="${k}" ${k===L.mes?'selected':''}>${mesLbl(k)}</option>`).join('')}</select></label>
+    <label>Fecha en que te pagaron<input id="lq-fecha" type="date" value="${esc(L.fecha)}"></label>
+    <label>Monto recibido<input id="lq-monto" type="number" min="0" step="100" value="${esc(L.monto)}" placeholder="${tot?Math.round(tot):''}"></label>
+    <label>Forma<select id="lq-forma">${[['efectivo','Efectivo'],['transferencia','Transferencia']].map(([k,l])=>`<option value="${k}" ${k===L.forma?'selected':''}>${l}</option>`).join('')}</select></label>
+    <div class="full liq-drop"><label class="btn" style="cursor:pointer">Subir Excel del gym<input id="lq-file" type="file" accept=".xlsx,.csv" hidden></label><span class="hint" style="margin:0">${L.archivo?`<b>${esc(L.archivo)}</b> · ${L.filas.length} filas`:'o copiá las filas en el Excel y pegalas acá abajo'}</span></div>
+    ${L.filas.length?'':`<textarea id="lq-paste" class="full" rows="4" placeholder="Pegá acá las filas copiadas del Excel (fecha, nombre, veces, monto)"></textarea><div class="full actions"><button class="btn" type="button" data-lq="paste">Leer filas pegadas</button></div>`}
+    ${L.msg?`<p class="full imp-err">${esc(L.msg)}</p>`:''}
+  </div>
+  ${L.filas.length?`<div class="liq-res"><div><span>Te rindieron</span><b>${money(rec)}</b><i>${plural(L.filas.length,'entrenado','entrenados')}${L.monto&&Math.abs(rec-tot)>1?' · el Excel suma '+money(tot):''}</i></div><div><span>Esperado (${pct(pc)} de la tarifa)</span><b>${money(esp)}</b><i>con las promos de cada ficha</i></div><div><span>Diferencia</span><b class="${dif<0?'neg':''}">${dif<0?'−':dif>0?'+':''}${money(Math.abs(dif))}</b><i>${dif?'revisá las filas marcadas':'coincide'}</i></div></div>
+  <div class="card"><div class="tbl-wrap"><table class="liq-t"><thead><tr><th>Pagó</th><th>En el Excel</th><th>Es…</th><th>Te rinden</th><th>Esperado</th><th>Dif.</th></tr></thead><tbody>
+    ${L.filas.map((f,i)=>{const e2=esperadoFila(f),d=(Number(f.monto)||0)-e2;return `<tr class="${f.eid?'':'liq-sin'}"><td>${f.fecha?fmtShort(f.fecha):'—'}</td><td>${esc(f.nombre)}${f.veces?`<br><span class="hint" style="display:inline">${f.veces}× por semana</span>`:''}</td>
+      <td><select data-lqe="${i}"><option value="">— No está en tu lista —</option>${cf.map(e=>`<option value="${esc(e.id)}" ${e.id===f.eid?'selected':''}>${esc(name(e))} · ${esc(e.id)}</option>`).join('')}</select>${f.how==='ap'?'<br><span class="pill p-warn">Por apellido: confirmá</span>':''}</td>
+      <td>${money(f.monto)}</td><td class="hint">${money(e2)}</td><td>${d?`<span class="${d<0?'neg':''}">${d<0?'−':'+'}${money(Math.abs(d))}</span>`:'<span class="hint">ok</span>'}</td></tr>`}).join('')}
+  </tbody></table></div></div>
+  ${faltan.length||nuevos.length?`<div class="card pad" style="margin-top:12px"><b>Tus CrossForce que no figuran en ${mesLbl(L.mes)}</b>
+    ${faltan.length?`<ul class="alist">${faltan.map(e=>`<li><span class="nm">${esc(name(e))} · ${esc(e.id)}</span><span class="pill p-bad">No figura</span></li>`).join('')}</ul>`:''}
+    ${nuevos.length?`<p class="hint">Empezaron después de ${mesLbl(L.mes)}: ${nuevos.map(e=>esc(name(e))).join(', ')}.</p>`:''}</div>`:''}`:''}
+  <div class="actions" style="margin-top:14px">${L.filas.length?`<button class="btn pri" type="button" data-lq="save">Guardar liquidación</button>`:''}${L.id?`<button class="btn" type="button" data-lq="del">${L.armed?'Confirmar borrado':'Borrar'}</button>`:''}<button class="btn" type="button" data-close>Cancelar</button></div>`;
+}
+function liqLeerForm(){const L=S.lq;if(!L)return;const v=id=>$(id)?.value;if($('#lq-mes'))L.mes=v('#lq-mes');if($('#lq-fecha'))L.fecha=v('#lq-fecha');if($('#lq-monto'))L.monto=v('#lq-monto');if($('#lq-forma'))L.forma=v('#lq-forma')}
+async function liqGuardar(){const L=S.lq;liqLeerForm();if(!L.fecha){L.msg='Falta la fecha en que te pagaron.';renderSheet();return}
+  const tot=L.filas.reduce((a,f)=>a+(Number(f.monto)||0),0);
+  const doc={gym:'CROSSFORCE',mes:L.mes,fecha:L.fecha,monto:Number(L.monto)||tot,forma:L.forma,filas:L.filas.map(f=>({fecha:f.fecha,nombre:f.nombre,veces:f.veces,monto:Number(f.monto)||0,eid:f.eid||''})),esperado:L.filas.reduce((a,f)=>a+esperadoFila(f),0),archivo:L.archivo||'',ts:Date.now()};
+  const otra=liqMes(L.mes);if(otra&&otra._id!==L.id){L.msg=`Ya hay una liquidación de ${mesLbl(L.mes)}. Abrila desde el panel para corregirla.`;renderSheet();return}
+  const ok=L.id?await write(()=>S.db.collection('liquidaciones').doc(L.id).set(doc)):await write(()=>S.db.collection('liquidaciones').add(doc));
+  if(ok){toast('Liquidación de '+mesLbl(L.mes)+' guardada');closeSheet()}}
+function rendHTML(M){const R=S.rend;const c=cajaDe(M);
+  const L=S.rends.filter(r=>r.mes===M).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  return `<div class="liq-res"><div><span>${pct(1-pctFran('LEVEL'))} de lo cobrado en LEVEL</span><b>${money(c.aRendir)}</b></div><div><span>Rendido</span><b>${money(c.rendido)}</b></div><div><span>Por rendir</span><b class="${c.porRendir>0?'neg':''}">${money(c.porRendir)}</b></div></div>
+  ${L.length?`<div class="card"><ul class="alist">${L.map(r=>`<li><span class="nm">${fmtD(r.fecha)} · ${money(r.monto)} <span class="hint" style="display:inline">${r.forma==='transferencia'?'Transferencia':'Efectivo'}</span></span><button class="x-sm" type="button" data-rdel="${esc(r._id)}">${R.armed===r._id?'Confirmar':'Borrar'}</button></li>`).join('')}</ul></div>`:''}
+  <div class="form card pad" style="margin-top:12px"><div class="full"><b>Registrar rendición</b></div>
+    <label>Fecha<input id="rd-fecha" type="date" value="${esc(iso(today()))}"></label>
+    <label>Monto<input id="rd-monto" type="number" min="0" step="100" value="${c.porRendir>0?Math.round(c.porRendir):''}"></label>
+    <label>Forma<select id="rd-forma"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
+    <label>Mes<input value="${mesLbl(M)}" readonly></label>
+    <div class="full actions"><button class="btn pri" type="button" data-rsave="${M}">Guardar rendición</button><button class="btn" type="button" data-close>Cerrar</button></div></div>`}
+function cajaDe(M){
+  const enM=f=>(f||'').slice(0,7)===M;
+  const pm=S.pagos.filter(p=>enM(p.fecha));
+  const lev=pm.filter(p=>p.gym==='LEVEL'),onl=pm.filter(p=>p.gym==='ONLINE'),otros=pm.filter(p=>p.gym==='CROSSFORCE');
+  const sum=(a,f)=>a.reduce((x,p)=>x+f(p),0);
+  const L=sum(lev,p=>Number(p.monto)||0),Lf=sum(lev,p=>(Number(p.monto)||0)*(p.pctFran??pctFran('LEVEL'))),O=sum(onl,p=>Number(p.monto)||0),X=sum(otros,p=>Number(p.monto)||0),Xf=sum(otros,p=>(Number(p.monto)||0)*(p.pctFran??1));
+  const liqs=S.liqs.filter(l=>enM(l.fecha)),Q=sum(liqs,l=>Number(l.monto)||0);
+  const aRendir=L-Lf,rends=S.rends.filter(r=>r.mes===M),rendido=sum(rends,r=>Number(r.monto)||0);
+  const efe=sum(pm,p=>partes(p).ef)+sum(liqs.filter(l=>l.forma!=='transferencia'),l=>Number(l.monto)||0)-sum(rends.filter(r=>r.forma!=='transferencia'),r=>Number(r.monto)||0);
+  const tra=sum(pm,p=>partes(p).tr+partes(p).nd)+sum(liqs.filter(l=>l.forma==='transferencia'),l=>Number(l.monto)||0)-sum(rends.filter(r=>r.forma==='transferencia'),r=>Number(r.monto)||0);
+  return {L,Lf,O,X,Xf,Q,liqs,aRendir,rendido,porRendir:Math.max(0,aRendir-rendido),entro:L+O+X+Q,disp:Lf+O+Xf+Q,saldo:L+O+X+Q-rendido,efe,tra};
+}
+function cajaHTML(M){const c=cajaDe(M);
+  return `<div class="kpis">
+    <div class="card kpi hl"><div class="lbl">Disponible real</div><div class="val">${money(c.disp)}</div><div class="sub">lo tuyo de lo que entró en ${mesLbl(M).split(' ')[0].toLowerCase()}</div></div>
+    <div class="card kpi"><div class="lbl">Entró a tu cuenta</div><div class="val">${money(c.entro)}</div><div class="sub">efectivo + transferencias</div></div>
+    <div class="card kpi"><div class="lbl">Por rendir a LEVEL</div><div class="val" style="color:${c.porRendir>0?'var(--bad)':'inherit'}">${money(c.porRendir)}</div><div class="sub">de ${money(c.aRendir)} · rendiste ${money(c.rendido)}</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Movimientos de ${mesLbl(M)}</th><th>Entró</th><th>Es tuyo</th></tr></thead><tbody>
+      <tr><td>Cobros LEVEL</td><td>${money(c.L)}</td><td>${money(c.Lf)}</td></tr>
+      <tr><td>Cobros Online</td><td>${money(c.O)}</td><td>${money(c.O)}</td></tr>
+      ${c.X?`<tr><td>Cobros CrossForce (pagos sueltos)</td><td>${money(c.X)}</td><td>${money(c.Xf)}</td></tr>`:''}
+      ${c.liqs.length?c.liqs.map(l=>`<tr><td><button class="lnk-f" type="button" data-liq="${esc(l._id)}">Liquidación CrossForce (${mesLbl(l.mes).split(' ')[0].toLowerCase()}) · ${fmtShort(l.fecha)} ›</button></td><td>${money(l.monto)}</td><td>${money(l.monto)}</td></tr>`).join(''):`<tr><td class="hint">Sin liquidación de CrossForce cobrada este mes</td><td></td><td></td></tr>`}
+      ${S.rends.filter(r=>r.mes===M).map(r=>`<tr><td>Rendición a LEVEL · ${fmtShort(r.fecha)}</td><td class="neg">−${money(r.monto)}</td><td class="hint">ya descontado</td></tr>`).join('')}
+      <tr class="total"><td>Saldo en mano</td><td>${money(c.saldo)}</td><td>${money(c.disp)}</td></tr></tbody></table></div>
+      <p class="hint pad" style="padding-top:4px">${c.porRendir>0?`“Saldo en mano” incluye ${money(c.porRendir)} que todavía tenés que rendirle a LEVEL. `:''}En efectivo ${money(c.efe)} · por transferencia ${money(c.tra)}.</p></div>
+    <div class="card pad"><div class="kpi" style="padding:0"><div class="lbl">LEVEL · rendición de ${mesLbl(M)}</div></div>
+      <div class="split"><i style="width:${c.aRendir?Math.min(100,c.rendido/c.aRendir*100):0}%;background:var(--ok-fill,var(--ok))"></i><i style="width:${c.aRendir?100-Math.min(100,c.rendido/c.aRendir*100):0}%;background:var(--bad);opacity:.35"></i></div>
+      <div class="legend"><span>Rendido <b>${money(c.rendido)}</b></span><span>Por rendir <b>${money(c.porRendir)}</b></span></div>
+      <div class="actions" style="margin-top:12px"><button class="btn pri" type="button" data-rend="${M}">+ Registrar rendición</button><button class="btn" type="button" data-liqnew="1">+ Liquidación CrossForce</button></div>
+      <p class="hint" style="margin-top:8px">El ${pct(1-pctFran('LEVEL'))} de LEVEL se calcula sobre lo que cobraste en el mes. Las liquidaciones de CrossForce cuentan en el mes en que te pagan.</p></div>
+  </div>`}
 /* ----- estado de rutina y de pago para el listado ----- */
 function ultPagoReg(e){let m='';for(const p of S.pagos)if(p.entrenadoId===e.id&&(p.fecha||'')>m)m=p.fecha;return m}
 function pagoInfo(e){
   const v=parse(e.proxVenc),dv=diasVenc(e);
-  if(gymOf(e)==='CROSSFORCE')return {k:'gym',txt:'Cobra el gym',cls:'p-gymc',sub:v?'vence '+fmtShort(e.proxVenc):''};
+  if(gymOf(e)==='CROSSFORCE'){const x=liqDeEnt(e.id);const mesC=k=>mesLbl(k).split(' ')[0].toLowerCase();
+    if(x&&x.f&&x.ultima)return {k:'gym',txt:'Pagó al gym',cls:'p-gymc',sub:`${x.f.fecha?fmtShort(x.f.fecha):''} · liquidado ${mesC(x.l.mes)}`};
+    if(x&&x.ult){const [yy,mm]=x.ult.mes.split('-').map(Number),fin=iso(new Date(yy,mm,0));if(!(e.inicio&&e.inicio>fin))return {k:'gym',txt:'Cobra el gym',cls:'p-gymc',sub:`no figuró en ${mesC(x.ult.mes)}`+(x.f?` · últ. ${mesC(x.l.mes)}`:'')}}
+    return {k:'gym',txt:'Cobra el gym',cls:'p-gymc',sub:v?'vence '+fmtShort(e.proxVenc):''}}
   const u=ultPagoReg(e);
   let desde='';if(v){const x=new Date(v);x.setMonth(x.getMonth()-1);x.setDate(x.getDate()-10);desde=iso(x)}
   if(u&&v&&v>=today()&&u>=desde&&e.pagoRegistrado!=='Debe')return {k:'ok',txt:'Al día',cls:'p-ok',sub:`pagó ${fmtShort(u)} · vence ${fmtShort(e.proxVenc)}`};
@@ -404,6 +549,20 @@ function renderSheet(){
   if(openId==='__asig'){ov.innerHTML=shell('Asignar plantilla',asignarHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};bindAsignar(sheetArg);return}
   if(openId==='__formas'){ov.innerHTML=shell('Pagos de '+mesLbl(sheetArg.mes),formasHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
       const f=ev.target.closest('[data-formas]');if(f){sheetArg.f=f.dataset.formas;renderSheet();return}const o=ev.target.closest('[data-open]');if(o)openSheet(o.dataset.open)};return}
+  if(openId==='__liq'){if(!S.lq)S.lq=liqNueva();ov.innerHTML=shell(S.lq.id?'Liquidación CrossForce · '+mesLbl(S.lq.mes):'Registrar liquidación CrossForce',liqHTML());ov.querySelector('.sheet').classList.add('wide');
+    const fi=$('#lq-file');if(fi)fi.onchange=async()=>{const file=fi.files[0];if(!file)return;liqLeerForm();try{const buf=await file.arrayBuffer();const aoa=/\.csv$/i.test(file.name)?new TextDecoder().decode(buf).split(/\r?\n/).map(l=>l.split(/[;,\t](?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c=>c.replace(/^"|"$/g,'').trim()||null)):await leerXLSX(buf);
+      const f=liqMatch(liqFilas(aoa));if(!f.length)throw new Error('No encontré filas con nombre y monto en el Excel.');S.lq.filas=f;S.lq.archivo=file.name;S.lq.msg='';const fs=f.map(x=>x.fecha).filter(Boolean).sort();if(fs.length&&!S.lq.id)S.lq.mes=fs[fs.length-1].slice(0,7)}catch(x){S.lq.msg=x.message}renderSheet()};
+    ov.oninput=ev=>{if(ev.target.matches('#lq-monto,#lq-fecha,#lq-mes,#lq-forma'))liqLeerForm()};
+    ov.onchange=ev=>{const se=ev.target.closest('[data-lqe]');if(se){liqLeerForm();const i=Number(se.dataset.lqe),f=S.lq.filas[i];if(se.value)S.lq.filas.forEach((g,j)=>{if(j!==i&&g.eid===se.value){g.eid='';g.how=''}});f.eid=se.value;f.how='';renderSheet();return}if(ev.target.matches('#lq-mes')){liqLeerForm();renderSheet()}};
+    ov.onclick=async ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}const b=ev.target.closest('[data-lq]');if(!b)return;const k=b.dataset.lq;
+      if(k==='paste'){liqLeerForm();const t=$('#lq-paste').value;const aoa=t.split(/\r?\n/).map(l=>l.split('\t').map(c=>c.trim()===''?null:c.trim()));const f=liqMatch(liqFilas(aoa));if(!f.length){S.lq.msg='No encontré filas con nombre y monto. Copiá desde la columna de fecha hasta la de monto.'}else{S.lq.filas=f;S.lq.archivo='Filas pegadas';S.lq.msg=''}renderSheet();return}
+      if(k==='save'){await liqGuardar();return}
+      if(k==='del'){if(!S.lq.armed){S.lq.armed=true;renderSheet();return}if(await write(()=>S.db.collection('liquidaciones').doc(S.lq.id).delete())){toast('Liquidación borrada');closeSheet()}}};return}
+  if(openId==='__rend'){const M=sheetArg||curMes();S.rend=S.rend||{};ov.innerHTML=shell('Rendición a LEVEL · '+mesLbl(M),rendHTML(M));
+    ov.oninput=null;ov.onchange=null;
+    ov.onclick=async ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
+      const sv=ev.target.closest('[data-rsave]');if(sv){const m=Number($('#rd-monto').value)||0,f=$('#rd-fecha').value;if(!m||!f){toast('Completá fecha y monto');return}if(await write(()=>S.db.collection('rendiciones').add({gym:'LEVEL',mes:M,fecha:f,monto:m,forma:$('#rd-forma').value,ts:Date.now()}))){toast('Rendición guardada');renderSheet()}return}
+      const dl=ev.target.closest('[data-rdel]');if(dl){if(S.rend.armed!==dl.dataset.rdel){S.rend.armed=dl.dataset.rdel;renderSheet();return}if(await write(()=>S.db.collection('rendiciones').doc(dl.dataset.rdel).delete())){S.rend.armed=null;toast('Rendición borrada');renderSheet()}}};return}
   if(openId==='__rv'){const r=S.rutinas.find(x=>x._id===sheetArg);if(!r){closeSheet();return}const e=S.ents[r.entrenadoId];
     ov.innerHTML=shell((e?firstName(e)+' · ':'')+(r.nombre||'Rutina'),`<div class="actions" style="margin-bottom:10px"><button class="btn" type="button" data-open="${esc(r.entrenadoId)}">← Volver a la ficha</button></div>`+rutVistaHTML(r,e));ov.querySelector('.sheet').classList.add('wide');
     ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}const o=ev.target.closest('[data-open]');if(o){openSheet(o.dataset.open);return}
@@ -1634,6 +1793,10 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-bulk]');if(b){startBulk(b.dataset.bulk);return}
   const fz=e.target.closest('[data-formas]');if(fz){openSheet('__formas','ver',{mes:S.mes,f:fz.dataset.formas});return}
   const mc=e.target.closest('[data-mes]');if(mc){S.mes=mc.dataset.mes;renderPanel();window.scrollTo(0,0);return}
+  const pv=e.target.closest('[data-pv]');if(pv){S.pv=pv.dataset.pv;render();return}
+  const lq=e.target.closest('[data-liq]');if(lq){const l=S.liqs.find(x=>x._id===lq.dataset.liq);if(l){S.lq={id:l._id,mes:l.mes,fecha:l.fecha,monto:l.monto,forma:l.forma||'efectivo',filas:(l.filas||[]).map(f=>({...f})),archivo:l.archivo||'',msg:''};openSheet('__liq','ver')}return}
+  const ln=e.target.closest('[data-liqnew]');if(ln){S.lq=liqNueva();if(/^\d{4}-\d{2}$/.test(ln.dataset.liqnew))S.lq.mes=ln.dataset.liqnew;openSheet('__liq','ver');return}
+  const rn=e.target.closest('[data-rend]');if(rn){S.rend={};openSheet('__rend','ver',rn.dataset.rend);return}
   const ci=e.target.closest('[data-cerrar]');if(ci){if(ci.dataset.armed!=='1'){ci.dataset.armed='1';ci.textContent='Confirmar cierre';return}cerrarMes(ci.dataset.cerrar);return}
   const o=e.target.closest('[data-open]');if(o)openSheet(o.dataset.open);
 });
@@ -1655,6 +1818,8 @@ show(location.hash.slice(1)||'panel');
   db.collection('rutinas').onSnapshot(s=>{S.rutinas=s.docs.map(d=>({...d.data(),_id:d.id}));got.r=true;done()},onErr);
   db.collection('ejercicios').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.ejs=m;S.ejsV++;got.j=true;done()},onErr);
   db.collection('plantillas').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.plantillas=m;got.t=true;done()},onErr);
+  db.collection('liquidaciones').onSnapshot(s=>{S.liqs=s.docs.map(d=>({...d.data(),_id:d.id}));render()},()=>{});
+  db.collection('rendiciones').onSnapshot(s=>{S.rends=s.docs.map(d=>({...d.data(),_id:d.id}));render()},()=>{});
   db.collection('registros').onSnapshot(s=>{S.regs=s.docs.map(d=>({...d.data(),_id:d.id}));got.g=true;done()},onErr);
   db.doc('config/general').onSnapshot(s=>{S.cfgRaw=s.exists?s.data():{};S.cfg=normCfg(s.exists?s.data():null);render()},onErr);
 })();
