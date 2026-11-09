@@ -266,12 +266,35 @@ async function cerrarMes(M){
   if(await write(()=>S.db.doc('meses/'+M).set({mes:M,cerrado:true,fechaCierre:iso(today()),plantel:d.roster})))toast(mesLbl(M)+' cerrado');
 }
 
+
+/* ----- estado de rutina y de pago para el listado ----- */
+function ultPagoReg(e){let m='';for(const p of S.pagos)if(p.entrenadoId===e.id&&(p.fecha||'')>m)m=p.fecha;return m}
+function pagoInfo(e){
+  const v=parse(e.proxVenc),dv=diasVenc(e);
+  if(gymOf(e)==='CROSSFORCE')return {k:'gym',txt:'Cobra el gym',cls:'p-gymc',sub:v?'vence '+fmtShort(e.proxVenc):''};
+  const u=ultPagoReg(e);
+  let desde='';if(v){const x=new Date(v);x.setMonth(x.getMonth()-1);x.setDate(x.getDate()-10);desde=iso(x)}
+  if(u&&v&&v>=today()&&u>=desde&&e.pagoRegistrado!=='Debe')return {k:'ok',txt:'Al día',cls:'p-ok',sub:`pagó ${fmtShort(u)} · vence ${fmtShort(e.proxVenc)}`};
+  if(!v||v<today())return {k:'vencido',txt:'Vencido',cls:'p-bad',sub:v?`hace ${-dv} d · ${fmtShort(e.proxVenc)}`:'sin vencimiento'};
+  const pre=e.pagoRegistrado==='Debe'&&u>=desde?'pago parcial · ':u?'':'sin pagos · ';
+  return {k:'pend',txt:'Pendiente',cls:'p-warn',sub:`${pre}vence ${dv===0?'hoy':'en '+dv+' d'} · ${fmtShort(e.proxVenc)}`};
+}
+function rutinaInfo(e){
+  const t=iso(today()),a=activaDe(e.id),c=colaDe(e.id),lista=c.find(r=>(r.fechaSugerida||t)<=t),esp=c.find(r=>(r.fechaSugerida||t)>t);
+  if(lista)return {k:'entregar',txt:'Para entregar',cls:'p-warn',sub:'en cola desde '+fmtShort(lista.fechaSugerida||t)};
+  if(a){const dur=Number(a.duracionSemanas)||4,fin=new Date(parse(a.fechaEntrega)||today());fin.setDate(fin.getDate()+dur*7);const resta=days(fin,today());
+    if(resta<0)return {k:'vencida',txt:'Vencida',cls:'p-bad',sub:`hace ${-resta} d`+(esp?' · próxima '+fmtShort(esp.fechaSugerida):'')};
+    if(resta<=5)return {k:'renovar',txt:resta===0?'Renovar hoy':`Renovar en ${resta} d`,cls:'p-warn',sub:'termina '+fmtShort(iso(fin))+(esp?' · próxima lista':'')};
+    return {k:'ok',txt:'Al día',cls:'p-ok',sub:`semana ${Math.min(dur,semanaActual(a)+1)} de ${dur}`}}
+  if(esp)return {k:'espera',txt:'En espera',cls:'p-warn',sub:'entrega '+fmtShort(esp.fechaSugerida)};
+  return {k:'sin',txt:'Sin rutina',cls:'p-mute',sub:e.ultRutina?'últ. '+fmtShort(e.ultRutina):''};
+}
 /* ---------- LISTA ---------- */
 const FILTERS=[['activos','Activos'],['LEVEL','LEVEL'],['CROSSFORCE','CrossForce'],['ONLINE','Online'],['deuda','Deben'],['rutina','Rutina a revisar'],['Suspendido','Suspendidos'],['Baja','Bajas']];
 function renderLista(){
   const el=$('#v-lista');
   if(!el.dataset.built){
-    el.innerHTML=`<div class="toolbar"><input id="q" class="search" type="search" placeholder="Buscar por nombre o teléfono" autocomplete="off"><div class="chips" id="chips">${FILTERS.map(([k,l])=>`<button class="chip" data-f="${k}" aria-pressed="${k===S.filter}">${l}</button>`).join('')}</div></div><p class="count" id="cnt"></p><div class="card"><div class="rhead"><span>Entrenado</span><span>Plan</span><span>Mensualidad</span><span>Próx. venc.</span><span>Estado</span><span></span></div><div class="rows" id="rows"></div></div>`;
+    el.innerHTML=`<div class="toolbar"><input id="q" class="search" type="search" placeholder="Buscar por nombre o teléfono" autocomplete="off"><div class="chips" id="chips">${FILTERS.map(([k,l])=>`<button class="chip" data-f="${k}" aria-pressed="${k===S.filter}">${l}</button>`).join('')}</div></div><p class="count" id="cnt"></p><div class="card"><div class="rhead"><span>Entrenado</span><span>Plan</span><span>Mensualidad</span><span>Rutina</span><span>Pago</span><span></span></div><div class="rows" id="rows"></div></div>`;
     el.dataset.built=1;
     $('#q').addEventListener('input',e=>{S.q=e.target.value.trim().toLowerCase();renderRows()});
     $('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-f]');if(!b)return;S.filter=b.dataset.f;el.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',c.dataset.f===S.filter));renderRows()});
@@ -284,18 +307,18 @@ function renderRows(){
   const f=S.filter;
   if(GYMS.includes(f))list=list.filter(e=>gymOf(e)===f&&isAct(e));
   else if(f==='activos')list=list.filter(isAct);
-  else if(f==='deuda')list=list.filter(e=>['Pendiente','Vencido'].includes(estadoPago(e)));
+  else if(f==='deuda')list=list.filter(e=>isAct(e)&&['pend','vencido'].includes(pagoInfo(e).k));
   else if(f==='rutina')list=list.filter(rutinaRevisar);
   else if(f==='Suspendido'||f==='Baja')list=list.filter(e=>estado(e)===f);
   if(S.q){const qd=S.q.replace(/\D/g,'');list=list.filter(e=>(e.nombre||'').toLowerCase().includes(S.q)||(qd&&phoneDigits(e).includes(qd)))}
   list.sort((a,b)=>name(a).localeCompare(name(b),'es'));
   $('#cnt').textContent=S.loaded?plural(list.length,'entrenado','entrenados'):'Cargando…';
-  $('#rows').innerHTML=list.length?list.map(e=>{const p=estadoPago(e);const es=estado(e);return `<button class="row" data-open="${esc(e.id)}">
+  $('#rows').innerHTML=list.length?list.map(e=>{const es=estado(e);return `<button class="row" data-open="${esc(e.id)}">
     <span class="c"><span class="n">${esc(name(e))}</span><br><span class="s">${gymTag(e)} ${esc(e.id)}</span></span>
     <span class="c h">${esc(e.plan||'—')}<br><span class="s">${esc(e.estimulos)}×/sem</span></span>
     <span class="c h">${money(monto(e))}${Number(e.promo)?`<br><span class="s">promo ${pct(e.promo)}</span>`:''}</span>
-    <span class="c h">${es==='Activo'?fmtD(e.proxVenc)+(diasVenc(e)!==null?`<br><span class="s">${diasVenc(e)<0?'hace '+(-diasVenc(e))+' d':diasVenc(e)===0?'hoy':'en '+diasVenc(e)+' d'}</span>`:''):'—'}</span>
-    <span class="c">${es==='Activo'?`<span class="pill ${pagoPill(p)}">${p}</span>`:`<span class="pill ${estPill(es)}">${es}</span>`}</span>
+    ${es==='Activo'?(()=>{const r=rutinaInfo(e),q=pagoInfo(e);return `<span class="c rp" data-l="Rutina"><span class="pill ${r.cls}">${esc(r.txt)}</span>${r.sub?`<br><span class="s">${esc(r.sub)}</span>`:''}</span>
+    <span class="c rp" data-l="Pago"><span class="pill ${q.cls}">${esc(q.txt)}</span>${q.sub?`<br><span class="s">${esc(q.sub)}</span>`:''}</span>`})():`<span class="c h">—</span><span class="c rp"><span class="pill ${estPill(es)}">${es}</span></span>`}
     <span class="c h"></span></button>`}).join(''):`<div class="empty">${S.loaded?'No hay entrenados con ese filtro.':'Cargando…'}</div>`;
 }
 

@@ -333,3 +333,10 @@ input.falta::placeholder{color:var(--bad);opacity:.85}
 .rv-prev{border:1.5px dashed var(--line);max-height:420px;overflow:auto}
 .rv-prev .rv-dia{box-shadow:none}
 @media (max-width:560px){.rv-it{grid-template-columns:1fr 1fr}.rv-n{grid-column:1/-1}}
+/* listado: rutina y pago */
+.p-gymc{background:#E3ECF7;color:#2F5A8A}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .p-gymc{background:#1C2A3A;color:#9DBBE0}}
+:root[data-theme="dark"] .p-gymc{background:#1C2A3A;color:#9DBBE0}
+.row .rp .s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:100%;vertical-align:top}
+.row,.rhead{grid-template-columns:minmax(0,2fr) .9fr .9fr 1.3fr 1.3fr auto}
+@media (max-width:760px){.row{grid-template-columns:minmax(0,1fr) auto auto}.row .rp .s,.row .rp br{display:none}.row .rp{text-align:center}.row .rp::before{content:attr(data-l);display:block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}}
