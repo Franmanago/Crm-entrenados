@@ -27,7 +27,7 @@ function normCfg(raw){
   c.avisos={...AVISOS_DEF,...(raw.avisos||{}),gyms:{...AVISOS_DEF.gyms,...(raw.avisos?.gyms||{})}};
   return c;
 }
-const S={liqs:[],rends:[],pv:'ganado',ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
+const S={evs:[],liqs:[],rends:[],pv:'ganado',ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
 const WA='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.5-.3Z"/></svg>';
 
 /* ---------- fechas ---------- */
@@ -567,6 +567,18 @@ function renderSheet(){
   if(openId==='__asig'){ov.innerHTML=shell('Asignar plantilla',asignarHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};bindAsignar(sheetArg);return}
   if(openId==='__formas'){ov.innerHTML=shell('Pagos de '+mesLbl(sheetArg.mes),formasHTML(sheetArg));ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
       const f=ev.target.closest('[data-formas]');if(f){sheetArg.f=f.dataset.formas;renderSheet();return}const o=ev.target.closest('[data-open]');if(o)openSheet(o.dataset.open)};return}
+  if(openId==='__cev'){const ev=calBuscar(sheetArg);if(!ev){closeSheet();return}ov.innerHTML=shell(ev.k==='ent'?'Entrenamiento':ev.k==='ev'?'Evento':ev.k==='pago'?'Cuota':'Rutina',cevHTML(ev));
+    ov.onclick=ev2=>{if(ev2.target===ov||ev2.target.closest('[data-close]')){closeSheet();return}const o=ev2.target.closest('[data-open]');if(o){openSheet(o.dataset.open);return}const m=ev2.target.closest('[data-msg]');if(m){openSheet(m.dataset.msg,'wa',m.dataset.kind);return}
+      const ed=ev2.target.closest('[data-cedit]');if(ed){const v=S.evs.find(x=>x._id===ed.dataset.cedit);if(v)openSheet('__evf','edit',{...v});return}handleRut(ev2)};return}
+  if(openId==='__evf'){const v=sheetArg||{};ov.innerHTML=shell(v._id?'Editar evento':'Nuevo evento',evFormHTML(v));
+    ov.onclick=async ev2=>{if(ev2.target===ov||ev2.target.closest('[data-close]')){closeSheet();return}const dl=ev2.target.closest('[data-evdel]');if(dl){if(S.evArm!==dl.dataset.evdel){S.evArm=dl.dataset.evdel;renderSheet();return}S.evArm=null;if(await write(()=>S.db.collection('eventos').doc(dl.dataset.evdel).delete())){toast('Evento borrado');closeSheet()}}};
+    $('#evf').onsubmit=async ev2=>{ev2.preventDefault();const d={titulo:$('#ev-t').value.trim(),tipo:$('#ev-tipo').value,eid:$('#ev-e').value,fecha:$('#ev-f').value,hora:$('#ev-h').value,dur:Number($('#ev-d').value)||60,rep:$('#ev-r').value,hasta:$('#ev-r').value==='semanal'?$('#ev-hasta').value:'',notas:$('#ev-n').value.trim(),ts:Date.now()};
+      if(!d.titulo||!d.fecha){toast('Completá título y fecha');return}
+      const ok=v._id?await write(()=>S.db.collection('eventos').doc(v._id).set(d)):await write(()=>S.db.collection('eventos').add(d));if(ok){toast('Evento guardado');closeSheet()}};return}
+  if(openId==='__cexp'){S.calExp=S.calExp||{ent:true,pago:true,rut:true,ev:true,dias:60};ov.innerHTML=shell('Pasar a Google Calendar',expHTML());
+    ov.onchange=ev2=>{const x=ev2.target.closest('[data-ex]');if(x)S.calExp[x.dataset.ex]=x.checked;const y=ev2.target.closest('[data-exd]');if(y)S.calExp.dias=Number(y.value)};
+    ov.onclick=ev2=>{if(ev2.target===ov||ev2.target.closest('[data-close]')){closeSheet();return}if(ev2.target.closest('[data-exgo]')){const r=icsTxt(S.calExp);if(!r.n){toast('No hay eventos para exportar');return}
+      const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.txt],{type:'text/calendar;charset=utf-8'}));a.download='entrena.ics';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);toast(plural(r.n,'evento exportado','eventos exportados'))}};return}
   if(openId==='__liq'){if(!S.lq)S.lq=liqNueva();ov.innerHTML=shell(S.lq.id?'Liquidación CrossForce · '+mesLbl(S.lq.mes):'Registrar liquidación CrossForce',liqHTML());ov.querySelector('.sheet').classList.add('wide');
     const fi=$('#lq-file');if(fi)fi.onchange=async()=>{const file=fi.files[0];if(!file)return;liqLeerForm();try{const buf=await file.arrayBuffer();const aoa=/\.csv$/i.test(file.name)?new TextDecoder().decode(buf).split(/\r?\n/).map(l=>l.split(/[;,\t](?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c=>c.replace(/^"|"$/g,'').trim()||null)):await leerXLSX(buf);
       const f=liqMatch(liqFilas(aoa));if(!f.length)throw new Error('No encontré filas con nombre y monto en el Excel.');S.lq.filas=f;S.lq.archivo=file.name;S.lq.msg='';const fs=f.map(x=>x.fecha).filter(Boolean).sort();if(fs.length&&!S.lq.id)S.lq.mes=fs[fs.length-1].slice(0,7)}catch(x){S.lq.msg=x.message}renderSheet()};
@@ -1754,8 +1766,140 @@ function bindEj(){
     if(await write(()=>S.db.collection('ejercicios').doc(S.ejEdit.id).delete())){toast('Ejercicio eliminado');closeSheet()}});
 }
 
+
+/* ---------- CALENDARIO ---------- */
+const EV_TIPOS=[['evaluacion','Evaluación'],['clase','Clase / entrenamiento'],['reunion','Reunión'],['personal','Personal'],['otro','Otro']];
+const CAL_F=[['ent','Entrenamientos'],['pago','Cuotas'],['rut','Rutinas'],['ev','Mis eventos']];
+function calSt(){if(!S.cal)S.cal={vista:innerWidth<760?'dia':'semana',ref:iso(today()),f:{ent:true,pago:true,rut:true,ev:true},gym:''};return S.cal}
+const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const lunes=d=>addD(d,-((d.getDay()+6)%7));
+const hm=t=>{const [h,m]=String(t||'0:0').split(':').map(Number);return h*60+(m||0)};
+const hhmm=m=>pad(Math.floor(m/60))+':'+pad(m%60);
+const MES_C=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function calRango(){const c=calSt(),r=parse(c.ref);if(c.vista==='dia')return [r,r];if(c.vista==='semana'){const a=lunes(r);return [a,addD(a,6)]}
+  const a=lunes(new Date(r.getFullYear(),r.getMonth(),1));return [a,addD(a,41)]}
+function calEventos(desde,hasta){
+  const c=calSt(),out=[],D=[];for(let d=new Date(desde);d<=hasta;d=addD(d,1))D.push(new Date(d));
+  const okG=e=>!c.gym||gymOf(e)===c.gym;
+  const enR=s=>s&&s>=iso(desde)&&s<=iso(hasta);
+  const asis=new Set(S.regs.filter(r=>String(r.item||'').startsWith('asis:')).map(r=>r.entrenadoId+'|'+r.fecha));
+  const act=Object.values(S.ents).filter(e=>isAct(e)&&okG(e));
+  if(c.f.ent)act.forEach(e=>(e.horarios||[]).forEach(h=>{if(!/^\d{1,2}:\d{2}$/.test(h.hora||''))return;D.forEach(d=>{if(((d.getDay()+6)%7)+1!==Number(h.dia))return;const f=iso(d);
+    if(e.inicio&&f<e.inicio)return;out.push({k:'ent',id:'ent|'+e.id+'|'+f+'|'+h.hora,fecha:f,ini:hm(h.hora),dur:Number(h.dur)||60,tit:name(e),sub:GYM_LBL[gymOf(e)],eid:e.id,c:{LEVEL:'--ok',CROSSFORCE:'--cf',ONLINE:'--online'}[gymOf(e)],hecho:asis.has(e.id+'|'+f)})})}));
+  if(c.f.pago)act.filter(e=>gymOf(e)!=='CROSSFORCE').forEach(e=>{if(enR(e.proxVenc)){const q=pagoInfo(e);out.push({k:'pago',id:'pago|'+e.id,fecha:e.proxVenc,tit:'Cuota · '+name(e),sub:money(monto(e))+' · '+q.txt,eid:e.id,ok:q.k==='ok'})}});
+  if(c.f.rut)act.forEach(e=>{const a=activaDe(e.id);if(a&&a.fechaEntrega){const fin=iso(addD(parse(a.fechaEntrega),(Number(a.duracionSemanas)||4)*7));if(enR(fin))out.push({k:'rut',id:'rut|'+a._id,fecha:fin,tit:'Termina rutina · '+name(e),sub:a.nombre||'',eid:e.id,rid:a._id})}
+    colaDe(e.id).forEach(r=>{if(enR(r.fechaSugerida))out.push({k:'rut',id:'cola|'+r._id,fecha:r.fechaSugerida,tit:'Entregar rutina · '+name(e),sub:r.nombre||'',eid:e.id,rid:r._id})})});
+  if(c.f.ev)S.evs.forEach(v=>{const en=v.eid&&S.ents[v.eid];if(c.gym&&en&&gymOf(en)!==c.gym)return;
+    const push=f=>out.push({k:'ev',id:'ev|'+v._id+'|'+f,fecha:f,ini:v.hora?hm(v.hora):null,dur:Number(v.dur)||60,tit:v.titulo||'Evento',sub:[EV_TIPOS.find(t=>t[0]===v.tipo)?.[1],en?name(en):''].filter(Boolean).join(' · '),eid:v.eid||'',evId:v._id,tipo:v.tipo});
+    if(v.rep==='semanal'){const b=parse(v.fecha);if(!b)return;D.forEach(d=>{const f=iso(d);if(f>=v.fecha&&(!v.hasta||f<=v.hasta)&&d.getDay()===b.getDay()&&!(v.excl||[]).includes(f))push(f)})}else if(enR(v.fecha))push(v.fecha)});
+  return out.sort((a,b)=>(a.fecha.localeCompare(b.fecha))||((a.ini??-1)-(b.ini??-1))||a.tit.localeCompare(b.tit,'es'));
+}
+function calChip(ev,corto){const cls={ent:'ce-ent',pago:'ce-pago',rut:'ce-rut',ev:'ce-ev'}[ev.k];
+  return `<button type="button" class="ce ${cls}${ev.hecho?' ce-ok':''}${ev.ok?' ce-paid':''}" data-cev="${esc(ev.id)}" ${ev.c?`style="--c:var(${ev.c})"`:''} title="${esc(ev.tit+(ev.sub?' · '+ev.sub:''))}">${ev.ini!=null&&ev.k!=='ent'||ev.ini!=null&&corto?`<b>${hhmm(ev.ini)}</b> `:''}${ev.hecho?'✓ ':''}${esc(ev.tit)}</button>`}
+function calLanes(evs){const s=[...evs].sort((a,b)=>a.ini-b.ini||b.dur-a.dur);let grp=[],end=-1;const out=[];
+  const flush=()=>{const lanes=[];grp.forEach(e=>{let i=lanes.findIndex(x=>x<=e.ini);if(i<0){i=lanes.length;lanes.push(0)}lanes[i]=e.ini+e.dur;e.lane=i});grp.forEach(e=>e.lanes=lanes.length);out.push(...grp);grp=[]};
+  s.forEach(e=>{if(e.ini>=end&&grp.length)flush();grp.push(e);end=Math.max(end,e.ini+e.dur)});if(grp.length)flush();return out}
+function calSemanaHTML(dias,evs){
+  const timed=evs.filter(e=>e.ini!=null),allday=evs.filter(e=>e.ini==null);
+  let h0=7*60,h1=22*60;timed.forEach(e=>{h0=Math.min(h0,Math.floor(e.ini/60)*60);h1=Math.max(h1,Math.ceil((e.ini+e.dur)/60)*60)});
+  const PX=0.8,hoy=iso(today()),now=new Date(),nowM=now.getHours()*60+now.getMinutes();
+  const horas=[];for(let m=h0;m<h1;m+=60)horas.push(m);
+  return `<div class="cal-week ${dias.length===1?'cal-1':''}" style="--cols:${dias.length}">
+    <div class="cw-head"><span></span>${dias.map(d=>{const f=iso(d);return `<button type="button" class="cw-d ${f===hoy?'hoy':''}" data-cday="${f}"><span>${dsem(((d.getDay()+6)%7)+1)[2]}</span><b>${d.getDate()}</b></button>`}).join('')}</div>
+    <div class="cw-all"><span class="cw-lab">todo el día</span>${dias.map(d=>{const f=iso(d),L=allday.filter(e=>e.fecha===f).sort((x,y)=>(x.ok?1:0)-(y.ok?1:0));return `<div class="cw-ac">${L.slice(0,3).map(e=>calChip(e)).join('')}${L.length>3?`<button type="button" class="cm-mas" data-cday="${f}">+${L.length-3} más</button>`:''}</div>`}).join('')}</div>
+    <div class="cw-body"><div class="cw-hrs">${horas.map(m=>`<span style="height:${60*PX}px">${hhmm(m)}</span>`).join('')}</div>
+      ${dias.map(d=>{const f=iso(d),L=calLanes(timed.filter(e=>e.fecha===f));
+        return `<div class="cw-col ${f===hoy?'hoy':''}" data-cslot="${f}" data-h0="${h0}" style="height:${(h1-h0)*PX}px;background-size:100% ${60*PX}px">
+          ${f===hoy&&nowM>=h0&&nowM<=h1?`<i class="cw-now" style="top:${(nowM-h0)*PX}px"></i>`:''}
+          ${L.map(e=>`<button type="button" class="cw-ev ce-${e.k}${e.hecho?' ce-ok':''}" data-cev="${esc(e.id)}" style="top:${(e.ini-h0)*PX}px;height:${Math.max(18,e.dur*PX-2)}px;left:calc(${e.lane/e.lanes*100}% + 2px);width:calc(${100/e.lanes}% - 4px);${e.c?`--c:var(${e.c})`:''}"><b>${e.hecho?'✓ ':''}${esc(e.tit)}</b><span>${hhmm(e.ini)}${e.dur*PX>34?' · '+esc(e.sub||''):''}</span></button>`).join('')}</div>`}).join('')}
+    </div></div>`}
+function calMesHTML(evs){const c=calSt(),r=parse(c.ref),[a]=calRango(),hoy=iso(today());
+  return `<div class="cal-month"><div class="cm-h">${DSEM.map(d=>`<span>${d[2]}</span>`).join('')}</div><div class="cm-g">${Array.from({length:42},(_,i)=>{const d=addD(a,i),f=iso(d),L=evs.filter(e=>e.fecha===f),fuera=d.getMonth()!==r.getMonth();
+    const ent=L.filter(e=>e.k==='ent'),otros=L.filter(e=>e.k!=='ent').sort((x,y)=>(x.ok?1:0)-(y.ok?1:0));
+    return `<div class="cm-c ${fuera?'fuera':''} ${f===hoy?'hoy':''}" data-cday="${f}"><span class="cm-n">${d.getDate()}</span>
+      ${otros.slice(0,3).map(e=>calChip(e,true)).join('')}${otros.length>3?`<span class="cm-mas">+${otros.length-3} más</span>`:''}
+      ${ent.length?`<span class="cm-ent">${plural(ent.length,'entrenamiento','entrenamientos')}</span>`:''}</div>`}).join('')}</div></div>`}
+function calDiaHTML(d,evs){const f=iso(d),L=evs.filter(e=>e.fecha===f),all=L.filter(e=>e.ini==null),t=L.filter(e=>e.ini!=null);
+  return `<div class="cal-day"><div class="cd-h"><b>${dsem(((d.getDay()+6)%7)+1)[1]} ${d.getDate()} de ${MESES_N[d.getMonth()].toLowerCase()}</b><span class="hint">${plural(t.filter(e=>e.k==='ent').length,'entrenamiento','entrenamientos')}</span></div>
+    ${all.length?`<div class="cd-all">${all.map(e=>calChip(e)).join('')}</div>`:''}
+    ${t.length?`<ul class="cd-l">${t.map(e=>`<li><button type="button" class="cd-it ce-${e.k}${e.hecho?' ce-ok':''}" data-cev="${esc(e.id)}" ${e.c?`style="--c:var(${e.c})"`:''}><span class="cd-t">${hhmm(e.ini)}<i>${hhmm(e.ini+e.dur)}</i></span><span class="cd-b"><b>${e.hecho?'✓ ':''}${esc(e.tit)}</b><span>${esc(e.sub||'')}</span></span></button></li>`).join('')}</ul>`:all.length?'':'<div class="empty">Nada agendado para este día.</div>'}
+    <div class="actions" style="padding:12px 16px"><button class="btn" type="button" data-cnew="${f}">+ Evento este día</button></div></div>`}
+function renderCalendario(){
+  const el=$('#v-calendario'),c=calSt(),[a,b]=calRango(),evs=calEventos(a,b),r=parse(c.ref);
+  const tit=c.vista==='mes'?`${MESES_N[r.getMonth()]} ${r.getFullYear()}`:c.vista==='dia'?`${pad(r.getDate())} ${MES_C[r.getMonth()]} ${r.getFullYear()}`:(a.getMonth()===b.getMonth()?`${a.getDate()} – ${b.getDate()} ${MES_C[b.getMonth()]} ${b.getFullYear()}`:`${a.getDate()} ${MES_C[a.getMonth()]} – ${b.getDate()} ${MES_C[b.getMonth()]} ${b.getFullYear()}`);
+  const dias=[];for(let d=new Date(a);d<=b;d=addD(d,1))dias.push(new Date(d));
+  el.innerHTML=`<div class="cal-bar">
+    <div class="cal-nav"><button class="btn" type="button" data-cmov="-1" aria-label="Anterior">‹</button><button class="btn" type="button" data-cmov="0">Hoy</button><button class="btn" type="button" data-cmov="1" aria-label="Siguiente">›</button><h2 class="cal-t">${tit}</h2></div>
+    <div class="cal-act"><div class="seg">${[['dia','Día'],['semana','Semana'],['mes','Mes']].map(([k,l])=>`<button type="button" data-cvista="${k}" aria-pressed="${c.vista===k}">${l}</button>`).join('')}</div>
+      <button class="btn pri" type="button" data-cnew="${c.vista==='dia'?c.ref:''}">+ Evento</button><button class="btn gcal" type="button" data-cexp="1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Pasar a Google Calendar</button></div></div>
+  <div class="cal-fil chips">${CAL_F.map(([k,l])=>`<button class="chip cf-${k}" type="button" data-cf="${k}" aria-pressed="${!!c.f[k]}">${l}</button>`).join('')}
+    <select data-cgym aria-label="Gimnasio"><option value="">Todos los gimnasios</option>${GYMS.map(g=>`<option value="${g}" ${c.gym===g?'selected':''}>${GYM_LBL[g]}</option>`).join('')}</select></div>
+  <div class="card cal-card">${c.vista==='mes'?calMesHTML(evs):c.vista==='dia'?calDiaHTML(r,evs):calSemanaHTML(dias,evs)}</div>
+  <p class="hint">Los entrenamientos salen de los horarios cargados en cada ficha (✓ = marcó asistencia). Tocá un espacio vacío de la semana para crear un evento a esa hora.</p>`;
+  if(c.vista==='semana'&&!S.calScrolled){S.calScrolled=1;const cw=el.querySelector('.cw-body');if(cw){const first=el.querySelector('.cw-ev');if(first)cw.scrollTop=Math.max(0,first.offsetTop-24)}}
+}
+function calBuscar(id){const [a,b]=calRango();return calEventos(addD(a,-1),addD(b,1)).find(e=>e.id===id)}
+function calNav(n){const c=calSt(),r=parse(c.ref);if(n===0)c.ref=iso(today());else if(c.vista==='dia')c.ref=iso(addD(r,n));else if(c.vista==='semana')c.ref=iso(addD(r,7*n));else c.ref=iso(new Date(r.getFullYear(),r.getMonth()+n,1));renderCalendario()}
+function gcalEvUrl(ev){const fmt=(f,m)=>f.replace(/-/g,'')+(m==null?'':'T'+pad(Math.floor(m/60))+pad(m%60)+'00');
+  const dates=ev.ini==null?`${fmt(ev.fecha)}/${fmt(iso(addD(parse(ev.fecha),1)))}`:`${fmt(ev.fecha,ev.ini)}/${fmt(ev.fecha,ev.ini+ev.dur)}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(ev.k==='ent'?'Entrenamiento · '+ev.tit:ev.tit)}&dates=${dates}&ctz=America/Argentina/Buenos_Aires&details=${encodeURIComponent(ev.sub||'')}`}
+function cevHTML(ev){const e=ev.eid&&S.ents[ev.eid];const v=ev.evId&&S.evs.find(x=>x._id===ev.evId);
+  const cuando=`${fmtD(ev.fecha)}${ev.ini!=null?` · ${hhmm(ev.ini)} a ${hhmm(ev.ini+ev.dur)}`:' · todo el día'}`;
+  const tipo={ent:'Entrenamiento',pago:'Vencimiento de cuota',rut:ev.id.startsWith('cola')?'Rutina para entregar':'Fin de rutina',ev:'Evento'}[ev.k];
+  let g='';if(e&&ev.k==='ent'){const gr=horGrupos(e.horarios).find(x=>x.hora===hhmm(ev.ini));if(gr)g=gcalSemanal(e,gr)}
+  return `<div class="card pad cev"><span class="pill ${ev.k==='pago'?'p-warn':ev.k==='rut'?'p-ok':ev.k==='ent'?'p-mute':'p-gymc'}">${tipo}</span>
+    <h3 style="margin:8px 0 2px">${esc(ev.tit)}</h3><p class="hint" style="margin:0">${cuando}${ev.sub?' · '+esc(ev.sub):''}</p>
+    ${ev.k==='ent'?`<p style="margin:10px 0 0">${ev.hecho?'<span class="pill p-ok">✓ Marcó asistencia</span>':ev.fecha<=iso(today())?'<span class="pill p-mute">Sin asistencia marcada</span>':''}</p>`:''}
+    ${v&&v.notas?`<p style="margin:10px 0 0">${esc(v.notas)}</p>`:''}
+    <div class="actions" style="margin-top:14px">
+      ${e?`<button class="btn" type="button" data-open="${esc(e.id)}">Ver ficha</button>`:''}
+      ${e&&ev.k==='pago'?msgBtn(e,'pago','Avisar'):''}
+      ${ev.rid?`<button class="btn" type="button" data-verrut="${esc(ev.rid)}">Ver rutina</button>`:''}
+      ${v?`<button class="btn" type="button" data-cedit="${esc(v._id)}">Editar</button>`:''}
+      <a class="btn gcal" target="_blank" rel="noopener" href="${esc(g||gcalEvUrl(ev))}">${g?'Google Calendar (todas las semanas)':'Agregar a Google Calendar'}</a>
+    </div></div>`}
+function evFormHTML(v){const ents=Object.values(S.ents).filter(isAct).sort((a,b)=>name(a).localeCompare(name(b),'es'));
+  return `<form class="form card pad" id="evf">
+    <label class="full">Título<input id="ev-t" required value="${esc(v.titulo||'')}" placeholder="Ej: Evaluación CMJ · Reunión con LEVEL"></label>
+    <label>Tipo<select id="ev-tipo">${EV_TIPOS.map(([k,l])=>`<option value="${k}" ${v.tipo===k?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label>Entrenado (opcional)<select id="ev-e"><option value="">—</option>${ents.map(e=>`<option value="${esc(e.id)}" ${v.eid===e.id?'selected':''}>${esc(name(e))}</option>`).join('')}</select></label>
+    <label>Fecha<input id="ev-f" type="date" required value="${esc(v.fecha||iso(today()))}"></label>
+    <label>Hora (vacío = todo el día)<input id="ev-h" type="time" value="${esc(v.hora||'')}"></label>
+    <label>Duración<select id="ev-d">${[30,45,60,75,90,120,180].map(m=>`<option value="${m}" ${(Number(v.dur)||60)===m?'selected':''}>${m<60?m+' min':m%60?Math.floor(m/60)+' h '+m%60:m/60+' h'}</option>`).join('')}</select></label>
+    <label>Repetir<select id="ev-r"><option value="no">No se repite</option><option value="semanal" ${v.rep==='semanal'?'selected':''}>Todas las semanas</option></select></label>
+    <label>Hasta (si se repite)<input id="ev-hasta" type="date" value="${esc(v.hasta||'')}"></label>
+    <label class="full">Notas<textarea id="ev-n" rows="2">${esc(v.notas||'')}</textarea></label>
+    <div class="full actions"><button class="btn pri" type="submit">Guardar</button>${v._id?`<button class="btn" type="button" data-evdel="${esc(v._id)}">${S.evArm===v._id?'Confirmar borrado':'Borrar'}</button>`:''}<button class="btn" type="button" data-close>Cancelar</button></div></form>`}
+function icsTxt(op){
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//entrena//CRM//ES','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:entrená.','X-WR-TIMEZONE:America/Argentina/Buenos_Aires',
+    'BEGIN:VTIMEZONE','TZID:America/Argentina/Buenos_Aires','BEGIN:STANDARD','DTSTART:19700101T000000','TZOFFSETFROM:-0300','TZOFFSETTO:-0300','TZNAME:-03','END:STANDARD','END:VTIMEZONE'];
+  const tx=s=>String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+  const st=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');const TZ=';TZID=America/Argentina/Buenos_Aires:';
+  const dt=(f,m)=>f.replace(/-/g,'')+'T'+pad(Math.floor(m/60))+pad(m%60)+'00';
+  const ev=(uid,sum,desc,loc,a)=>{L.push('BEGIN:VEVENT','UID:'+uid+'@entrena.app','DTSTAMP:'+st,...a,'SUMMARY:'+tx(sum));if(desc)L.push('DESCRIPTION:'+tx(desc));if(loc)L.push('LOCATION:'+tx(loc));L.push('END:VEVENT')};
+  const hoy=today(),hasta=addD(hoy,Number(op.dias)||60),act=Object.values(S.ents).filter(isAct);let n=0;
+  if(op.ent)act.forEach(e=>horGrupos(e.horarios).forEach(g=>{let first=null;for(let k=0;k<7&&!first;k++){const d=addD(hoy,k);if(g.dias.includes(((d.getDay()+6)%7)+1))first=d}if(!first)return;const f=iso(first),m=hm(g.hora);
+    ev(`ent-${e.id}-${g.hora.replace(':','')}-${g.dias.join('')}`,'Entrenamiento · '+name(e),[`${e.estimulos||''} estímulos por semana`,e.telefono?'Tel: '+e.telefono:''].filter(Boolean).join('\n'),GYM_LBL[gymOf(e)],['DTSTART'+TZ+dt(f,m),'DTEND'+TZ+dt(f,m+g.dur),'RRULE:FREQ=WEEKLY;BYDAY='+g.dias.map(d=>dsem(d)[3]).join(',')]);n++}));
+  const allday=(uid,sum,desc,f)=>{ev(uid,sum,desc,'',['DTSTART;VALUE=DATE:'+f.replace(/-/g,''),'DTEND;VALUE=DATE:'+iso(addD(parse(f),1)).replace(/-/g,'')]);n++};
+  if(op.pago)act.filter(e=>gymOf(e)!=='CROSSFORCE').forEach(e=>{const p=parse(e.proxVenc);if(p&&p>=hoy&&p<=hasta)allday(`pago-${e.id}-${e.proxVenc}`,'Vence cuota · '+name(e),money(monto(e)),e.proxVenc)});
+  if(op.rut)act.forEach(e=>{const a=activaDe(e.id);if(a&&a.fechaEntrega){const fin=addD(parse(a.fechaEntrega),(Number(a.duracionSemanas)||4)*7);if(fin>=hoy&&fin<=hasta)allday(`rut-${a._id}`,'Termina rutina · '+name(e),a.nombre||'',iso(fin))}});
+  if(op.ev)S.evs.forEach(v=>{if(!v.fecha)return;const en=v.eid&&S.ents[v.eid];const desc=[en?name(en):'',v.notas||''].filter(Boolean).join('\n');
+    const a=v.hora?['DTSTART'+TZ+dt(v.fecha,hm(v.hora)),'DTEND'+TZ+dt(v.fecha,hm(v.hora)+(Number(v.dur)||60))]:['DTSTART;VALUE=DATE:'+v.fecha.replace(/-/g,''),'DTEND;VALUE=DATE:'+iso(addD(parse(v.fecha),1)).replace(/-/g,'')];
+    if(v.rep==='semanal')a.push('RRULE:FREQ=WEEKLY'+(v.hasta?';UNTIL='+v.hasta.replace(/-/g,'')+(v.hora?'T235959Z':''):''));ev('ev-'+v._id,v.titulo||'Evento',desc,'',a);n++});
+  L.push('END:VCALENDAR');
+  const fold=l=>{const o=[];let s=l;while(s.length>72){o.push(s.slice(0,72));s=' '+s.slice(72)}o.push(s);return o.join('\r\n')};
+  return {txt:L.map(fold).join('\r\n'),n}}
+function expHTML(){const o=S.calExp;return `<div class="card pad">
+  <p style="margin-top:0">Se descarga un archivo con tus eventos para importarlo en Google Calendar. Quedan como una copia: si después cambiás algo en la app, volvés a exportar.</p>
+  <div class="chips" style="flex-direction:column;align-items:flex-start;gap:8px">
+    ${[['ent','Horarios de entrenamiento (se repiten todas las semanas)'],['pago','Vencimientos de cuotas'],['rut','Fin de rutinas'],['ev','Mis eventos']].map(([k,l])=>`<label class="plan-on"><input type="checkbox" data-ex="${k}" ${o[k]?'checked':''}> ${l}</label>`).join('')}
+    <label>Cuotas y rutinas de los próximos <select data-exd>${[30,60,90].map(d=>`<option ${Number(o.dias)===d?'selected':''}>${d}</option>`).join('')}</select> días</label></div>
+  <div class="actions" style="margin-top:14px"><button class="btn pri" type="button" data-exgo="1">Descargar archivo (.ics)</button></div>
+  <ol class="hint" style="margin:14px 0 0;padding-left:18px;line-height:1.6"><li>En la compu, abrí Google Calendar → ⚙ Configuración → <b>Importar y exportar</b>.</li><li>Elegí el archivo <b>entrena.ics</b> y el calendario donde lo querés (te conviene crear uno llamado “entrená.”, así lo podés borrar y volver a importar entero).</li><li>Tocá <b>Importar</b>. En el celular aparece solo.</li></ol>
+  <p class="hint">Para un solo evento, tocalo en el calendario y usá “Agregar a Google Calendar”.</p></div>`}
+
 /* ---------- navegación ---------- */
-const VIEWS=['panel','lista','rutinas','ajustes'];
+const VIEWS=['panel','lista','calendario','rutinas','ajustes'];
 function show(v){
   if(!VIEWS.includes(v))v='panel';S.view=v;
   VIEWS.forEach(k=>$('#v-'+k).hidden=k!==v);
@@ -1764,11 +1908,23 @@ function show(v){
   render();window.scrollTo(0,0);
 }
 function render(){
-  if(S.view==='panel')renderPanel();else if(S.view==='lista')renderLista();else if(S.view==='rutinas')renderRutinas();else if(!document.querySelector('#v-ajustes input:focus'))renderAjustes();
+  if(S.view==='panel')renderPanel();else if(S.view==='lista')renderLista();else if(S.view==='calendario')renderCalendario();else if(S.view==='rutinas')renderRutinas();else if(!document.querySelector('#v-ajustes input:focus'))renderAjustes();
   if(openId&&openId!=='__bulk'&&sheetMode==='ver')renderSheet();
 }
 document.querySelector('nav.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){if(location.hash!=='#'+b.dataset.view)location.hash=b.dataset.view;else show(b.dataset.view)}});
 window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+(function(){const el=$('#v-calendario');if(!el)return;
+  el.addEventListener('click',e=>{const c=calSt();const g=k=>e.target.closest('['+k+']');let b;
+    if(b=g('data-cmov')){calNav(Number(b.dataset.cmov));return}
+    if(b=g('data-cvista')){c.vista=b.dataset.cvista;S.calScrolled=0;renderCalendario();return}
+    if(b=g('data-cf')){c.f[b.dataset.cf]=!c.f[b.dataset.cf];renderCalendario();return}
+    if(b=g('data-cev')){openSheet('__cev','ver',b.dataset.cev);return}
+    if(b=g('data-cnew')){openSheet('__evf','edit',{fecha:b.dataset.cnew||c.ref,tipo:'evaluacion',dur:60});return}
+    if(b=g('data-cexp')){openSheet('__cexp','ver');return}
+    if(b=g('data-cday')){if(c.vista==='dia')return;c.ref=b.dataset.cday;c.vista='dia';renderCalendario();return}
+    if(b=g('data-cslot')){const r=b.getBoundingClientRect(),m=Number(b.dataset.h0)+Math.floor((e.clientY-r.top)/0.8/30)*30;openSheet('__evf','edit',{fecha:b.dataset.cslot,hora:hhmm(m),tipo:'evaluacion',dur:60});return}});
+  el.addEventListener('change',e=>{const s=e.target.closest('[data-cgym]');if(s){calSt().gym=s.value;renderCalendario()}});
+})();
 function horLeer(){if(!S.horEdit)return;document.querySelectorAll('[data-hrow]').forEach(r=>{const h=S.horEdit.hs[Number(r.dataset.hrow)];if(!h)return;h.dia=Number(r.querySelector('[data-hd]').value);h.hora=r.querySelector('[data-hh]').value;h.dur=Number(r.querySelector('[data-hm]').value)})}
 function handleRut(e){
   const g=k=>e.target.closest('['+k+']');let b;
@@ -1836,6 +1992,7 @@ show(location.hash.slice(1)||'panel');
   db.collection('rutinas').onSnapshot(s=>{S.rutinas=s.docs.map(d=>({...d.data(),_id:d.id}));got.r=true;done()},onErr);
   db.collection('ejercicios').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.ejs=m;S.ejsV++;got.j=true;done()},onErr);
   db.collection('plantillas').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.plantillas=m;got.t=true;done()},onErr);
+  db.collection('eventos').onSnapshot(s=>{S.evs=s.docs.map(d=>({...d.data(),_id:d.id}));render()},()=>{});
   db.collection('liquidaciones').onSnapshot(s=>{S.liqs=s.docs.map(d=>({...d.data(),_id:d.id}));render()},()=>{});
   db.collection('rendiciones').onSnapshot(s=>{S.rends=s.docs.map(d=>({...d.data(),_id:d.id}));render()},()=>{});
   db.collection('registros').onSnapshot(s=>{S.regs=s.docs.map(d=>({...d.data(),_id:d.id}));got.g=true;done()},onErr);
