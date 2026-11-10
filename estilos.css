@@ -355,3 +355,10 @@ input.falta::placeholder{color:var(--bad);opacity:.85}
 .liq-sin td{background:color-mix(in srgb,var(--warn) 9%,transparent)}
 @media (max-width:620px){.liq-res{grid-template-columns:1fr}}
 .liq-t th:nth-child(-n+3),.liq-t td:nth-child(-n+3){text-align:left}
+/* listas del panel con scroll y buscador */
+.al-q{position:relative;padding:0 16px 8px}
+.al-q input{width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:8px 12px 8px 34px;border:1px solid var(--line);border-radius:999px;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A938F' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px center;color:var(--ink)}
+.al-q input:focus{outline:2px solid var(--ok-fill,#C8F23A);outline-offset:1px}
+.al-n{position:absolute;right:48px;top:10px;font-size:12px;color:var(--muted);pointer-events:none}
+ul.alist.al-scroll{max-height:265px;overflow-y:auto;overscroll-behavior:contain;border-top:1px solid var(--line);scrollbar-width:thin}
+.al-vacio{padding:14px 16px}

@@ -264,6 +264,7 @@ function renderPanel(){
     <div class="card pad"><b>Por plan</b>${Object.entries(plans).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="bar-row"><span>${esc(k)}</span><span class="bar"><i style="width:${v/maxP*100}%"></i></span><span style="text-align:right">${v}</span></div>`).join('')}</div>
     <div class="card pad"><b>Por estímulos semanales</b>${Object.entries(est).sort((a,b)=>a[0]-b[0]).map(([k,v])=>`<div class="bar-row"><span>${k} por semana</span><span class="bar"><i style="width:${v/maxE*100}%"></i></span><span style="text-align:right">${v}</span></div>`).join('')}</div>
   </div>`:''}`;
+  listasBuscables(el);
 }
 async function cerrarMes(M){
   const d=monthData(M);
@@ -272,6 +273,23 @@ async function cerrarMes(M){
 
 
 
+
+/* ----- listas del panel: máximo 5 visibles, scroll y buscador ----- */
+function listasBuscables(root){
+  S.fq=S.fq||{};
+  root.querySelectorAll('.grid2 > .card > ul.alist').forEach(ul=>{
+    const lis=[...ul.children].filter(x=>x.tagName==='LI');if(lis.length<=5)return;
+    const card=ul.parentElement,t=(card.querySelector('b')?.textContent||'').replace(/[\d·:]+/g,'').trim().slice(0,40);
+    const h=lis.slice(0,5).reduce((a,li)=>a+li.offsetHeight,0);
+    ul.classList.add('al-scroll');if(h>0)ul.style.maxHeight=(h+2)+'px';
+    const box=document.createElement('div');box.className='al-q';
+    box.innerHTML=`<input type="search" placeholder="Buscar entrenado (${lis.length})" aria-label="Buscar en ${esc(t)}" value="${esc(S.fq[t]||'')}"><span class="al-n"></span>`;
+    ul.before(box);const inp=box.firstChild,n=box.lastChild;
+    const empty=document.createElement('div');empty.className='empty al-vacio';empty.textContent='Ningún entrenado coincide.';empty.hidden=true;ul.after(empty);
+    const apply=()=>{const q=normN(inp.value);S.fq[t]=inp.value;let k=0;lis.forEach(li=>{const ok=!q||normN(li.textContent).includes(q);li.hidden=!ok;if(ok)k++});n.textContent=q?`${k} de ${lis.length}`:'';empty.hidden=k>0;ul.hidden=!k};
+    inp.addEventListener('input',apply);if(inp.value)apply();
+  });
+}
 /* ----- liquidaciones de CrossForce, rendiciones a LEVEL y caja ----- */
 const normN=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
 function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;let pr=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(pr[j]+1,c[j-1]+1,pr[j-1]+(a[i-1]===b[j-1]?0:1));pr=c}return pr[n]}
