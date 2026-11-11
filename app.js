@@ -360,7 +360,7 @@ function liqHTML(){
   return `<div class="form card pad liq-f">
     <label>Mes que liquida<select id="lq-mes">${meses.map(k=>`<option value="${k}" ${k===L.mes?'selected':''}>${mesLbl(k)}</option>`).join('')}</select></label>
     <label>Fecha en que te pagaron<input id="lq-fecha" type="date" value="${esc(L.fecha)}"></label>
-    <label>Monto recibido<input id="lq-monto" type="number" min="0" step="100" value="${esc(L.monto)}" placeholder="${tot?Math.round(tot):''}"></label>
+    <label>Monto recibido<input id="lq-monto" type="number" min="0" step="any" value="${esc(L.monto)}" placeholder="${tot?Math.round(tot):''}"></label>
     <label>Forma<select id="lq-forma">${[['efectivo','Efectivo'],['transferencia','Transferencia']].map(([k,l])=>`<option value="${k}" ${k===L.forma?'selected':''}>${l}</option>`).join('')}</select></label>
     <div class="full liq-drop"><label class="btn" style="cursor:pointer">Subir Excel del gym<input id="lq-file" type="file" accept=".xlsx,.csv" hidden></label><span class="hint" style="margin:0">${L.archivo?`<b>${esc(L.archivo)}</b> · ${L.filas.length} filas`:'o copiá las filas en el Excel y pegalas acá abajo'}</span></div>
     ${L.filas.length?'':`<textarea id="lq-paste" class="full" rows="4" placeholder="Pegá acá las filas copiadas del Excel (fecha, nombre, veces, monto)"></textarea><div class="full actions"><button class="btn" type="button" data-lq="paste">Leer filas pegadas</button></div>`}
@@ -390,7 +390,7 @@ function rendHTML(M){const R=S.rend;const c=cajaDe(M);
   ${L.length?`<div class="card"><ul class="alist">${L.map(r=>`<li><span class="nm">${fmtD(r.fecha)} · ${money(r.monto)} <span class="hint" style="display:inline">${r.forma==='transferencia'?'Transferencia':'Efectivo'}</span></span><button class="x-sm" type="button" data-rdel="${esc(r._id)}">${R.armed===r._id?'Confirmar':'Borrar'}</button></li>`).join('')}</ul></div>`:''}
   <div class="form card pad" style="margin-top:12px"><div class="full"><b>Registrar rendición</b></div>
     <label>Fecha<input id="rd-fecha" type="date" value="${esc(iso(today()))}"></label>
-    <label>Monto<input id="rd-monto" type="number" min="0" step="100" value="${c.porRendir>0?Math.round(c.porRendir):''}"></label>
+    <label>Monto<input id="rd-monto" type="number" min="0" step="any" value="${c.porRendir>0?Math.round(c.porRendir):''}"></label>
     <label>Forma<select id="rd-forma"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
     <label>Mes<input value="${mesLbl(M)}" readonly></label>
     <div class="full actions"><button class="btn pri" type="button" data-rsave="${M}">Guardar rendición</button><button class="btn" type="button" data-close>Cerrar</button></div></div>`}
@@ -490,14 +490,14 @@ function renderAjustes(){
   const c=S.cfg;
   const gymForm=g=>`<div class="card pad form" style="margin-bottom:12px">
     <div class="full"><span class="pill ${gymPill(g)}">${GYM_LBL[g]}</span></div>
-    ${[1,2,3,4,5].map(n=>`<label>${n}× por semana<input id="t-${g}-${n}" type="number" min="0" step="500" value="${esc(c.gyms[g].tarifas[String(n)]??'')}"></label>`).join('')}
+    ${[1,2,3,4,5].map(n=>`<label>${n}× por semana<input id="t-${g}-${n}" type="number" min="0" step="any" value="${esc(c.gyms[g].tarifas[String(n)]??'')}"></label>`).join('')}
     <label>% para Fran<input id="p-${g}" type="number" min="0" max="100" step="1" value="${Math.round(c.gyms[g].pctFran*100)}"></label>
   </div>`;
   $('#v-ajustes').innerHTML=`<h2 class="sec">Tarifas y reparto por gimnasio</h2>
   <form id="cfgf">
     ${gymForm('LEVEL')}${gymForm('CROSSFORCE')}
     <div class="card pad form" style="margin-bottom:12px"><div class="full"><span class="pill p-on">Online</span></div>
-      <label>Precio mensual<input id="tonl" type="number" min="0" step="500" value="${esc(c.online)}"></label><label>% para Fran<input value="100%" readonly></label></div>
+      <label>Precio mensual<input id="tonl" type="number" min="0" step="any" value="${esc(c.online)}"></label><label>% para Fran<input value="100%" readonly></label></div>
     <p class="hint">Los valores son sin promo; las promos de 10% y 15% se descuentan sobre estos precios. Al guardar se recalcula todo el panel.</p>
     <div class="actions" style="margin-top:12px"><button class="btn pri" type="submit">Guardar ajustes</button></div>
   </form>
@@ -726,9 +726,9 @@ function pagoHTML(e){
   return `<form id="pf" class="form card pad">
     <label class="full">Cuota del mes<select id="p-mes">${opts.map(k=>`<option value="${k}" ${k===defM?'selected':''}>${mesLbl(k)}${um.includes(k)&&k<cm?' · adeudada':''}</option>`).join('')}</select></label>
     <label>Fecha de pago<input id="p-fecha" type="date" value="${iso(today())}" required></label>
-    <label>Monto abonado<input id="p-monto" type="number" min="0" step="100" value="${monto(e)}" required></label>
+    <label>Monto abonado<input id="p-monto" type="number" min="0" step="any" value="${monto(e)}" required></label>
     <div class="full"><span class="lbl-s">Forma de pago</span><div class="chips" id="p-forma">${FORMAS.map(([k,l])=>`<button type="button" class="chip" data-forma="${k}" aria-pressed="${k==='efectivo'}">${l}</button>`).join('')}</div></div>
-    <div class="full mixto" id="p-mix" hidden><label>En efectivo<input id="p-ef" type="number" min="0" step="100" value="0"></label><label>Por transferencia<input id="p-tr" type="number" min="0" step="100" value="${monto(e)}"></label><p class="hint full" id="p-mixh"></p></div>
+    <div class="full mixto" id="p-mix" hidden><label>En efectivo<input id="p-ef" type="number" min="0" step="any" value="0"></label><label>Por transferencia<input id="p-tr" type="number" min="0" step="any" value="${monto(e)}"></label><p class="hint full" id="p-mixh"></p></div>
     <label class="full">Nuevo vencimiento<input id="p-venc" type="date" value="${sug}" required></label>
     <p class="hint full">Vencimiento actual: ${fmtD(e.proxVenc)}. Al guardar, el estado pasa a “Al día” y el pago queda en el historial.</p>
     <div class="full actions"><button class="btn pri" type="submit">Confirmar pago</button><button class="btn" type="button" data-mode="ver">Cancelar</button></div>
