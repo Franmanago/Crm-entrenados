@@ -423,3 +423,60 @@ ul.alist.al-scroll{max-height:265px;overflow-y:auto;overscroll-behavior:contain;
 .cev h3{font-size:20px}
 button.cm-mas{border:0;background:none;font:inherit;cursor:pointer;text-align:left;padding:1px 6px}
 button.cm-mas:hover{color:var(--ink);text-decoration:underline}
+
+/* ---- cuota: según tarifa / monto fijo / sin cuota ---- */
+.cq{display:flex;flex-direction:column;gap:4px}
+.cq-l{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.seg.cq-seg{display:flex;margin:0;border-radius:10px;border:1px solid var(--line)}
+.seg.cq-seg button{flex:1;border-radius:8px;padding:8px 6px;font-size:13.5px}
+.form .cq-f,.form .cq-s{display:none}
+.form[data-cq="fijo"] .cq-f{display:flex}
+.form[data-cq="fijo"] .cq-t,.form[data-cq="sin"] .cq-t,.form[data-cq="sin"] .cq-p{display:none}
+.form[data-cq="sin"] label.cq-s{display:flex}.form[data-cq="sin"] p.cq-s{display:block}
+
+/* ---- corregir días hechos (ficha) ---- */
+.ase-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 4px}
+.ase-nav b{font-size:14px;text-align:center}
+.ase-b{width:34px;height:34px;flex:0 0 34px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:18px;font-weight:700;line-height:1}
+.ase-b:disabled{opacity:.35;cursor:default}
+.ase-rut{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:4px}
+.ase-sec{display:block;width:100%;max-width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);font-size:13px}
+.ase-l{list-style:none;margin:0;padding:0}
+.ase-r{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.ase-r:first-child{border-top:0}
+.ase-tg{width:30px;height:30px;flex:0 0 30px;border-radius:8px;border:2px solid var(--line);background:var(--surface);font-weight:700;font-size:15px;color:var(--ok-ink);padding:0}
+.ase-tg.on{background:var(--ok-fill);border-color:var(--ok-fill)}
+.ase-n{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.ase-n b{font-size:14.5px}.ase-n small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ase-f{flex:0 0 auto;width:132px;padding:5px 6px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);font-size:13px}
+.ase-f.off{opacity:.55}
+
+/* ---- encuadre en celular ---- */
+.av-sel{width:100%;max-width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235A635E' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;border:1px solid var(--line);border-radius:8px;padding:7px 30px 7px 10px;-webkit-appearance:none;appearance:none;text-overflow:ellipsis;margin-top:2px}
+.facts dd{min-width:0;overflow-wrap:anywhere}
+#v-rutinas .alist .nm{white-space:normal;overflow-wrap:anywhere}
+#v-rutinas .alist .nm .pill{white-space:nowrap}
+@media (max-width:560px){
+  table.t-stack thead{display:none}
+  table.t-stack,table.t-stack tbody{display:block}
+  table.t-stack tr{display:grid;grid-template-columns:repeat(3,1fr);gap:2px 8px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  table.t-stack tr:last-child{border-bottom:0}
+  table.t-stack tr.total{background:var(--ok-soft)}table.t-stack tr.total td{background:none}
+  table.t-stack td{border:0;padding:0;text-align:left;white-space:normal;font-weight:700;font-size:14px}
+  table.t-stack td:first-child{grid-column:1/-1;font-weight:700;font-size:14.5px;margin-bottom:4px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  table.t-stack td:not(:first-child)::before{display:block;font-size:11.5px;font-weight:500;color:var(--muted);letter-spacing:.02em}
+  table.t-stack td:nth-child(2)::before{content:"Esperado"}
+  table.t-stack td:nth-child(3)::before{content:"Cobrado"}
+  table.t-stack td:nth-child(4)::before{content:"Falta"}
+  #rmdefs thead{display:none}
+  #rmdefs,#rmdefs tbody{display:block}
+  #rmdefs tr{display:grid;grid-template-columns:1fr 86px;gap:6px 8px;padding:10px 0;border-bottom:1px solid var(--line)}
+  #rmdefs td{border:0;padding:0;white-space:normal;text-align:left}
+  #rmdefs td:nth-child(1){grid-column:1;grid-row:1}
+  #rmdefs td:nth-child(4){grid-column:2;grid-row:1}
+  #rmdefs td:nth-child(2){grid-column:1;grid-row:2}
+  #rmdefs td:nth-child(3){grid-column:2;grid-row:2}
+  #rmdefs input,#rmdefs select{width:100%!important;min-width:0}
+  #rmdefs .x-sm{width:100%;height:100%}
+  #rmdefs td:nth-child(3) input::placeholder{color:var(--muted)}
+}
