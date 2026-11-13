@@ -480,3 +480,43 @@ button.cm-mas:hover{color:var(--ink);text-decoration:underline}
   #rmdefs .x-sm{width:100%;height:100%}
   #rmdefs td:nth-child(3) input::placeholder{color:var(--muted)}
 }
+
+/* ---- ordenar columnas de la lista ---- */
+.rhead .sh{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;border-radius:6px;padding:2px 4px;margin:-2px -4px;white-space:nowrap}
+.rhead .sh:hover{color:var(--ink);background:var(--surface-2)}
+.rhead .sh:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.rhead .sh.on{color:var(--ink)}
+.rhead .sh i{font-style:normal;font-size:9px;min-width:9px}
+.rhead .sh:not(.on):hover i::after{content:"▲";opacity:.35}
+.cnt-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px}
+.cnt-bar .count{margin:0}
+.ord-m{display:none;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.ord-m select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235A635E' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center;border:1px solid var(--line);border-radius:8px;padding:6px 26px 6px 9px;-webkit-appearance:none;appearance:none;max-width:200px;text-overflow:ellipsis}
+@media (max-width:760px){.ord-m{display:flex}}
+.cnt-bar .count{white-space:nowrap}
+
+/* ---- mover bloques ---- */
+.bl-grip{align-self:center;display:grid;place-items:center;width:22px;height:34px;margin-right:-4px;color:var(--muted);cursor:grab;touch-action:none;border-radius:6px;flex:0 0 auto}
+.bl-grip:hover{color:var(--ink);background:rgba(0,0,0,.05)}
+body.dragging,body.dragging *{cursor:grabbing!important;user-select:none;-webkit-user-select:none}
+.bl.bl-drag{position:relative;z-index:5;box-shadow:0 12px 28px rgba(0,0,0,.2);opacity:.96;transition:none}
+.bl-drop{border:2px dashed var(--ok-ink,#4D7A0C);border-radius:10px;background:var(--ok-soft,#F1F8DA);color:var(--ok-ink,#4D7A0C);font-weight:700;font-size:13px;display:grid;place-items:center;margin:0 0 10px}
+.bl-mv{display:flex;gap:2px;align-self:center;margin-left:auto}
+.bl-mv button{width:30px;height:30px;border:1px solid var(--line);border-radius:7px;background:var(--surface);font-weight:700;color:var(--ink);padding:0}
+.bl-mv button:disabled{opacity:.3;cursor:default}
+.bl-mv+.x-sm{margin-left:0}
+.bl-h .bl-n{flex:1 1 180px;min-width:140px}
+.bl.plegado .bl-res{flex:1 1 140px;min-width:0}
+/* ---- bloque de distancias ---- */
+.it.it-ds{grid-template-columns:minmax(0,2fr) 90px 60px 76px 76px minmax(0,1.4fr) auto}
+.it-pv{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin-top:-1px}
+.it-pv b{color:var(--ink)}
+@media (max-width:760px){
+  .it.it-ds{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .it.it-ds .it-ej{grid-column:1/-1}
+  .it.it-ds .it-n{grid-column:1/-1}
+}
+/* ---- unidad por ejercicio (kg, cm, metros, seg, reps) ---- */
+.it .u-l{gap:3px}
+.it .u-sel{width:auto;align-self:flex-start;border:0;background:none;padding:0 14px 0 0;margin:0;font:inherit;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;-webkit-appearance:none;appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%235A635E' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 2px center}
+.it .u-sel:focus-visible{outline:2px solid var(--ink);border-radius:4px}

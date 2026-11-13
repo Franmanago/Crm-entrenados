@@ -1,5 +1,22 @@
 /* ===== Rutinas en PDF (A4, una hoja por rutina) — sin librerías externas ===== */
 const RutinaPDF=(function(){
+/* ----- bloques de distancias: metros × reps × pausa / metros en X seg ----- */
+function distSeg(v){v=String(v??'').trim().replace(/,/g,'.').replace(/’|´/g,"'").replace(/”|''/g,'"');if(!v)return null;let m;
+  if(m=v.match(/^(\d+(?:\.\d+)?)\s*'\s*(?:(\d+(?:\.\d+)?)\s*(?:"|s)?)?$/))return Number(m[1])*60+Number(m[2]||0);
+  if(m=v.match(/^(\d+):(\d{1,2}(?:\.\d+)?)$/))return Number(m[1])*60+Number(m[2]);
+  if(m=v.match(/^(\d+(?:\.\d+)?)\s*(?:"|s|seg|segs|segundos)?$/i))return Number(m[1]);
+  if(m=v.match(/^(\d+(?:\.\d+)?)\s*(?:min|mins|minutos)$/i))return Number(m[1])*60;return null}
+function distFmtT(s){if(s==null)return '';if(s<60)return (Math.round(s*10)/10)+'"';const mi=Math.floor(s/60),r=Math.round(s-mi*60);return r?`${mi}'${String(r).padStart(2,'0')}"`:`${mi}'`}
+const distT=v=>{const s=distSeg(v);return s==null?String(v??'').trim():distFmtT(s)};
+const distM=v=>(String(v??'').match(/\d+(?:[.,]\d+)?/g)||[]).reduce((a,x)=>a+Number(x.replace(',','.')),0);
+const distMil=n=>String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+function distPace(it){const m=String(it.metros||'').trim(),t=distSeg(it.tiempo);if(!/^\d+(?:[.,]\d+)?$/.test(m)||!t)return '';const mm=Number(m.replace(',','.'));if(mm<400)return '';return distFmtT(t/mm*1000)+'/km'}
+function distParts(it){const reps=parseInt(it.reps)||0,m=String(it.metros||'').trim();
+  return {vol:m?((reps>1?reps+' × ':'')+m+' m'):(reps?reps+' reps':''),en:String(it.tiempo||'').trim()?'en '+distT(it.tiempo):'',pausa:String(it.pausa||'').trim()?'pausa '+distT(it.pausa):'',ritmo:distPace(it)}}
+function distTxt(it){const p=distParts(it);return [p.vol+(p.en?' '+p.en:''),p.pausa,p.ritmo].filter(Boolean).join(' · ')}
+function distTot(b){const ser=Math.max(1,parseInt(b.series)||1);return (b.items||[]).reduce((a,i)=>a+distM(i.metros)*Math.max(1,parseInt(i.reps)||1),0)*ser}
+function distBlk(b){const ser=parseInt(b.series)||0,tot=distTot(b);return [ser>1?ser+' series':'',ser>1&&String(b.pausaSeries||'').trim()?'entre series '+distT(b.pausaSeries):'',tot?'total '+distMil(tot)+' m':''].filter(Boolean).join(' · ')}
+
 const HW=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,350,556,350,222,556,333,1000,556,556,333,1000,667,333,1000,350,611,350,350,222,222,333,333,350,556,1000,333,1000,500,333,944,350,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500];
 const HBW=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,350,556,350,278,556,500,1000,556,556,333,1000,667,333,1000,350,611,350,350,278,278,500,500,350,556,1000,333,1000,556,333,944,350,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556];
 
@@ -80,7 +97,8 @@ function build(r,e,kgFn){
     // indicaciones
     const notes=(r.notas||'').trim();const dist=r.distribucion&&r.distribucion.length?r.distribucion:null;
     if(notes||dist){
-      const z=8.2;const lines=notes?wrap(notes,CW-16,z,false).slice(0,3):[];
+      const z=8.2;const lines=[];if(notes){let a=notes.split(/\n+/);if(a.length<2)a=notes.replace(/([.;])\s+(?=[A-ZÁÉÍÓÚÑ¿¡0-9])/g,'$1\n').split('\n');a=a.map(x=>x.replace(/^\s*[-•*·]\s*/,'').replace(/[.;]\s*$/,'').trim()).filter(Boolean);
+        for(const v of a){const w=wrap(v,CW-26,z,false);w.forEach((l,i)=>lines.push((i?'   ':'• ')+l))}lines.splice(5)}
       const distTxt=dist?dist.map((w,i)=>`Sem ${i+1}: ${w.map(x=>(secs[0]?.dias[x]?.nombre)||('Día '+(x+1))).join(' y ')}`):[];
       const distLines=[];let cur='';for(const d of distTxt){const tt=cur?cur+'     '+d:d;if(tw(tt,z,false)<=CW-16)cur=tt;else{distLines.push(cur);cur=d}}if(cur)distLines.push(cur);
       const h=8+lines.length*10.5+(dist?11+distLines.length*10.5:0)+2;
@@ -108,11 +126,18 @@ function build(r,e,kgFn){
       t+=CH;
       for(const b of d.bloques){
         p.rect(M,t,CW,BH,LS,null);const bz=Math.min(10,BH*0.86);const bn=(b.nombre||'').toUpperCase();p.text(M+4,t+BH*0.8,bn,bz,'d',K);
-        const bt=b.modo==='timer'?`· POR TIEMPO: ${b.trabajo||40}" trabajo / ${b.descanso||20}" descanso · ${b.vueltas||3} vueltas${Number(b.pausa)?` · ${b.pausa}" entre vueltas`:''}`:(b.series?`· ${b.series} series`:'');
+        const bt=b.modo==='dist'?(distBlk(b)?'· DISTANCIAS · '+distBlk(b):'· DISTANCIAS'):b.modo==='timer'?`· POR TIEMPO: ${b.trabajo||40}" trabajo / ${b.descanso||20}" descanso · ${b.vueltas||3} vueltas${Number(b.pausa)?` · ${b.pausa}" entre vueltas`:''}`:(b.series?`· ${b.series} series`:'');
         if(bt)p.text(M+8+tw(bn,bz,'d'),t+BH*0.76,bt,Math.min(7,BH*0.66),true,OL);
         p.line(M,t+BH,M+CW,t+BH,0.35,LN);t+=BH;
         for(const it of b.items){
-          const k=kgFn(it);const pad=3;
+          const pad=3;
+          if(b.modo==='dist'){const q=distParts(it);
+            const c0=fit(it.nombre,colsW[0]-2*pad,fz,false,Math.max(5.6,fz-1.8));p.text(colX[0]+pad,t+rowH*0.66,c0.s,c0.z,false,K);
+            const vol=q.vol.replace(' × ','×'),largo=vol.length>14;if(!largo){const c1=fit(vol,colsW[1]-2*pad,fz,false,5.2);p.text(colX[1]+pad,t+rowH*0.66,c1.s,c1.z,false,K)}
+            if(q.en){const c2=fit(q.en,colsW[2]-2*pad,fz,true,5.2);p.text(colX[2]+pad,t+rowH*0.66,c2.s,c2.z,true,K)}
+            const nt=[largo?vol:'',q.pausa?q.pausa.replace('pausa ','p '):'',q.ritmo,it.notas].filter(Boolean).join(' · ');const c3=fit(nt,colsW[3]-2*pad,fz*0.9,false,5.2);p.text(colX[3]+pad,t+rowH*0.66,c3.s,c3.z,false,MU);
+            p.line(M,t+rowH,M+CW,t+rowH,0.35,LN);t+=rowH;continue}
+          let k=kgFn(it);const un=it.unidad||(/\b(cmj|sj|abalakov|drop ?jump|salto vertical|salto horizontal|salto largo|salto en largo|multisaltos?)\b/i.test(it.nombre||'')?'cm':'kg');if(k&&un!=='kg')k=k+' '+un;
           const c0=fit(it.nombre,colsW[0]-2*pad,fz,false,Math.max(5.6,fz-1.8));p.text(colX[0]+pad,t+rowH*0.66,c0.s,c0.z,false,K);
           const c1=fit(b.modo==='timer'?'':it.reps,colsW[1]-2*pad,fz,false,5.5);p.text(colX[1]+pad,t+rowH*0.66,c1.s,c1.z,false,K);
           if(k){const kz=fz;const kt=fit(k,colsW[2]-2*pad-(it.pct?tw(it.pct+'%',fz*0.72,false)+2:0),kz,true,5.5);p.text(colX[2]+pad,t+rowH*0.66,kt.s,kt.z,true,K);
