@@ -701,14 +701,14 @@ function fichaHTML(e){
     <div><dt>ID</dt><dd>${esc(e.id)}</dd></div>
     <div><dt>Teléfono</dt><dd>${esc(e.telefono)}</dd></div>
     <div><dt>Plan</dt><dd>${esc(e.plan)} · ${esc(e.estimulos)}×/sem</dd></div>
-    <div><dt>Perfil</dt><dd>${esc([e.perfil,e.nivel].filter(Boolean).join(' · ')||'—')}${e.objetivo?`<br><span class="hint" style="display:inline">${esc(e.objetivo)}</span>`:''}</dd></div>
+    ${e.perfil||e.nivel||e.objetivo?`<div><dt>Perfil</dt><dd>${esc([e.perfil,e.nivel].filter(Boolean).join(' · ')||'—')}${e.objetivo?`<br><span class="hint" style="display:inline">${esc(e.objetivo)}</span>`:''}</dd></div>`:''}
     <div><dt>Mensualidad</dt><dd>${sinCuota(e)?'Sin cuota'+(e.cuotaMotivo?` <span class="hint" style="display:inline">· ${esc(e.cuotaMotivo)}</span>`:''):money(monto(e))+(e.cuota==='fijo'?' <span class="hint" style="display:inline">(monto fijo)</span>':Number(e.promo)?' (promo '+pct(e.promo)+')':'')}</dd></div>
     <div><dt>Último pago</dt><dd>${fmtD(e.ultPago)}</dd></div>
     <div><dt>Próximo vencimiento</dt><dd>${fmtD(e.proxVenc)}${dv!==null&&es==='Activo'?` <span class="hint" style="display:inline">(${dv<0?'hace '+(-dv)+' d':dv===0?'hoy':'en '+dv+' d'})</span>`:''}</dd></div>
     ${(()=>{const a=activaDe(e.id);if(a){const w=a.fechaEntrega?Math.floor(days(today(),parse(a.fechaEntrega))/7)+1:null,dur=Number(a.duracionSemanas)||4;
       return `<div><dt>Rutina activa</dt><dd>${esc(a.nombre||'Rutina')}</dd></div><div><dt>Entregada</dt><dd>${fmtD(a.fechaEntrega)}${w?` <span class="hint" style="display:inline">(semana ${Math.min(w,dur)} de ${dur})</span>`:''}</dd></div>`}
       return `<div><dt>Rutina</dt><dd>${esc(e.modalidad||'—')}</dd></div><div><dt>Última rutina</dt><dd>${fmtD(e.ultRutina)}${dr!==null?` <span class="hint" style="display:inline">(${dr} d · ${periodo(e)})</span>`:''}</dd></div>`})()}
-    <div><dt>Fecha de inicio</dt><dd>${fmtD(e.inicio)}</dd></div>
+    ${e.inicio?`<div><dt>Fecha de inicio</dt><dd>${fmtD(e.inicio)}</dd></div>`:''}
     <div><dt>Pago registrado</dt><dd>${esc(e.pagoRegistrado)}</dd></div>
     <div><dt>Avisos de cuota en su link</dt><dd><select data-avpago="${esc(e.id)}" class="av-sel"><option value="" ${!e.avisoPago?'selected':''}>Según gimnasio (${avisoAuto(e)?'sí':'no'})</option><option value="si" ${e.avisoPago==='si'?'selected':''}>Sí, mostrar</option><option value="no" ${e.avisoPago==='no'?'selected':''}>No mostrar</option></select></dd></div>
   </dl>
@@ -1222,13 +1222,13 @@ function renderRutinas(){
     const {listas,espera,sinProx}=entregasData();
     const rowR=(r,btns)=>{const e=S.ents[r.entrenadoId];return `<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}${pgP(e)}<br><span class="hint">${esc(r.nombre||'Rutina')}${r.fechaSugerida?' · '+fmtShort(r.fechaSugerida):''}${faltaPill(r)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></button>${btns}</li>`};
     const vista=S.evista||'tablero';
-    const fp=S.ePago||'todos',okP=r=>{const e=S.ents[r.entrenadoId||r.id];return fp==='todos'||(e&&pagoEst(e)===fp)};
+    const fp='todos',okP=r=>{const e=S.ents[r.entrenadoId||r.id];return fp==='todos'||(e&&pagoEst(e)===fp)};
     const cnt=k=>Object.values(S.ents).filter(e=>isAct(e)&&(k==='todos'||pagoEst(e)===k)).length;
     const pgP=e=>{const pg=pagoEst(e);return ` <span class="pill ${pagoEstPill(pg)}">${pg}</span>`};
     const top=`<div class="actions" style="margin-bottom:12px;justify-content:space-between;flex-wrap:wrap"><button class="btn pri" data-asignar="">Asignar plantilla a entrenados o grupo</button>
       <div class="chips"><button class="chip" data-evista="tablero" aria-pressed="${vista==='tablero'}">Tablero</button><button class="chip" data-evista="listado" aria-pressed="${vista==='listado'}">Listado de todos</button></div></div>`;
     if(vista==='listado'){body=top+listadoPlanHTML()}else{
-    body=top+`<div class="chips" style="margin-bottom:12px;align-items:center"><span class="lbl-s" style="margin:0 4px 0 0">Pago del mes</span>${PAGO_F.map(([k,l])=>`<button class="chip" data-epago="${k}" aria-pressed="${k===fp}">${l} (${cnt(k)})</button>`).join('')}</div>`;
+    body=top;
     body+=`
     ${sinTerminarCard(false)?`<div style="margin-bottom:12px">${sinTerminarCard(false)}</div>`:''}
     <div class="grid3">
@@ -1342,9 +1342,17 @@ function fichaRutinasHTML(e){
   const warn=r=>{const n=diasDe(r),est=Number(e.estimulos)||0;return n&&est&&n!==est?` <span class="pill p-warn">${n} días · paga ${est}</span>`:''};
   return `<div class="card">
     <div class="pad" style="padding-bottom:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><b>Rutinas</b>
-      <span class="actions"><button class="btn" style="padding:5px 10px;font-size:13px" data-asignar="" data-para="${esc(e.id)}">Desde plantilla</button><button class="btn" style="padding:5px 10px;font-size:13px" data-copiarde="${esc(e.id)}">De otro entrenado</button><button class="btn" style="padding:5px 10px;font-size:13px" data-newrut="${esc(e.id)}">Vacía</button><button class="btn" style="padding:5px 10px;font-size:13px" data-iaimp="${esc(e.id)}">Importar de Claude</button><button class="btn" style="padding:5px 10px;font-size:13px" data-iaexp="${esc(e.id)}">Copiar para Claude</button>${a?`<button class="btn" style="padding:5px 10px;font-size:13px" data-duprut="${esc(a._id)}">Duplicar actual</button>`:''}</span></div>
+      <span class="actions">
+        <details class="dmenu"><summary class="btn pri">Nueva rutina</summary><div class="dm-p" role="menu">
+          <button type="button" role="menuitem" data-asignar="" data-para="${esc(e.id)}"><b>Desde plantilla</b><small>Elegí una de tus plantillas</small></button>
+          ${a?`<button type="button" role="menuitem" data-duprut="${esc(a._id)}"><b>Duplicar la actual</b><small>Parte de “${esc(a.nombre||'Rutina')}”</small></button>`:''}
+          <button type="button" role="menuitem" data-copiarde="${esc(e.id)}"><b>De otro entrenado</b><small>Copiá la rutina de alguien más</small></button>
+          <button type="button" role="menuitem" data-newrut="${esc(e.id)}"><b>Vacía</b><small>Empezá de cero</small></button></div></details>
+        <details class="dmenu"><summary class="btn">Con Claude</summary><div class="dm-p" role="menu">
+          <button type="button" role="menuitem" data-iaexp="${esc(e.id)}"><b>Copiar para Claude</b><small>Pedido con su rutina y registros, sin nombre</small></button>
+          <button type="button" role="menuitem" data-iaimp="${esc(e.id)}"><b>Importar de Claude</b><small>Pegá la rutina que armó Claude</small></button></div></details></span></div>
     <ul class="alist">
-      ${a?`<li><span class="nm" style="white-space:normal"><span class="pill p-ok">Activa</span> <b>${esc(a.nombre||'Rutina')}</b>${warn(a)}${faltaPill(a)}<br><span class="hint">Entregada ${fmtD(a.fechaEntrega)} · semana ${semanaActual(a)+1} de ${a.duracionSemanas||'?'}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(a._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-verrut="${esc(a._id)}">Ver</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(a._id)}">Abrir</button></span></li>`:'<li><span class="nm hint">Sin rutina activa en la app.</span></li>'}
+      ${a?`<li><span class="nm" style="white-space:normal"><span class="pill p-ok">Activa</span> <b>${esc(a.nombre||'Rutina')}</b>${warn(a)}${faltaPill(a)}<br><span class="hint">Entregada ${fmtD(a.fechaEntrega)} · semana ${semanaActual(a)+1} de ${a.duracionSemanas||'?'}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn ic-b" data-pdf="${esc(a._id)}" title="Descargar PDF" aria-label="Descargar PDF">PDF</button><button class="btn ic-b" data-verrut="${esc(a._id)}" title="Ver como la ve el entrenado" aria-label="Ver rutina">Ver</button><button class="btn pri" data-editrut="${esc(a._id)}">Abrir</button></span></li>`:'<li><span class="nm hint">Sin rutina activa en la app. Creala con “Nueva rutina”.</span></li>'}
       ${c.map(r=>`<li><span class="nm" style="white-space:normal"><span class="pill p-warn">En cola</span> <b>${esc(r.nombre||'Rutina')}</b>${warn(r)}${faltaPill(r)}<br><span class="hint">Entrega sugerida ${fmtD(r.fechaSugerida)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(r._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button></span></li>`).join('')}
       ${finT.length?`<li class="rv-sep"><b>Rutinas anteriores</b><span class="hint">${finT.length}</span></li>`:''}
       ${fin.map(r=>`<li><span class="nm" style="white-space:normal"><span class="pill p-mute">Finalizada</span> ${esc(r.nombre||'Rutina')}<br><span class="hint">${fmtD(r.fechaEntrega)} al ${fmtD(r.fechaFin)}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(r._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-verrut="${esc(r._id)}">Ver</button></span></li>`).join('')}
@@ -2155,6 +2163,10 @@ document.addEventListener('click',e=>{
   const ci=e.target.closest('[data-cerrar]');if(ci){if(ci.dataset.armed!=='1'){ci.dataset.armed='1';ci.textContent='Confirmar cierre';return}cerrarMes(ci.dataset.cerrar);return}
   const o=e.target.closest('[data-open]');if(o)openSheet(o.dataset.open);
 });
+/* encabezado: inicial de la cuenta; el email y "Salir" quedan en el menú */
+(()=>{const um=$('#user-mail'),ui=$('#user-ini');if(!um||!ui)return;const f=()=>{ui.textContent=(um.textContent.trim()[0]||'·').toUpperCase()};f();new MutationObserver(f).observe(um,{childList:true,characterData:true,subtree:true})})();
+/* menús desplegables: se cierran al elegir una opción o al tocar afuera */
+document.addEventListener('click',ev=>{document.querySelectorAll('details.dmenu[open],details.umenu[open]').forEach(d=>{if(!d.contains(ev.target)||ev.target.closest('.dm-p button'))d.open=false})});
 $('#fab').addEventListener('click',()=>openSheet('__new','editar'));
 /* el botón "+ Nuevo entrenado" se achica a un círculo al bajar, para no tapar contenido */
 (()=>{let y0=scrollY,raf=0;addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const y=scrollY,f=$('#fab');if(!f)return;
