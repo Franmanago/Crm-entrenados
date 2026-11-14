@@ -378,6 +378,16 @@ body.mini-on .tmr-fab{opacity:0;pointer-events:none;transform:scale(.8)}
 .ej-ds .ds-chips,.ej-ds .ds-reps,.ej-ds .nota{margin-left:46px}
 .vbtn{padding:6px 10px;font-size:13px}
 @media (max-width:380px){.ej>.campos,.ej>.aj-n,.ej>.nota,.ej>.ej-pie,.ej>.log,.ej-ds .ds-chips,.ej-ds .ds-reps,.ej-ds .nota{margin-left:0}.campo input{width:70px}}
+/* ---- paso 2: objetivos táctiles de al menos 40 px ---- */
+.mas-kg{border:1.5px dashed var(--line);background:none;border-radius:9px;color:var(--muted);font:inherit;font-size:13.5px;font-weight:700;min-height:40px;padding:0 12px;align-self:flex-end}
+.mas,.strip .link,.ult+.mas,.df-a .link,.hecho-s .link,.asis.fin .link{min-height:40px;padding:0 6px;display:inline-flex;align-items:center}
+.strip .link{margin-right:-6px}
+.mh-bl a{padding:9px 12px}
+.vbtn{min-height:36px}
+.bl-r .bl-tm{width:40px;height:40px}
+.campos .x:has(+ .mas-kg){visibility:hidden;width:4px}
+.mas-kg{margin-left:4px}
+details.why summary{min-height:32px}
 .hecho-s{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;background:var(--ok-soft);border:1px solid var(--ok-line);border-radius:10px;padding:9px 12px;font-size:14px;color:var(--ink)}
 .hecho-s .hs-ic{font-weight:700;color:var(--ok)}
 .hecho-s .h-a{margin-left:auto;display:flex;gap:14px;align-items:center}
@@ -511,7 +521,7 @@ const UNI_L={kg:'Kg',cm:'Cm',m:'Metros',seg:'Seg',reps:'Reps'};
 function vinetas(t){t=String(t||'').trim();if(!t)return [];let a=t.split(/\n+/);
   if(a.length<2)a=t.replace(/([.;])\s+(?=[A-ZÁÉÍÓÚÑ¿¡0-9])/g,'$1\n').split('\n');
   return a.map(x=>x.replace(/^\s*[-•*·]\s*/,'').replace(/[.;]\s*$/,'').trim()).filter(Boolean)}
-let blOpen={},blCerr={},diaOpen=false;
+let blOpen={},blCerr={},diaOpen=false,kgOpen={};
 const itemsReales=b=>(b.items||[]).filter(i=>String(i.nombre||i.metros||'').trim());
 const blHecho=b=>{const its=itemsReales(b);return its.length>0&&its.every(i=>regHoy(i.uid))};
 const cerrKey=d=>'cerrado:'+d.uid+':'+fSel();
@@ -752,7 +762,7 @@ function render(){window.splashOff&&window.splashOff();
       const mK=String(vk)!==String(k||''),mR=String(vr)!==String(it.reps||''),ok=!!hoyReg;
       h+=`<div class="ej${ok?' hecho':''}" data-uid="${esc(it.uid)}">
         <div class="ej-top"><button class="chk" data-chk="${esc(it.uid)}" aria-pressed="${ok}" aria-label="${ok?'Hecho. Tocá para desmarcar':'Marcar como hecho'}" title="${ok?'Hecho':'Marcar como hecho'}">✓</button><div class="ej-n">${esc(it.nombre)}</div>${v?`<button class="vbtn" data-video="${esc(it.uid)}" aria-expanded="${!!o.video}">${o.video?'Cerrar':'▶ Video'}</button>`:''}</div>
-        <div class="campos">${b.modo==='timer'?'':`<label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="—" class="${mR?'mod':''}" autocomplete="off"></label><span class="x">×</span>`}<label class="campo">${UNI_L[uniDe(it)]||'Kg'}<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label>${it.pct?`<span class="pc">${(()=>{const a=ajusteHoy();return a&&ajustable(it)?Math.max(0,Number(it.pct)+a.pct):esc(it.pct)})()}% de tu máximo</span>`:''}${mK||(mR&&b.modo!=='timer')?`<span class="tag-mod">Cambiado</span>`:''}</div>
+        <div class="campos">${b.modo==='timer'?'':`<label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="—" class="${mR?'mod':''}" autocomplete="off"></label><span class="x">×</span>`}${k||it.pct||it.rm||vk||kgOpen[it.uid]||last.some(r=>r.kg)?`<label class="campo">${UNI_L[uniDe(it)]||'Kg'}<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label>`:`<button type="button" class="mas-kg" data-kgopen="${esc(it.uid)}">+ ${uniDe(it)==='kg'?'kg':esc((UNI_L[uniDe(it)]||'').toLowerCase())}</button>`}${it.pct?`<span class="pc">${(()=>{const a=ajusteHoy();return a&&ajustable(it)?Math.max(0,Number(it.pct)+a.pct):esc(it.pct)})()}% de tu máximo</span>`:''}${mK||(mR&&b.modo!=='timer')?`<span class="tag-mod">Cambiado</span>`:''}</div>
         ${(()=>{const a=ajusteHoy();return a&&ajustable(it)?`<div class="aj-n aj-${a.k}">Planificado <s>${esc(kgBase(it))} kg</s> → hoy <b>${esc(kg(it))} kg</b> (${Math.max(0,Number(it.pct)+a.pct)}% en vez de ${esc(it.pct)}%) · dejá ${a.rir} reps en reserva</div>`:''})()}
         ${it.notas?`<div class="nota">${esc(it.notas)}</div>`:''}
         ${o.video&&v?(yt?`<div class="video ${yt.short?'v916':'v169'}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(yt.id)}?rel=0&playsinline=1" title="Video de ${esc(it.nombre)}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`:'')+`<a class="yt" href="${esc(v)}" target="_blank" rel="noopener">Abrir en YouTube</a>`:''}
@@ -765,7 +775,7 @@ function render(){window.splashOff&&window.splashOff();
   if(dia&&!gate&&!(diaCerrado(dia)&&!diaOpen)){const ya=regHoy('asis:'+dia.uid);
     h+=`<div class="asis fin dia-fin${ya?' si':''}">${diaCerrado(dia)?`<span>✓ <b>${esc(dia.nombre)}</b> terminado ${esc(cuando())}</span><button class="link" data-dclose="1">Minimizar</button>`:`<button class="asis-btn" data-asis="${esc(dia.uid)}">✓ Terminar ${esc(dia.nombre)}${esHoy()?'':' ('+esc(fLarga(fSel()))+')'}</button>${ya?`<button class="link" data-asis="${esc(dia.uid)}" data-off="1">Deshacer</button>`:''}`}</div>`;
     if(R.controlCarga&&ya)h+=cargaHTML(dia)}
-  if(dia&&!gate)h+=semanaHTML();
+
   h+='<p class="hint" style="text-align:center;margin-top:8px">Guardá este link en favoritos o agregalo a la pantalla de inicio.</p><div style="height:60px"></div><button class="tmr-fab" data-tmr="1" aria-label="Abrir timer" title="Timer">'+IC.tmr+'</button>';
   $('#main').innerHTML=h;
   miniH(dia?String(dia.nombre||''):'',secs.length>1?(S0.titulo||''):'',dia&&!gate&&!(diaCerrado(dia)&&!diaOpen)?dia:null);
@@ -788,6 +798,7 @@ document.addEventListener('click',ev=>{
   if(b=t.closest('[data-pej]')){progEj=b.dataset.pej;render();return}
   if(b=t.closest('[data-asis]')){marcarAsis(b);return}
   if(b=t.closest('[data-chk]')){tildar(b);return}
+  if(b=t.closest('[data-kgopen]')){const u=b.dataset.kgopen;kgOpen[u]=1;render();const i=document.querySelector(`[data-in="kg"][data-uid="${CSS.escape(u)}"]`);if(i)i.focus();return}
   if(b=t.closest('[data-blopen]')){blOpen[b.dataset.blopen]=1;render();return}
   if(b=t.closest('[data-blclose]')){delete blOpen[b.dataset.blclose];render();const x=document.getElementById('bl-'+b.dataset.blclose);if(x)x.scrollIntoView({block:'nearest'});return}
   if(b=t.closest('[data-dopen]')){diaOpen=true;render();return}
