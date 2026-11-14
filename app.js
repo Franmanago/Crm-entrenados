@@ -184,7 +184,7 @@ function renderPanel(){
   </div>
 
   <h2 class="sec">Reparto de ${mesLbl(M)}</h2>
-  <div class="grid2">
+  <div class="grid2 g-rep">
     <div class="card"><div class="tbl-wrap"><table class="t-stack">
       <thead><tr><th></th><th>Esperado</th><th>Cobrado</th><th>Falta</th></tr></thead>
       <tbody>
@@ -667,8 +667,9 @@ function fichaHTML(e){
     <div><dt>Mensualidad</dt><dd>${sinCuota(e)?'Sin cuota'+(e.cuotaMotivo?` <span class="hint" style="display:inline">· ${esc(e.cuotaMotivo)}</span>`:''):money(monto(e))+(e.cuota==='fijo'?' <span class="hint" style="display:inline">(monto fijo)</span>':Number(e.promo)?' (promo '+pct(e.promo)+')':'')}</dd></div>
     <div><dt>Último pago</dt><dd>${fmtD(e.ultPago)}</dd></div>
     <div><dt>Próximo vencimiento</dt><dd>${fmtD(e.proxVenc)}${dv!==null&&es==='Activo'?` <span class="hint" style="display:inline">(${dv<0?'hace '+(-dv)+' d':dv===0?'hoy':'en '+dv+' d'})</span>`:''}</dd></div>
-    <div><dt>Rutina</dt><dd>${esc(e.modalidad||'—')}</dd></div>
-    <div><dt>Última rutina</dt><dd>${fmtD(e.ultRutina)}${dr!==null?` <span class="hint" style="display:inline">(${dr} d · ${periodo(e)})</span>`:''}</dd></div>
+    ${(()=>{const a=activaDe(e.id);if(a){const w=a.fechaEntrega?Math.floor(days(today(),parse(a.fechaEntrega))/7)+1:null,dur=Number(a.duracionSemanas)||4;
+      return `<div><dt>Rutina activa</dt><dd>${esc(a.nombre||'Rutina')}</dd></div><div><dt>Entregada</dt><dd>${fmtD(a.fechaEntrega)}${w?` <span class="hint" style="display:inline">(semana ${Math.min(w,dur)} de ${dur})</span>`:''}</dd></div>`}
+      return `<div><dt>Rutina</dt><dd>${esc(e.modalidad||'—')}</dd></div><div><dt>Última rutina</dt><dd>${fmtD(e.ultRutina)}${dr!==null?` <span class="hint" style="display:inline">(${dr} d · ${periodo(e)})</span>`:''}</dd></div>`})()}
     <div><dt>Fecha de inicio</dt><dd>${fmtD(e.inicio)}</dd></div>
     <div><dt>Pago registrado</dt><dd>${esc(e.pagoRegistrado)}</dd></div>
     <div><dt>Avisos de cuota en su link</dt><dd><select data-avpago="${esc(e.id)}" class="av-sel"><option value="" ${!e.avisoPago?'selected':''}>Según gimnasio (${avisoAuto(e)?'sí':'no'})</option><option value="si" ${e.avisoPago==='si'?'selected':''}>Sí, mostrar</option><option value="no" ${e.avisoPago==='no'?'selected':''}>No mostrar</option></select></dd></div>
@@ -2116,6 +2117,9 @@ document.addEventListener('click',e=>{
   const o=e.target.closest('[data-open]');if(o)openSheet(o.dataset.open);
 });
 $('#fab').addEventListener('click',()=>openSheet('__new','editar'));
+/* el botón "+ Nuevo entrenado" se achica a un círculo al bajar, para no tapar contenido */
+(()=>{let y0=scrollY,raf=0;addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const y=scrollY,f=$('#fab');if(!f)return;
+  const nearEnd=innerHeight+y>=document.documentElement.scrollHeight-140;f.classList.toggle('min',y>80&&(y>y0||nearEnd));f.classList.toggle('lift',nearEnd);y0=y})},{passive:true})})();
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&openId)closeSheet()});
 show(location.hash.slice(1)||'panel');
 

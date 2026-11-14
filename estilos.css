@@ -3,8 +3,8 @@
 :root{
   --bg:#F3F4F1; --surface:#FFFFFF; --surface-2:#F0F2ED; --line:#DCE0D8;
   --ink:#0C0F0E; --muted:#5A635E; --accent:#0C0F0E; --accent-ink:#C8F23A; --accent-soft:#ECF5CC;
-  --ok:#4D7A0C; --ok-soft:#F1F8DA; --ok-fill:#C8F23A; --ok-ink:#0C0F0E; --warn:#9A5B00; --warn-soft:#FBEBCF; --bad:#C0392B; --bad-soft:#F9E0DC;
-  --online:#7A3FB0; --online-soft:#EEE3F8; --cf:#B4461C; --cf-soft:#FBE4D9;
+  --ok:#4D7A0C; --ok-soft:#F1F8DA; --ok-fill:#C8F23A; --ok-ink:#0C0F0E; --warn:#9A5B00; --warn-soft:#FBEBCF; --bad:#B23325; --bad-soft:#F9E0DC;
+  --online:#7A3FB0; --online-soft:#EEE3F8; --cf:#A33F18; --cf-soft:#FBE4D9;
   --lima:#C8F23A; --brand-dot:#6E8A12;
   --display:"Bebas Neue","Barlow Condensed","Arial Narrow",Arial,sans-serif;
   --body:"DM Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
@@ -520,3 +520,22 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none;-webkit
 .it .u-l{gap:3px}
 .it .u-sel{width:auto;align-self:flex-start;border:0;background:none;padding:0 14px 0 0;margin:0;font:inherit;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;-webkit-appearance:none;appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%235A635E' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 2px center}
 .it .u-sel:focus-visible{outline:2px solid var(--ink);border-radius:4px}
+
+/* ---- paquete 1 · correcciones de la auditoría ---- */
+.g-rep{grid-template-columns:minmax(0,1fr)}
+@media (min-width:1100px){.g-rep{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}}
+.fab{display:inline-flex;align-items:center;gap:6px;transition:padding .18s,width .18s,transform .18s}
+.fab .fab-i{font-size:22px;line-height:1;font-weight:700}
+.fab.min{width:56px;height:56px;padding:0;justify-content:center}
+.fab.min .fab-t{display:none}
+main{padding-bottom:140px}
+.facts dt{font-size:12px}
+.bl-h label{font-size:12px}
+.it label{font-size:11.5px}
+.it .u-sel{font-size:11.5px}
+.ac-op small{font-size:12px}
+.asis-w{font-size:12px}
+.cw-lab{font-size:12px}
+.cw-hrs span{font-size:12px}
+.cw-ev span{font-size:12px}
+.rhead .sh i{font-size:11px}
