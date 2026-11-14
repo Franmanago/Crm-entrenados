@@ -139,7 +139,8 @@ function renderPanel(){
   if(!all.length){el.innerHTML='<div class="card pad"><b>Todavía no hay entrenados cargados.</b><p class="hint">Tocá “+ Nuevo entrenado” para agregar el primero.</p></div>';return}
   const meses=mesesList();
   if(!S.mes||!meses.includes(S.mes))S.mes=curMes();
-  const M=S.mes,isCur=M===curMes(),D=monthData(M);
+  const tabFin=S.ptab==='fin';
+  const M=tabFin?S.mes:curMes(),isCur=M===curMes(),D=monthData(M);
   const act=all.filter(isAct);
   const susp=all.filter(e=>estado(e)==='Suspendido').sort((a,b)=>name(a).localeCompare(name(b),'es'));
   const bajas=all.filter(e=>estado(e)==='Baja').sort((a,b)=>name(a).localeCompare(name(b),'es'));
@@ -170,14 +171,43 @@ function renderPanel(){
   const hist=meses.map(monthData);
   const maxF=Math.max(...hist.map(h=>Math.max(h.T.ff,h.T.fc)),1);
 
-  el.innerHTML=`
-  ${prevOpen?`<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>${mesLbl(prev)} terminó y todavía está abierto. Al cerrarlo se guarda quiénes estaban activos y cuánto pagaba cada uno.</span><button class="btn" data-cerrar="${prev}">Cerrar ${mesLbl(prev)}</button></div>`:''}
-  <div class="chips" id="mesChips" style="margin-bottom:14px">${meses.map(k=>`<button class="chip" data-mes="${k}" aria-pressed="${k===M}">${mesLbl(k)}${S.meses[k]?.cerrado?' ✓':''}</button>`).join('')}</div>
+  const hoyHTML=()=>`<div class="hoy-res"><span>${mesLbl(M)}: cobraste <b>${money(D.T.fc)}</b> de ${money(D.T.ff)}</span><span class="prog"><i style="width:${D.T.ff?Math.min(100,D.T.fc/D.T.ff*100):0}%"></i></span><button class="lnk-f" type="button" data-ptab="fin">Ver finanzas ›</button></div>
+  <h2 class="sec">${isCur?'Para hacer hoy':'Cuotas de '+mesLbl(M)}</h2>
+  <div class="grid2 hoy-grid">
+    ${isCur?`<div class="card">${head(`Vencen hoy · ${fmtShort(iso(today()))}`,'hoy',hoyV.length)}
+      ${hoyV.length?`<ul class="alist">${hoyV.map(e=>li(e,`${money(monto(e))}`,'pago')).join('')}</ul>${hoyV.length===1?'':''}`:'<div class="empty">Hoy no vence ninguna cuota.</div>'}</div>`:''}
+    ${isCur&&aus.length?`<div class="card">${head(`Sin entrenar hace ${S.cfg.alertas.dias} días o más`,'ausentes',aus.length)}
+      <ul class="alist">${aus.map(x=>li(x.e,`últ. ${fmtShort(x.ult)} · ${x.d} d`,'ausencia')).join('')}</ul><p class="hint pad" style="padding-top:6px">Solo entrenados que marcan asistencia en su link.</p></div>`:''}
+    ${isCur&&cargaAlta.length?`<div class="card falta-card"><div class="pad" style="padding-bottom:6px"><b>Carga en aumento</b> <span class="pill p-bad">${cargaAlta.length}</span><p class="hint">La carga de los últimos 7 días es más de ${S.cfg.alertas.acwr} veces su promedio de las 4 semanas anteriores.</p></div>
+      <ul class="alist">${cargaAlta.map(x=>`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}</button><span class="meta"><span class="pill p-bad">${x.a.ratio.toFixed(2)}</span> ${x.a.agudo} UA esta semana</span></li>`).join('')}</ul></div>`:''}
+    ${isCur?(()=>{const wd=((today().getDay()+6)%7)+1;const L=act.flatMap(e=>(e.horarios||[]).filter(h=>Number(h.dia)===wd).map(h=>({e,h}))).sort((x,y)=>x.h.hora.localeCompare(y.h.hora));
+      return L.length?`<div class="card"><div class="pad" style="padding-bottom:6px"><b>Hoy entrenan</b> <span class="pill p-ok">${L.length}</span><p class="hint">Según los horarios cargados en cada ficha.</p></div><ul class="alist">${L.map(({e,h})=>`<li><span class="hor-h">${esc(h.hora)}</span><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}</button><span class="meta">${gymTag(e)}${ultAsis(e.id)===iso(today())?' <span class="pill p-ok">✓ Ya marcó</span>':''}</span></li>`).join('')}</ul></div>`:''})():''}
+    ${isCur&&bienHoy.length?`<div class="card"><div class="pad" style="padding-bottom:6px"><b>Wellness de hoy: moderado o bajo</b> <span class="pill p-warn">${bienHoy.length}</span><p class="hint">Comparado con su propio promedio de las últimas 4 semanas. Si la rutina tiene el ajuste activado, ya entrenan con la carga reducida.</p></div>
+      <ul class="alist">${bienHoy.map(x=>`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}<br><span class="hint">${bienTxt(x.b.datos)}</span></button><span class="pill ${EST[x.st.k][1]}">${EST[x.st.k][0]}${activaDe(x.e.id)?.ajusteWellness?' · '+EST[x.st.k][2]+'%':''}</span></li>`).join('')}</ul></div>`:''}
+    <div class="card">${head(isCur?`Cobros de ${mesLbl(M)} · ${D.pagos.length} pagaron`:`Sin pagar en ${mesLbl(M)}`,'deuda',urg.length)}
+      ${pendInfo.length?`<ul class="alist">${pendInfo.map(x=>x.e?`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}</button><span class="meta"><span class="pill ${x.cls}">${esc(x.tag)}</span> ${money(x.r.monto)}</span>${msgBtn(x.e,x.kind,'Avisar')}</li>`:`<li><span class="nm">${esc(titleCase(x.r.nombre))}</span><span class="meta">${money(x.r.monto)}</span></li>`).join('')}</ul>`:'<div class="empty">Todos pagaron este mes.</div>'}
+    </div>
+    ${isCur?`<div class="card">${head('Vencen en los próximos 7 días','prox',prox.length)}
+      ${prox.length?`<ul class="alist">${prox.map(e=>li(e,`${fmtShort(e.proxVenc)} · ${diasVenc(e)===0?'hoy':diasVenc(e)+' d'}`,'pago')).join('')}</ul>`:'<div class="empty">No hay vencimientos esta semana.</div>'}
+    </div>
+    ${entregasCard()}
+    ${sinTerminarCard(true)}
+    <div class="card"><div class="pad" style="padding-bottom:6px"><b>Rutinas a revisar</b></div>
+      ${rut.length?`<ul class="alist">${rut.map(e=>`<li><button class="nm" data-open="${esc(e.id)}">${esc(name(e))}</button><span class="meta">${diasRutina(e)!==null&&diasRutina(e)>30?diasRutina(e)+' días':esc(e.modalidad)}</span></li>`).join('')}</ul>`:'<div class="empty">Todas las rutinas están al día.</div>'}
+    </div>
+    <div class="card"><div class="pad" style="padding-bottom:6px"><b>Agenda de vencimientos · 30 días</b></div>
+      ${agK.length?`<ul class="alist">${agK.map(k=>`<li><span class="nm" style="flex:0 0 64px;font-weight:600">${fmtShort(k)}</span><span class="meta" style="flex:1;white-space:normal">${ag[k].length} · ${ag[k].slice(0,4).map(e=>esc(firstName(e))).join(', ')}${ag[k].length>4?'…':''}</span><span class="meta">${money(ag[k].reduce((a,e)=>a+monto(e),0))}</span></li>`).join('')}</ul>`:'<div class="empty">Sin vencimientos próximos.</div>'}
+    </div>`:`<div class="card"><div class="pad" style="padding-bottom:6px"><b>Pagos registrados · ${D.pagos.length}</b></div>
+      ${D.pagos.length?`<ul class="alist">${D.pagos.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(p=>`<li><span class="nm">${esc(titleCase(p.nombre||S.ents[p.entrenadoId]?.nombre||p.entrenadoId))}</span><span class="meta">${fmtShort(p.fecha)} · ${money(p.monto)}${p.forma?' · '+esc(formaTxt(p)):''}</span></li>`).join('')}</ul>`:'<div class="empty">Sin pagos registrados.</div>'}
+    </div>`}
+  </div>
+
+`;
+  const finHTML=()=>`  <div class="chips" id="mesChips" style="margin-bottom:14px">${meses.map(k=>`<button class="chip" data-mes="${k}" aria-pressed="${k===M}">${mesLbl(k)}${S.meses[k]?.cerrado?' ✓':''}</button>`).join('')}</div>
   <h2 class="sec">${mesLbl(M)} ${D.cerrado?'<span class="pill p-mute">Cerrado</span>':isCur?'<span class="pill p-ok">En curso</span>':'<span class="pill p-warn">Abierto</span>'}</h2>
   <div class="seg" role="tablist"><button type="button" data-pv="ganado" aria-pressed="${S.pv!=='caja'}">Ganado</button><button type="button" data-pv="caja" aria-pressed="${S.pv==='caja'}">Caja</button></div>
   ${S.pv==='caja'?cajaHTML(M):`<div class="kpis">
-    <div class="card kpi hl"><div class="lbl">Tu ganancia cobrada</div><div class="val">${money(D.T.fc)}</div><div class="sub">de ${money(D.T.ff)} esperados</div></div>
-    <div class="card kpi"><div class="lbl">Cobrado</div><div class="val">${money(D.T.c)}</div><div class="sub">${Math.round(pctCob*100)}% de ${money(D.T.f)}</div><div class="prog" style="margin-top:8px"><i style="width:${pctCob*100}%"></i></div></div>
+    <div class="card kpi hl"><div class="lbl">Tu ganancia cobrada</div><div class="val">${money(D.T.fc)}</div><div class="sub">${D.T.ff?Math.round(D.T.fc/D.T.ff*100):0}% de ${money(D.T.ff)} esperados</div><div class="prog" style="margin-top:8px"><i style="width:${D.T.ff?Math.min(100,D.T.fc/D.T.ff*100):0}%"></i></div></div>
     <div class="card kpi"><div class="lbl">Falta cobrar</div><div class="val" style="color:var(--bad)">${money(D.T.p)}</div><div class="sub">${plural(D.pend.length,'entrenado','entrenados')}</div></div>
     <div class="card kpi"><div class="lbl">Plantel del mes</div><div class="val">${D.T.n}</div><div class="sub">${GYMS.map(g=>D.G[g].n+' '+GYM_LBL[g]).join(' · ')}</div></div>
     ${isCur?`<div class="card kpi"><div class="lbl">Rutinas a revisar</div><div class="val" style="color:var(--warn)">${rut.length}</div><div class="sub">+30 días o a cambiar</div></div>`:''}
@@ -214,7 +244,7 @@ function renderPanel(){
       <div class="legend"><button class="lnk-f" data-formas="ef"><i class="dot" style="background:var(--ok)"></i>Efectivo <b>${money(t.ef)}</b></button><button class="lnk-f" data-formas="tr"><i class="dot" style="background:var(--accent)"></i>Transferencia <b>${money(t.tr)}</b></button>${t.nd?`<button class="lnk-f" data-formas="nd"><i class="dot" style="background:var(--line)"></i>Sin dato <b>${money(t.nd)}</b></button>`:''}</div>
       <p class="hint" style="margin-top:8px">Tocá una forma de pago para ver quién pagó así. En los pagos mixtos se suma a cada columna la parte que corresponde. “Tu parte” aplica el % de cada gimnasio.</p></div></div>`})()}
 `}
-  <h2 class="sec">${isCur?'Para hacer hoy':'Cuotas de '+mesLbl(M)}</h2>
+${!isCur?`  <h2 class="sec">${isCur?'Para hacer hoy':'Cuotas de '+mesLbl(M)}</h2>
   <div class="grid2">
     ${isCur?`<div class="card">${head(`Vencen hoy · ${fmtShort(iso(today()))}`,'hoy',hoyV.length)}
       ${hoyV.length?`<ul class="alist">${hoyV.map(e=>li(e,`${money(monto(e))}`,'pago')).join('')}</ul>${hoyV.length===1?'':''}`:'<div class="empty">Hoy no vence ninguna cuota.</div>'}</div>`:''}
@@ -244,7 +274,7 @@ function renderPanel(){
     </div>`}
   </div>
 
-  <h2 class="sec">Resumen por mes</h2>
+`:''}  <h2 class="sec">Resumen por mes</h2>
   <div class="card"><div class="tbl-wrap"><table>
     <thead><tr><th>Mes</th><th>Plantel</th><th>Esperado</th><th>Cobrado</th><th>Falta</th><th>Fran cobrado</th>${GYMS.map(g=>`<th>${GYM_LBL[g]}</th>`).join('')}</tr></thead>
     <tbody>${hist.slice().reverse().map(h=>`<tr${h.M===M?' class="total"':''}><td><button class="nm" style="font-weight:600;border:0;background:none;padding:0;color:var(--accent)" data-mes="${h.M}">${mesLbl(h.M)}</button></td><td>${h.T.n}</td><td>${money(h.T.f)}</td><td>${money(h.T.c)}</td><td>${money(h.T.p)}</td><td><b>${money(h.T.fc)}</b></td>${GYMS.map(g=>`<td>${money(h.G[g].c)}</td>`).join('')}</tr>`).join('')}</tbody>
@@ -268,6 +298,13 @@ function renderPanel(){
     <div class="card pad"><b>Por plan</b>${Object.entries(plans).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="bar-row"><span>${esc(k)}</span><span class="bar"><i style="width:${v/maxP*100}%"></i></span><span style="text-align:right">${v}</span></div>`).join('')}</div>
     <div class="card pad"><b>Por estímulos semanales</b>${Object.entries(est).sort((a,b)=>a[0]-b[0]).map(([k,v])=>`<div class="bar-row"><span>${k} por semana</span><span class="bar"><i style="width:${v/maxE*100}%"></i></span><span style="text-align:right">${v}</span></div>`).join('')}</div>
   </div>`:''}`;
+  el.innerHTML=`
+  ${prevOpen?`<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>${mesLbl(prev)} terminó y todavía está abierto. Al cerrarlo se guarda quiénes estaban activos y cuánto pagaba cada uno.</span><button class="btn" data-cerrar="${prev}">Cerrar ${mesLbl(prev)}</button></div>`:''}
+  <div class="seg ptabs" role="tablist" aria-label="Secciones del panel"><button type="button" role="tab" data-ptab="hoy" aria-pressed="${!tabFin}" aria-selected="${!tabFin}">Hoy</button><button type="button" role="tab" data-ptab="fin" aria-pressed="${tabFin}" aria-selected="${tabFin}">Finanzas</button></div>
+  ${tabFin?finHTML():hoyHTML()}`;
+  const g=el.querySelector('.hoy-grid');
+  if(g){const ok=[];g.querySelectorAll(':scope>.card').forEach(c=>{const em=c.querySelector(':scope>.empty');if(em&&!c.querySelector('.alist')){ok.push(em.textContent.trim());c.remove()}});
+    if(ok.length)g.insertAdjacentHTML('afterend',`<div class="card ok-lines" aria-label="Sin pendientes">${ok.map(t=>`<div><span class="ok-ic" aria-hidden="true">✓</span>${esc(t)}</div>`).join('')}</div>`)}
   listasBuscables(el);
 }
 async function cerrarMes(M){
@@ -458,6 +495,7 @@ function rutinaInfo(e){
   return {k:'sin',txt:'Sin rutina',cls:'p-mute',sub:e.ultRutina?'últ. '+fmtShort(e.ultRutina):''};
 }
 /* ---------- LISTA ---------- */
+S.ptab=(()=>{try{return localStorage.getItem('entrena.ptab')==='fin'?'fin':'hoy'}catch(_){return 'hoy'}})();
 const SORTS=[['nombre','Entrenado'],['plan','Plan'],['monto','Mensualidad'],['rutina','Rutina'],['pago','Pago']];
 S.ord=(()=>{try{const o=JSON.parse(localStorage.getItem('entrena.ord')||'null');if(o&&SORTS.some(x=>x[0]===o.k)&&(o.d===1||o.d===-1))return o}catch(_){}return {k:'nombre',d:1}})();
 const guardarOrd=()=>{try{localStorage.setItem('entrena.ord',JSON.stringify(S.ord))}catch(_){}};
@@ -2110,6 +2148,7 @@ document.addEventListener('click',e=>{
   const fz=e.target.closest('[data-formas]');if(fz){openSheet('__formas','ver',{mes:S.mes,f:fz.dataset.formas});return}
   const mc=e.target.closest('[data-mes]');if(mc){S.mes=mc.dataset.mes;renderPanel();window.scrollTo(0,0);return}
   const pv=e.target.closest('[data-pv]');if(pv){S.pv=pv.dataset.pv;render();return}
+  const pt=e.target.closest('[data-ptab]');if(pt){S.ptab=pt.dataset.ptab;try{localStorage.setItem('entrena.ptab',S.ptab)}catch(_){}render();scrollTo({top:0});return}
   const lq=e.target.closest('[data-liq]');if(lq){const l=S.liqs.find(x=>x._id===lq.dataset.liq);if(l){S.lq={id:l._id,mes:l.mes,fecha:l.fecha,monto:l.monto,forma:l.forma||'efectivo',filas:(l.filas||[]).map(f=>({...f})),archivo:l.archivo||'',msg:''};openSheet('__liq','ver')}return}
   const ln=e.target.closest('[data-liqnew]');if(ln){S.lq=liqNueva();if(/^\d{4}-\d{2}$/.test(ln.dataset.liqnew))S.lq.mes=ln.dataset.liqnew;openSheet('__liq','ver');return}
   const rn=e.target.closest('[data-rend]');if(rn){S.rend={};openSheet('__rend','ver',rn.dataset.rend);return}

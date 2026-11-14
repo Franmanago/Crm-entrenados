@@ -539,3 +539,20 @@ main{padding-bottom:140px}
 .cw-hrs span{font-size:12px}
 .cw-ev span{font-size:12px}
 .rhead .sh i{font-size:11px}
+
+/* ---- paso 3 · panel Hoy / Finanzas ---- */
+.seg.ptabs{display:flex;max-width:360px;margin:0 0 14px}
+.seg.ptabs button{flex:1;padding:9px 12px;font-size:15px}
+.hoy-res{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 4px;font-size:14px}
+.hoy-res .prog{flex:1 1 120px;min-width:100px;margin:0}
+.hoy-res .lnk-f{font-weight:700;color:var(--accent);min-height:36px}
+.hoy-grid{align-items:start}
+.ok-lines{display:grid;gap:2px;padding:8px 16px;margin-top:14px}
+.ok-lines>div{display:flex;align-items:center;gap:10px;padding:6px 0;color:var(--muted);font-size:14px}
+.ok-lines .ok-ic{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:12px;font-weight:800;flex:0 0 22px}
+@media (max-width:560px){
+  .alist li{flex-wrap:wrap;row-gap:2px}
+  .alist li>.nm{flex:1 1 100%;white-space:normal}
+  .alist li>.meta{flex:1;white-space:normal}
+}
+@media (min-width:900px){.hoy-grid{display:block;columns:3 300px;column-gap:14px}.hoy-grid>.card{break-inside:avoid;display:inline-block;width:100%;margin:0 0 14px}}
