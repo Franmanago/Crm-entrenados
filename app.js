@@ -546,7 +546,7 @@ function renderRows(){
   const om=$('#ord-m');if(om)om.value=S.ord.k+':'+S.ord.d;
   $('#cnt').textContent=S.loaded?plural(list.length,'entrenado','entrenados'):'Cargando…';
   $('#rows').innerHTML=list.length?list.map(e=>{const es=estado(e);return `<button class="row" data-open="${esc(e.id)}">
-    <span class="c"><span class="n">${esc(name(e))}</span><br><span class="s">${gymTag(e)} ${esc(e.id)}</span></span>
+    <span class="c"><span class="n">${esc(name(e))}</span><br><span class="s">${gymTag(e)} ${esc(e.id)}</span><span class="m-plan">${esc(e.plan||'Sin plan')} · ${esc(e.estimulos||'?')}×/sem · <b>${sinCuota(e)?'Sin cuota':money(monto(e))}</b>${!sinCuota(e)&&Number(e.promo)&&e.cuota!=='fijo'?` <span class="m-promo">promo ${pct(e.promo)}</span>`:''}</span></span>
     <span class="c h">${esc(e.plan||'—')}<br><span class="s">${esc(e.estimulos)}×/sem</span></span>
     <span class="c h">${money(monto(e))}${Number(e.promo)?`<br><span class="s">promo ${pct(e.promo)}</span>`:''}</span>
     ${es==='Activo'?(()=>{const r=rutinaInfo(e),q=pagoInfo(e);return `<span class="c rp" data-l="Rutina"><span class="pill ${r.cls}">${esc(r.txt)}</span>${r.sub?`<br><span class="s">${esc(r.sub)}</span>`:''}</span>
@@ -1173,11 +1173,14 @@ const PAGO_F=[['todos','Todos'],['Pagó','Pagaron este mes'],['Al día','Al día
 const pagoEst=e=>pagoMes(e)?'Pagó':estadoPago(e);
 const pagoEstPill=k=>k==='Pagó'?'p-ok':pagoPill(k);
 function listadoPlanHTML(){
-  const fp=S.lpPago||'todos',fr=S.lpPlan||'todos';
-  const rows=Object.values(S.ents).filter(isAct).map(e=>({e,pl:estadoPlan(e),pg:pagoEst(e),pm:pagoMes(e),ch:cambiosDe(e,7).filter(x=>x.cambio).length})).sort((a,b)=>name(a.e).localeCompare(name(b.e),'es'));
+  const fp=S.lpPago||'todos',fr=S.lpPlan||'todos',fg=S.lpGym||'todos';
+  const okG=e=>fg==='todos'||gymOf(e)===fg;
+  const rows=Object.values(S.ents).filter(e=>isAct(e)&&okG(e)).map(e=>({e,pl:estadoPlan(e),pg:pagoEst(e),pm:pagoMes(e),ch:cambiosDe(e,7).filter(x=>x.cambio).length})).sort((a,b)=>name(a.e).localeCompare(name(b.e),'es'));
   const cP=k=>rows.filter(x=>(k==='todos'||x.pg===k)&&(fr==='todos'||x.pl.k===fr)).length,cR=k=>rows.filter(x=>(fp==='todos'||x.pg===fp)&&(k==='todos'||x.pl.k===k)).length;
   const L=rows.filter(x=>(fp==='todos'||x.pg===fp)&&(fr==='todos'||x.pl.k===fr));
-  return `<div class="card pad lp-f"><div><span class="lbl-s">Pago del mes</span><div class="chips">${PAGO_F.map(([k,l])=>`<button class="chip" data-lppago="${k}" aria-pressed="${k===fp}">${l} (${cP(k)})</button>`).join('')}</div></div>
+  const cG=k=>Object.values(S.ents).filter(e=>isAct(e)&&(k==='todos'||gymOf(e)===k)).length;
+  return `<div class="card pad lp-f"><div><span class="lbl-s">Gimnasio</span><div class="chips">${[['todos','Todos'],['LEVEL','LEVEL'],['CROSSFORCE','CrossForce'],['ONLINE','Online']].filter(([k])=>k==='todos'||cG(k)).map(([k,l])=>`<button class="chip" data-lpgym="${k}" aria-pressed="${k===fg}">${l} (${cG(k)})</button>`).join('')}</div></div>
+    <div><span class="lbl-s">Pago del mes</span><div class="chips">${PAGO_F.map(([k,l])=>`<button class="chip" data-lppago="${k}" aria-pressed="${k===fp}">${l} (${cP(k)})</button>`).join('')}</div></div>
     <div><span class="lbl-s">Estado de la rutina</span><div class="chips">${PLAN_F.filter(([k])=>k==='todos'||cR(k)).map(([k,l])=>`<button class="chip" data-lpplan="${k}" aria-pressed="${k===fr}">${l} (${cR(k)})</button>`).join('')}</div></div></div>
   <p class="count">${plural(L.length,'entrenado','entrenados')}</p>
   <div class="card tbl-wrap"><table class="lp"><thead><tr><th>Entrenado</th><th>Pago del mes</th><th>Rutina</th><th>Cambios del entrenado</th><th></th></tr></thead><tbody>
@@ -2136,6 +2139,7 @@ function handleRut(e){
   if(b=g('data-evista')){S.evista=b.dataset.evista;renderRutinas();return true}
   if(b=g('data-epago')){S.ePago=b.dataset.epago;renderRutinas();return true}
   if(b=g('data-lppago')){S.lpPago=b.dataset.lppago;renderRutinas();return true}
+  if(b=g('data-lpgym')){S.lpGym=b.dataset.lpgym;renderRutinas();return true}
   if(b=g('data-lpplan')){S.lpPlan=b.dataset.lpplan;renderRutinas();return true}
   if(b=g('data-hedit')){const e2=S.ents[b.dataset.hedit];S.horEdit={id:e2.id,hs:clone(e2.horarios||[])};if(!S.horEdit.hs.length)S.horEdit.hs=[{dia:1,hora:'08:00',dur:60}];renderSheet();return true}
   if(b=g('data-hadd')){horLeer();const u=S.horEdit.hs[S.horEdit.hs.length-1];S.horEdit.hs.push({dia:u?Math.min(7,Number(u.dia)+2):1,hora:u?.hora||'08:00',dur:u?.dur||60});renderSheet();return true}
