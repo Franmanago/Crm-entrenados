@@ -703,7 +703,12 @@ function fechaHTML(){
     <label class="fs-c fs-otra" aria-pressed="${fuera}">${fuera?fmt(fSel()):'Otra'}<small>fecha</small><input type="date" data-fotra="1" min="${iso(min)}" max="${hoy}" value="${fSel()}"></label></div>
     ${esHoy()?'':`<p class="fs-aviso">Estás cargando el <b>${esc(fLarga(fSel()))}</b>. Lo que tildes queda guardado en esa fecha. <button class="link" data-fecha="${hoy}">Volver a hoy</button></p>`}</div>`;
 }
-function render(){window.splashOff&&window.splashOff();
+/* redibujar sin perder el lugar: scroll, campo con foco y cursor */
+function render(){const ae=document.activeElement,d=ae&&ae.dataset||{};let f=null;
+  if(ae&&ae!==document.body&&document.getElementById('main')?.contains(ae)){const sel=ae.id?'#'+CSS.escape(ae.id):d.in&&d.uid?`[data-in="${d.in}"][data-uid="${d.uid}"]`:ae.name?`[name="${CSS.escape(ae.name)}"]`:null;if(sel){f={sel};try{f.a=ae.selectionStart;f.z=ae.selectionEnd}catch(_){}}}
+  const y=scrollY;render0();if(Math.abs(scrollY-y)>2)scrollTo(0,y);
+  if(f){const n=document.querySelector(f.sel);if(n){n.focus({preventScroll:true});try{if(f.a!=null)n.setSelectionRange(f.a,f.z)}catch(_){}}}}
+function render0(){window.splashOff&&window.splashOff();
   const R=D.rutina,E=D.entrenado;
   $('#hola').textContent='Hola '+titleCase(E.nombre).split(' ')[0]+'!';
   const av=avisoInfo();

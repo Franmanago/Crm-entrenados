@@ -592,3 +592,6 @@ details.umenu>summary::-webkit-details-marker{display:none}
 /* lista en celular: plan, veces por semana y mensualidad debajo del nombre */
 .row .m-plan{display:none}
 @media (max-width:760px){.row .m-plan{display:block;margin-top:3px;font-size:13px;color:var(--muted);white-space:normal}.row .m-plan b{color:var(--ink);font-weight:700}.row .m-promo{font-size:12px;color:var(--ok)}}
+
+/* al redibujar una hoja abierta no se repite la animación de entrada */
+.sheet.noanim{animation:none!important}

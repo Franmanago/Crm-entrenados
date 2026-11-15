@@ -624,10 +624,22 @@ function renderAjustes(){
 /* ---------- FICHA ---------- */
 let openId=null,sheetMode='ver',sheetArg=null,bulk=null;
 function openSheet(id,mode,arg){if(id!==openId){S.asW=0;S.asSec=null}openId=id;sheetMode=mode||'ver';sheetArg=arg||null;renderSheet();$('#overlay').hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){openId=null;bulk=null;$('#overlay').hidden=true;$('#overlay').innerHTML='';document.body.style.overflow=''}
+function closeSheet(){_shId=null;_shK='';openId=null;bulk=null;$('#overlay').hidden=true;$('#overlay').innerHTML='';document.body.style.overflow=''}
 function setMode(m,arg){sheetMode=m;sheetArg=arg||null;renderSheet()}
-let _shK='';
-function renderSheet(){const sb=document.querySelector('#overlay .sheet-b'),k=openId+'|'+sheetMode,st=sb&&_shK===k?sb.scrollTop:0;renderSheet0();_shK=k;if(st){const n=document.querySelector('#overlay .sheet-b');if(n)n.scrollTop=st}}
+/* Al volver a dibujar una pantalla, se conserva dónde estabas: scroll, listas internas y el campo con foco.
+   Así tocar un botón o guardar no "refresca" la vista ni la manda arriba. */
+function focoSel(root){const ae=document.activeElement;if(!ae||!root.contains(ae)||ae===document.body)return null;const d=ae.dataset;let sel=null;
+  if(ae.id)sel='#'+CSS.escape(ae.id);else if(d.p!=null&&d.f)sel=`[data-p="${d.p}"][data-f="${d.f}"]`;else if(d.h)sel=`[data-h="${d.h}"]`;else if(d.in&&d.uid)sel=`[data-in="${d.in}"][data-uid="${d.uid}"]`;else if(ae.name)sel=`[name="${CSS.escape(ae.name)}"]`;
+  if(!sel)return null;let a=null,z=null;try{a=ae.selectionStart;z=ae.selectionEnd}catch(_){}return {sel,a,z}}
+function focoVolver(root,f){if(!f)return;const n=root.querySelector(f.sel);if(!n)return;n.focus({preventScroll:true});try{if(f.a!=null)n.setSelectionRange(f.a,f.z)}catch(_){}}
+const INNER='.al-scroll,.tbl-wrap,.cw-body,.dm-p,[data-keep-scroll]';
+function conservar(root,fn){if(!root)return fn();const inn=[...root.querySelectorAll(INNER)].map(e=>[e.scrollTop,e.scrollLeft]),f=focoSel(root);fn();
+  [...root.querySelectorAll(INNER)].forEach((e,i)=>{const v=inn[i];if(v){e.scrollTop=v[0];e.scrollLeft=v[1]}});focoVolver(root,f)}
+let _shK='',_shId=null;
+function renderSheet(){const ov=$('#overlay'),sh=ov.querySelector('.sheet'),k=openId+'|'+sheetMode,same=!!sh&&_shId===openId,keep=same&&_shK===k,st=keep?sh.scrollTop:0;
+  const go=()=>renderSheet0();if(keep)conservar(ov,go);else go();
+  const n=ov.querySelector('.sheet');if(n){if(same)n.classList.add('noanim');if(keep)n.scrollTop=st}
+  _shK=k;_shId=openId}
 function renderSheet0(){
   const ov=$('#overlay');
   ov.oninput=null;ov.onchange=null;
@@ -2098,7 +2110,8 @@ function show(v){
   $('#fab').hidden=v!=='panel'&&v!=='lista';
   render();window.scrollTo(0,0);
 }
-function render(){
+function render(){const y=scrollY,v=$('#v-'+S.view);conservar(v,render0);if(Math.abs(scrollY-y)>2)scrollTo(0,y)}
+function render0(){
   if(S.view==='panel')renderPanel();else if(S.view==='lista')renderLista();else if(S.view==='calendario')renderCalendario();else if(S.view==='rutinas')renderRutinas();else if(!document.querySelector('#v-ajustes input:focus'))renderAjustes();
   if(openId&&openId!=='__bulk'&&sheetMode==='ver')renderSheet();
 }
