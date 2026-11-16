@@ -641,3 +641,13 @@ dialog.overlay[open]::backdrop{background:rgba(10,16,14,.5)}
 .no-pop .actions,.no-pop .user{position:relative}
 .no-pop .pmenu{top:calc(100% + 6px);right:0}
 .user .av{border-radius:50%;padding:0;width:36px;height:36px;min-height:0}
+
+/* ---- Paso C · fluidez ---- */
+/* Transición entre vistas: el encabezado y la barra de pestañas quedan fijos, solo el contenido se funde */
+header.top,.topbar{view-transition-name:encabezado}
+nav.tabs{view-transition-name:pestanas}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
+@media (prefers-reduced-motion: reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+/* La lista larga dibuja solo lo que está cerca de la pantalla (las primeras filas, siempre) */
+#rows .row:nth-child(n+12){content-visibility:auto;contain-intrinsic-size:auto none auto 64px}
+@media (max-width:760px){#rows .row:nth-child(n+12){contain-intrinsic-size:auto none auto 92px}}

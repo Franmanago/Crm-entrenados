@@ -434,6 +434,9 @@ details.why summary{min-height:32px}
 .mh-t b{font-family:var(--display);font-size:22px;font-weight:400;letter-spacing:.02em;text-transform:uppercase;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mh-t small{font-size:12.5px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body.mini-on .tmr-fab{display:none}
+/* Paso C · fluidez: transición corta al cambiar de vista o de día; nada si la persona pidió menos movimiento */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.16s}
+@media (prefers-reduced-motion: reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
 </style>
 </head>
 <body>
@@ -709,6 +712,8 @@ function fechaHTML(){
     ${esHoy()?'':`<p class="fs-aviso">Estás cargando el <b>${esc(fLarga(fSel()))}</b>. Lo que tildes queda guardado en esa fecha. <button class="link" data-fecha="${hoy}">Volver a hoy</button></p>`}</div>`;
 }
 /* redibujar sin perder el lugar: scroll, campo con foco y cursor */
+/* Transición suave entre Mi rutina / Mi progreso y entre días (View Transitions API, si el navegador la tiene) */
+function conTransicion(fn){if(!document.startViewTransition){fn();return}try{document.startViewTransition(fn)}catch(_){fn()}}
 function render(){const ae=document.activeElement,d=ae&&ae.dataset||{};let f=null;
   if(ae&&ae!==document.body&&document.getElementById('main')?.contains(ae)){const sel=ae.id?'#'+CSS.escape(ae.id):d.in&&d.uid?`[data-in="${d.in}"][data-uid="${d.uid}"]`:ae.name?`[name="${CSS.escape(ae.name)}"]`:null;if(sel){f={sel};try{f.a=ae.selectionStart;f.z=ae.selectionEnd}catch(_){}}}
   const y=scrollY;render0();if(Math.abs(scrollY-y)>2)scrollTo(0,y);
@@ -804,7 +809,7 @@ function logHTML(it,hoy,last){
 }
 document.addEventListener('click',ev=>{
   const t=ev.target;let b;
-  if(b=t.closest('[data-vista]')){vista=b.dataset.vista;render();window.scrollTo({top:0});return}
+  if(b=t.closest('[data-vista]')){vista=b.dataset.vista;conTransicion(()=>{render();window.scrollTo({top:0})});return}
   if(b=t.closest('[data-pej]')){progEj=b.dataset.pej;render();return}
   if(b=t.closest('[data-asis]')){marcarAsis(b);return}
   if(b=t.closest('[data-chk]')){tildar(b);return}
@@ -832,7 +837,7 @@ document.addEventListener('click',ev=>{
   if(b=t.closest('[data-editb]')){editB=true;render();return}
   if(b=t.closest('[data-editc]')){editC[b.dataset.editc]=true;render();return}
   if(b=t.closest('[data-sec]')){secI=Number(b.dataset.sec);diaI=0;store.set('sec',secI);render();return}
-  if(b=t.closest('[data-dia]')){diaI=Number(b.dataset.dia);movOpen=false;diaOpen=false;blOpen={};store.set('dia',diaI);render();return}
+  if(b=t.closest('[data-dia]')){diaI=Number(b.dataset.dia);movOpen=false;diaOpen=false;blOpen={};store.set('dia',diaI);conTransicion(render);return}
   if(b=t.closest('[data-hmov]')){movOpen=true;render();return}
   if(b=t.closest('[data-hcancel]')){movOpen=false;render();return}
   if(b=t.closest('[data-hdel]')){asisMover(b.dataset.hdel,b.dataset.f,null,b);return}

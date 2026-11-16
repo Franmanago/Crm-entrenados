@@ -2124,6 +2124,10 @@ function expHTML(){const o=S.calExp;return `<div class="card pad">
 
 /* ---------- navegación ---------- */
 const VIEWS=['panel','lista','calendario','rutinas','ajustes'];
+/* Transición suave entre vistas con la View Transitions API; sin soporte, el cambio es inmediato como antes */
+function conTransicion(fn){if(!document.startViewTransition){fn();return}try{document.startViewTransition(fn)}catch(_){fn()}}
+/* Varios cambios de datos que llegan juntos (al guardar se actualizan 2 o 3 colecciones) se dibujan una sola vez por cuadro */
+let _rq=0;function pedirRender(){if(_rq)return;_rq=requestAnimationFrame(()=>{_rq=0;render()})}
 function show(v){
   if(!VIEWS.includes(v))v='panel';S.view=v;
   VIEWS.forEach(k=>$('#v-'+k).hidden=k!==v);
@@ -2137,7 +2141,7 @@ function render0(){
   if(openId&&openId!=='__bulk'&&sheetMode==='ver')renderSheet();
 }
 document.querySelector('nav.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){if(location.hash!=='#'+b.dataset.view)location.hash=b.dataset.view;else show(b.dataset.view)}});
-window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+window.addEventListener('hashchange',()=>conTransicion(()=>show(location.hash.slice(1))));
 (function(){const el=$('#v-calendario');if(!el)return;
   el.addEventListener('click',e=>{const c=calSt();const g=k=>e.target.closest('['+k+']');let b;
     if(b=g('data-cmov')){calNav(Number(b.dataset.cmov));return}
@@ -2194,7 +2198,7 @@ document.addEventListener('click',e=>{
   const fz=e.target.closest('[data-formas]');if(fz){openSheet('__formas','ver',{mes:S.mes,f:fz.dataset.formas});return}
   const mc=e.target.closest('[data-mes]');if(mc){S.mes=mc.dataset.mes;renderPanel();window.scrollTo(0,0);return}
   const pv=e.target.closest('[data-pv]');if(pv){S.pv=pv.dataset.pv;render();return}
-  const pt=e.target.closest('[data-ptab]');if(pt){S.ptab=pt.dataset.ptab;try{localStorage.setItem('entrena.ptab',S.ptab)}catch(_){}render();scrollTo({top:0});return}
+  const pt=e.target.closest('[data-ptab]');if(pt){S.ptab=pt.dataset.ptab;try{localStorage.setItem('entrena.ptab',S.ptab)}catch(_){}conTransicion(()=>{render();scrollTo({top:0})});return}
   const lq=e.target.closest('[data-liq]');if(lq){const l=S.liqs.find(x=>x._id===lq.dataset.liq);if(l){S.lq={id:l._id,mes:l.mes,fecha:l.fecha,monto:l.monto,forma:l.forma||'efectivo',filas:(l.filas||[]).map(f=>({...f})),archivo:l.archivo||'',msg:''};openSheet('__liq','ver')}return}
   const ln=e.target.closest('[data-liqnew]');if(ln){S.lq=liqNueva();if(/^\d{4}-\d{2}$/.test(ln.dataset.liqnew))S.lq.mes=ln.dataset.liqnew;openSheet('__liq','ver');return}
   const rn=e.target.closest('[data-rend]');if(rn){S.rend={};openSheet('__rend','ver',rn.dataset.rend);return}
@@ -2225,7 +2229,7 @@ show(location.hash.slice(1)||'panel');
   const db=await window.DBReady;
   S.db=db;
   const got={e:false,h:false,p:false,m:false,r:false,j:false,t:false,g:false};
-  const done=()=>{if(Object.values(got).every(Boolean)){S.loaded=true;window.splashOff&&window.splashOff()}render()};
+  const done=()=>{if(Object.values(got).every(Boolean)){S.loaded=true;window.splashOff&&window.splashOff()}if(S.loaded)pedirRender();else render()};
   const onErr=()=>banner('Se perdió la conexión con la base de datos. Recargá la página.');
   db.collection('entrenados').onSnapshot(s=>{const m={};s.docs.forEach(d=>{m[d.id]={...d.data(),id:d.id}});S.ents=m;got.e=true;done()},onErr);
   db.collection('historial').onSnapshot(s=>{S.hist=s.docs.map(d=>({...d.data(),_id:d.id}));got.h=true;done()},onErr);
@@ -2234,11 +2238,11 @@ show(location.hash.slice(1)||'panel');
   db.collection('rutinas').onSnapshot(s=>{S.rutinas=s.docs.map(d=>({...d.data(),_id:d.id}));got.r=true;done()},onErr);
   db.collection('ejercicios').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.ejs=m;S.ejsV++;got.j=true;done()},onErr);
   db.collection('plantillas').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.plantillas=m;got.t=true;done()},onErr);
-  db.collection('eventos').onSnapshot(s=>{S.evs=s.docs.map(d=>({...d.data(),_id:d.id}));render()},()=>{});
-  db.collection('liquidaciones').onSnapshot(s=>{S.liqs=s.docs.map(d=>({...d.data(),_id:d.id}));render()},()=>{});
-  db.collection('rendiciones').onSnapshot(s=>{S.rends=s.docs.map(d=>({...d.data(),_id:d.id}));render()},()=>{});
+  db.collection('eventos').onSnapshot(s=>{S.evs=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
+  db.collection('liquidaciones').onSnapshot(s=>{S.liqs=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
+  db.collection('rendiciones').onSnapshot(s=>{S.rends=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
   db.collection('registros').onSnapshot(s=>{S.regs=s.docs.map(d=>({...d.data(),_id:d.id}));got.g=true;done()},onErr);
-  db.doc('config/general').onSnapshot(s=>{S.cfgRaw=s.exists?s.data():{};S.cfg=normCfg(s.exists?s.data():null);render()},onErr);
+  db.doc('config/general').onSnapshot(s=>{S.cfgRaw=s.exists?s.data():{};S.cfg=normCfg(s.exists?s.data():null);pedirRender()},onErr);
 })();
 document.addEventListener('change',async ev=>{const sel=ev.target.closest&&ev.target.closest('[data-avpago]');if(!sel)return;const id=sel.dataset.avpago,v=sel.value;
   if(await write(()=>S.db.collection('entrenados').doc(id).update({avisoPago:v}))){if(S.ents[id])S.ents[id].avisoPago=v;toast(v==='no'?'No verá avisos de cuota':v==='si'?'Verá los avisos de cuota':'Avisos según su gimnasio')}});
