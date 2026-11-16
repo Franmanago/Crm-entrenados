@@ -113,7 +113,7 @@ tbody tr:last-child td{border-bottom:0}
   .row .c.h{display:none}
 }
 /* sheet */
-.overlay{position:fixed;inset:0;background:rgba(10,16,14,.5);z-index:40;display:flex;justify-content:flex-end}
+.overlay{z-index:40}
 .sheet{background:var(--bg);width:min(560px,100%);height:100%;overflow-y:auto;display:flex;flex-direction:column;
   padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
 .sheet-h{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:12px 16px;z-index:2}
@@ -595,3 +595,18 @@ details.umenu>summary::-webkit-details-marker{display:none}
 
 /* al redibujar una hoja abierta no se repite la animación de entrada */
 .sheet.noanim{animation:none!important}
+
+/* ---- Paso A · hojas como <dialog> modal nativo ---- */
+dialog.overlay{inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;color:inherit;overflow:hidden}
+dialog.overlay[open]{display:flex;justify-content:flex-end}
+@media (max-width:760px){dialog.overlay[open]{align-items:flex-end}}
+/* sin estas dos reglas, el scroll sobre el fondo o dentro de la hoja mueve la página de atrás */
+dialog.overlay:modal{overscroll-behavior:contain}
+dialog.overlay::backdrop{background:rgba(10,16,14,.5);overflow:hidden;overscroll-behavior:contain;transition-property:background-color,display,overlay;transition-duration:.18s;transition-timing-function:ease-out;transition-behavior:allow-discrete}
+dialog.overlay[open]::backdrop{background:rgba(10,16,14,.5)}
+@starting-style{dialog.overlay[open]::backdrop{background:rgba(10,16,14,0)}}
+.sheet{overscroll-behavior:contain}
+/* el aviso como popover: anular los estilos por defecto del popover y mantener su lugar */
+#toast[popover]{inset:auto;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));margin:0;border:0;overflow:visible}
+#toast[popover]:not(:popover-open){display:none}
+#toast[hidden]{display:none!important}

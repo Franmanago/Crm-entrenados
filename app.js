@@ -93,7 +93,12 @@ const waKind=e=>{if(!isAct(e))return'vuelta';if(sinCuota(e))return'link';const p
 const msgBtn=(e,kind,label)=>`<button class="wa" data-msg="${esc(e.id)}" data-kind="${kind}">${WA}${esc(label||'Avisar')}</button>`;
 
 /* ---------- UI helpers ---------- */
-let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+/* El aviso va en la capa superior (popover) para verse también encima de una hoja modal abierta.
+   Sin soporte de popover, se muestra igual que antes (detrás de la hoja). */
+const POP=Object.hasOwn(HTMLElement.prototype,'popover');
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;
+  if(POP){try{if(t.matches(':popover-open'))t.hidePopover();t.showPopover()}catch(_){}}
+  clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true;if(POP)try{t.hidePopover()}catch(_){}},2600)}
 function banner(m){const b=$('#banner');b.textContent=m||'';b.hidden=!m}
 $('#today').textContent=today().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
 const plural=(n,a,b)=>n+' '+(n===1?a:b);
@@ -623,8 +628,19 @@ function renderAjustes(){
 
 /* ---------- FICHA ---------- */
 let openId=null,sheetMode='ver',sheetArg=null,bulk=null;
-function openSheet(id,mode,arg){if(id!==openId){S.asW=0;S.asSec=null}openId=id;sheetMode=mode||'ver';sheetArg=arg||null;renderSheet();$('#overlay').hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){_shId=null;_shK='';openId=null;bulk=null;$('#overlay').hidden=true;$('#overlay').innerHTML='';document.body.style.overflow=''}
+/* Las hojas (ficha, editor, formularios) se abren en un <dialog> modal nativo:
+   el navegador bloquea la página de atrás, mantiene el foco adentro, y cierra con Esc o con el gesto "atrás" del celular. */
+function openSheet(id,mode,arg){if(id!==openId){S.asW=0;S.asSec=null}openId=id;sheetMode=mode||'ver';sheetArg=arg||null;renderSheet();
+  const ov=$('#overlay'),t=ov.querySelector('.sheet-h h3');if(t)ov.setAttribute('aria-label',t.textContent);
+  if(!ov.open){if(typeof ov.showModal==='function')ov.showModal();else ov.setAttribute('open','')}}
+function closeSheet(){const ov=$('#overlay');_shId=null;_shK='';openId=null;bulk=null;
+  if(ov.open){if(typeof ov.close==='function')ov.close();else ov.removeAttribute('open')}ov.innerHTML='';delete ov.dataset.warned}
+(()=>{const ov=$('#overlay');
+  /* Esc / gesto atrás: antes de cerrar, respetar cambios sin guardar del editor y cerrar el autocompletar si está abierto */
+  ov.addEventListener('cancel',ev=>{
+    const ac=ov.querySelector('.ac-wrap .ac-pop');if(ac){ev.preventDefault();ac.remove();return}
+    if(openId==='__rut'&&S.edit&&S.edit.dirty&&!ov.dataset.warned){ev.preventDefault();ov.dataset.warned=1;toast('Hay cambios sin guardar. Volvé a cerrar para descartarlos');return}});
+  ov.addEventListener('close',()=>{if(openId)closeSheet()})})();
 function setMode(m,arg){sheetMode=m;sheetArg=arg||null;renderSheet()}
 /* Al volver a dibujar una pantalla, se conserva dónde estabas: scroll, listas internas y el campo con foco.
    Así tocar un botón o guardar no "refresca" la vista ni la manda arriba. */
@@ -2188,7 +2204,7 @@ $('#fab').addEventListener('click',()=>openSheet('__new','editar'));
 /* el botón "+ Nuevo entrenado" se achica a un círculo al bajar, para no tapar contenido */
 (()=>{let y0=scrollY,raf=0;addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const y=scrollY,f=$('#fab');if(!f)return;
   const nearEnd=innerHeight+y>=document.documentElement.scrollHeight-140;f.classList.toggle('min',y>80&&(y>y0||nearEnd));f.classList.toggle('lift',nearEnd);y0=y})},{passive:true})})();
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&openId)closeSheet()});
+/* Esc lo maneja el <dialog> nativo */
 show(location.hash.slice(1)||'panel');
 
 /* ---------- datos ---------- */
