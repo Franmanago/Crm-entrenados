@@ -651,3 +651,26 @@ nav.tabs{view-transition-name:pestanas}
 /* La lista larga dibuja solo lo que está cerca de la pantalla (las primeras filas, siempre) */
 #rows .row:nth-child(n+12){content-visibility:auto;contain-intrinsic-size:auto none auto 64px}
 @media (max-width:760px){#rows .row:nth-child(n+12){contain-intrinsic-size:auto none auto 92px}}
+
+/* ---- Paso D · formularios ---- */
+/* El error aparece recién cuando la persona dejó el campo (o intentó guardar), no mientras escribe */
+.form :is(input,select,textarea):user-invalid{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--surface,#fff))}
+.form label:has(> :is(input,select,textarea):user-invalid)::after{content:"⚠ Error: este dato es obligatorio.";display:block;color:var(--bad);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none}
+.form label:has(> input[type=date]:user-invalid)::after{content:"⚠ Error: elegí una fecha."}
+.form label:has(> input[type=number]:user-invalid)::after{content:"⚠ Error: escribí un número (0 o más)."}
+#login-form input:user-invalid,form:has(#login-email) input:user-invalid{border-color:var(--bad)}
+
+/* Pista de que la fila sigue de costado: se esfuma solo el borde donde hay más contenido (sin scripts) */
+@property --fade-start{syntax:"<length>";inherits:false;initial-value:0px}
+@property --fade-end{syntax:"<length>";inherits:false;initial-value:0px}
+@supports (animation-timeline:scroll()){
+  #v-lista .toolbar #chips{--fade-size:2.5rem;scroll-padding-inline:var(--fade-size);
+    -webkit-mask:none;mask:linear-gradient(black,black) no-clip subtract,linear-gradient(to right,black,transparent) 0 0/var(--fade-start) 100% no-repeat no-clip,linear-gradient(to right,transparent,black) 100% 0/var(--fade-end) 100% no-repeat no-clip;
+    animation:fade-ini linear both,fade-fin linear both;animation-timeline:scroll(self inline);animation-range:0 var(--fade-size),calc(100% - var(--fade-size)) 100%}
+}
+@keyframes fade-ini{to{--fade-start:var(--fade-size)}}
+@keyframes fade-fin{from{--fade-end:var(--fade-size)}}
+/* Navegadores sin animaciones por scroll: queda el esfumado fijo a la derecha */
+@supports not (animation-timeline:scroll()){
+  #v-lista .toolbar #chips{-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+}

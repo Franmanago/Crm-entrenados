@@ -437,6 +437,24 @@ body.mini-on .tmr-fab{display:none}
 /* Paso C · fluidez: transición corta al cambiar de vista o de día; nada si la persona pidió menos movimiento */
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.16s}
 @media (prefers-reduced-motion: reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+/* Paso D · los casilleros de reps y kg se ajustan a lo que se escribe */
+@supports (field-sizing:content){.campo input{field-sizing:content;width:auto;min-inline-size:76px;max-inline-size:100%}}
+@media (max-width:380px){@supports (field-sizing:content){.campo input{min-inline-size:70px}}}
+
+/* Pista de que la fila sigue de costado: se esfuma solo el borde donde hay más contenido (sin scripts) */
+@property --fade-start{syntax:"<length>";inherits:false;initial-value:0px}
+@property --fade-end{syntax:"<length>";inherits:false;initial-value:0px}
+@supports (animation-timeline:scroll()){
+  .tabs,.mh-bl .wrap{--fade-size:2.5rem;scroll-padding-inline:var(--fade-size);
+    -webkit-mask:none;mask:linear-gradient(black,black) no-clip subtract,linear-gradient(to right,black,transparent) 0 0/var(--fade-start) 100% no-repeat no-clip,linear-gradient(to right,transparent,black) 100% 0/var(--fade-end) 100% no-repeat no-clip;
+    animation:fade-ini linear both,fade-fin linear both;animation-timeline:scroll(self inline);animation-range:0 var(--fade-size),calc(100% - var(--fade-size)) 100%}
+}
+@keyframes fade-ini{to{--fade-start:var(--fade-size)}}
+@keyframes fade-fin{from{--fade-end:var(--fade-size)}}
+/* Navegadores sin animaciones por scroll: queda el esfumado fijo a la derecha */
+@supports not (animation-timeline:scroll()){
+  .tabs,.mh-bl .wrap{-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+}
 </style>
 </head>
 <body>
@@ -625,7 +643,9 @@ const esHoy=()=>fSel()===iso(today());
 const DIAS_N=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const fLarga=k=>{const d=parse(k);return DIAS_N[d.getDay()]+' '+fmt(k)};
 const cuando=()=>esHoy()?'hoy':'el '+fLarga(fSel());
-const anchoIn=v=>{const n=String(v||'').length;return n>4?`width:calc(${Math.min(n,12)}ch + 30px);font-size:${n>7?22:26}px`:''};
+/* Con field-sizing el casillero crece solo mientras se escribe; si el navegador no lo tiene, se calcula el ancho al dibujar */
+const FS=window.CSS&&CSS.supports&&CSS.supports('field-sizing','content');
+const anchoIn=v=>{const n=String(v||'').length;return n>4?(FS?'':`width:calc(${Math.min(n,12)}ch + 30px);`)+`font-size:${n>7?22:26}px`:''};
 const BQ=[['sueno','¿Cómo dormiste?','Muy mal','Excelente','sueño'],['fatiga','¿Qué tan cansado te sentís?','Agotado','Con mucha energía','energía'],['dolor','¿Tenés dolor muscular?','Mucho dolor','Sin dolor','dolor'],['estres','¿Cómo está tu nivel de estrés?','Muy estresado','Tranquilo','estrés'],['animo','¿Cómo está tu ánimo?','Muy bajo','Excelente','ánimo']];
 function bienHTML(gate){
   const r=regHoy('bien:');const d=r?.datos||{};
