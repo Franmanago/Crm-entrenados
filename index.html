@@ -13,7 +13,7 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700;900&display=swap">
-<link rel="stylesheet" href="estilos.css?v=20261116a">
+<link rel="stylesheet" href="estilos.css?v=20261116b">
 </head>
 <body>
 <div id="splash" aria-hidden="true"><div class="sp-in"><img src="icono.svg" alt="" width="132" height="132"><span class="sp-w">entrená<i>.</i></span></div></div>
@@ -41,7 +41,7 @@
     <button data-view="ajustes">Ajustes</button>
   </nav>
   <div class="date" id="today"></div>
-  <div class="user"><details class="umenu"><summary class="av" aria-label="Cuenta"><span id="user-ini">·</span></summary><div class="um-p"><span id="user-mail"></span><button id="logout" type="button">Salir</button></div></details></div>
+  <div class="user"><button type="button" class="av" popovertarget="umenu" aria-label="Cuenta"><span id="user-ini">·</span></button><div id="umenu" class="pmenu um-p" popover="auto" aria-label="Cuenta"><span id="user-mail"></span><button id="logout" type="button">Salir</button></div></div>
 </div></header>
 
 <main class="wrap">
@@ -54,15 +54,15 @@
 </main>
 <button class="fab" id="fab" aria-label="Nuevo entrenado"><span class="fab-i" aria-hidden="true">+</span><span class="fab-t">Nuevo entrenado</span></button>
 <dialog id="overlay" class="overlay" aria-label="Detalle"></dialog>
-<div id="toast" class="toast" popover="manual" role="status" hidden></div>
+<div role="region" aria-label="Avisos"><div id="toast" class="toast" popover="manual" hidden></div></div>
 
 
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="db.js?v=20261116a"></script>
-<script src="pdffonts.js?v=20261116a"></script>
-<script src="rutinapdf.js?v=20261116a"></script>
-<script src="app.js?v=20261116a"></script>
+<script src="db.js?v=20261116b"></script>
+<script src="pdffonts.js?v=20261116b"></script>
+<script src="rutinapdf.js?v=20261116b"></script>
+<script src="app.js?v=20261116b"></script>
 </body>
 </html>

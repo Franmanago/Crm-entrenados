@@ -585,9 +585,6 @@ details.umenu{position:relative}
 details.umenu>summary{list-style:none;cursor:pointer}
 details.umenu>summary::-webkit-details-marker{display:none}
 .av{display:grid!important;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font-weight:700;font-size:14px;color:var(--ink)}
-.um-p{position:absolute;right:0;top:calc(100% + 8px);z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.14);padding:12px;display:grid;gap:10px;min-width:220px}
-.user .um-p #user-mail{display:block!important;font-size:13px;color:var(--muted);word-break:break-all}
-.user .um-p button{min-height:38px;font-size:14px;font-weight:700;padding:6px 12px}
 
 /* lista en celular: plan, veces por semana y mensualidad debajo del nombre */
 .row .m-plan{display:none}
@@ -610,3 +607,37 @@ dialog.overlay[open]::backdrop{background:rgba(10,16,14,.5)}
 #toast[popover]{inset:auto;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));margin:0;border:0;overflow:visible}
 #toast[popover]:not(:popover-open){display:none}
 #toast[hidden]{display:none!important}
+
+/* ---- Paso B · menús con Popover API y posición con anchor positioning ---- */
+.pmenu{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.16);padding:6px;min-width:250px;max-width:min(320px,calc(100vw - 24px))}
+.pmenu:popover-open{display:grid}
+.pmenu>button{all:unset;cursor:pointer;display:grid;gap:1px;padding:10px 12px;border-radius:8px;min-height:44px;box-sizing:border-box;text-align:left}
+.pmenu>button:hover,.pmenu>button:focus-visible{background:var(--surface-2)}
+.pmenu>button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.pmenu b{font-size:14px;font-weight:700;color:var(--ink)}.pmenu small{font-size:12.5px;color:var(--muted)}
+.pm-t::after{content:"";display:inline-block;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin:-3px 2px 0 8px;vertical-align:middle}
+.um-p{display:none;gap:10px;padding:12px;min-width:220px}
+.um-p:popover-open{display:grid}
+.um-p #user-mail{display:block!important;font-size:13px;color:var(--muted);word-break:break-all}
+.um-p button{all:revert;min-height:40px;font:inherit;font-size:14px;font-weight:700;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
+/* Con anchor positioning: el menú cuelga de su botón y se da vuelta solo si no entra en pantalla */
+@supports (position-area: block-end) {
+  .pmenu{inset:auto;margin:6px 0;position-area:block-end span-inline-start;position-try-fallbacks:flip-block,flip-inline,flip-block flip-inline}
+  .pmenu.um-p{position-area:block-end span-inline-start}
+}
+/* Sin anchor positioning: panel abajo de la pantalla, centrado (en vez de quedar suelto en una esquina) */
+@supports not (position-area: block-end) {
+  .pmenu{position:fixed;inset:auto 0 0 0;margin:0 auto;width:min(420px,100%);max-width:100%;border-radius:14px 14px 0 0;padding:10px 10px calc(10px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion: no-preference){
+  .pmenu{opacity:0;translate:0 -4px;transition:opacity .15s,translate .15s,display .15s,overlay .15s;transition-behavior:allow-discrete}
+  .pmenu:popover-open{opacity:1;translate:0 0;transition-duration:.1s}
+  @starting-style{.pmenu:popover-open{opacity:0;translate:0 -4px}}
+}
+/* Navegadores sin popover */
+.no-pop .pmenu{display:none;position:absolute;z-index:60}
+.no-pop .pmenu.open{display:grid}
+.sr-live{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.no-pop .actions,.no-pop .user{position:relative}
+.no-pop .pmenu{top:calc(100% + 6px);right:0}
+.user .av{border-radius:50%;padding:0;width:36px;height:36px;min-height:0}

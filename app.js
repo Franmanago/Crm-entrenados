@@ -96,7 +96,12 @@ const msgBtn=(e,kind,label)=>`<button class="wa" data-msg="${esc(e.id)}" data-ki
 /* El aviso va en la capa superior (popover) para verse también encima de una hoja modal abierta.
    Sin soporte de popover, se muestra igual que antes (detrás de la hoja). */
 const POP=Object.hasOwn(HTMLElement.prototype,'popover');
-let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;
+/* Anuncio para lectores de pantalla: con una hoja modal abierta lo de afuera queda inerte, así que se anuncia desde la hoja */
+function anunciar(m){const ov=$('#overlay'),host=ov&&ov.open?ov:document.body;
+  if(typeof host.ariaNotify==='function'){try{host.ariaNotify(m);return}catch(_){}}
+  let lr=host.querySelector(':scope>.sr-live');if(!lr){lr=document.createElement('div');lr.className='sr-live';lr.setAttribute('aria-live','polite');host.appendChild(lr)}
+  lr.textContent='';setTimeout(()=>{lr.textContent=m},30)}
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;anunciar(m);
   if(POP){try{if(t.matches(':popover-open'))t.hidePopover();t.showPopover()}catch(_){}}
   clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true;if(POP)try{t.hidePopover()}catch(_){}},2600)}
 function banner(m){const b=$('#banner');b.textContent=m||'';b.hidden=!m}
@@ -648,7 +653,7 @@ function focoSel(root){const ae=document.activeElement;if(!ae||!root.contains(ae
   if(ae.id)sel='#'+CSS.escape(ae.id);else if(d.p!=null&&d.f)sel=`[data-p="${d.p}"][data-f="${d.f}"]`;else if(d.h)sel=`[data-h="${d.h}"]`;else if(d.in&&d.uid)sel=`[data-in="${d.in}"][data-uid="${d.uid}"]`;else if(ae.name)sel=`[name="${CSS.escape(ae.name)}"]`;
   if(!sel)return null;let a=null,z=null;try{a=ae.selectionStart;z=ae.selectionEnd}catch(_){}return {sel,a,z}}
 function focoVolver(root,f){if(!f)return;const n=root.querySelector(f.sel);if(!n)return;n.focus({preventScroll:true});try{if(f.a!=null)n.setSelectionRange(f.a,f.z)}catch(_){}}
-const INNER='.al-scroll,.tbl-wrap,.cw-body,.dm-p,[data-keep-scroll]';
+const INNER='.al-scroll,.tbl-wrap,.cw-body,[data-keep-scroll]';
 function conservar(root,fn){if(!root)return fn();const inn=[...root.querySelectorAll(INNER)].map(e=>[e.scrollTop,e.scrollLeft]),f=focoSel(root);fn();
   [...root.querySelectorAll(INNER)].forEach((e,i)=>{const v=inn[i];if(v){e.scrollTop=v[0];e.scrollLeft=v[1]}});focoVolver(root,f)}
 let _shK='',_shId=null;
@@ -1374,14 +1379,14 @@ function fichaRutinasHTML(e){
   return `<div class="card">
     <div class="pad" style="padding-bottom:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><b>Rutinas</b>
       <span class="actions">
-        <details class="dmenu"><summary class="btn pri">Nueva rutina</summary><div class="dm-p" role="menu">
-          <button type="button" role="menuitem" data-asignar="" data-para="${esc(e.id)}"><b>Desde plantilla</b><small>Elegí una de tus plantillas</small></button>
-          ${a?`<button type="button" role="menuitem" data-duprut="${esc(a._id)}"><b>Duplicar la actual</b><small>Parte de “${esc(a.nombre||'Rutina')}”</small></button>`:''}
-          <button type="button" role="menuitem" data-copiarde="${esc(e.id)}"><b>De otro entrenado</b><small>Copiá la rutina de alguien más</small></button>
-          <button type="button" role="menuitem" data-newrut="${esc(e.id)}"><b>Vacía</b><small>Empezá de cero</small></button></div></details>
-        <details class="dmenu"><summary class="btn">Con Claude</summary><div class="dm-p" role="menu">
-          <button type="button" role="menuitem" data-iaexp="${esc(e.id)}"><b>Copiar para Claude</b><small>Pedido con su rutina y registros, sin nombre</small></button>
-          <button type="button" role="menuitem" data-iaimp="${esc(e.id)}"><b>Importar de Claude</b><small>Pegá la rutina que armó Claude</small></button></div></details></span></div>
+        <button type="button" class="btn pri pm-t" popovertarget="pm-nueva">Nueva rutina</button><div id="pm-nueva" class="pmenu" popover="auto" aria-label="Nueva rutina">
+          <button type="button" data-asignar="" data-para="${esc(e.id)}"><b>Desde plantilla</b><small>Elegí una de tus plantillas</small></button>
+          ${a?`<button type="button" data-duprut="${esc(a._id)}"><b>Duplicar la actual</b><small>Parte de “${esc(a.nombre||'Rutina')}”</small></button>`:''}
+          <button type="button" data-copiarde="${esc(e.id)}"><b>De otro entrenado</b><small>Copiá la rutina de alguien más</small></button>
+          <button type="button" data-newrut="${esc(e.id)}"><b>Vacía</b><small>Empezá de cero</small></button></div>
+        <button type="button" class="btn pm-t" popovertarget="pm-claude">Con Claude</button><div id="pm-claude" class="pmenu" popover="auto" aria-label="Con Claude">
+          <button type="button" data-iaexp="${esc(e.id)}"><b>Copiar para Claude</b><small>Pedido con su rutina y registros, sin nombre</small></button>
+          <button type="button" data-iaimp="${esc(e.id)}"><b>Importar de Claude</b><small>Pegá la rutina que armó Claude</small></button></div></span></div>
     <ul class="alist">
       ${a?`<li><span class="nm" style="white-space:normal"><span class="pill p-ok">Activa</span> <b>${esc(a.nombre||'Rutina')}</b>${warn(a)}${faltaPill(a)}<br><span class="hint">Entregada ${fmtD(a.fechaEntrega)} · semana ${semanaActual(a)+1} de ${a.duracionSemanas||'?'}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn ic-b" data-pdf="${esc(a._id)}" title="Descargar PDF" aria-label="Descargar PDF">PDF</button><button class="btn ic-b" data-verrut="${esc(a._id)}" title="Ver como la ve el entrenado" aria-label="Ver rutina">Ver</button><button class="btn pri" data-editrut="${esc(a._id)}">Abrir</button></span></li>`:'<li><span class="nm hint">Sin rutina activa en la app. Creala con “Nueva rutina”.</span></li>'}
       ${c.map(r=>`<li><span class="nm" style="white-space:normal"><span class="pill p-warn">En cola</span> <b>${esc(r.nombre||'Rutina')}</b>${warn(r)}${faltaPill(r)}<br><span class="hint">Entrega sugerida ${fmtD(r.fechaSugerida)}${r.pospuesta?.motivo?' · '+esc(r.pospuesta.motivo):''}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="wa" data-entregar="${esc(r._id)}">Entregar</button><button class="btn" style="padding:5px 8px;font-size:13px" data-posponer="${esc(r._id)}">Posponer</button><button class="btn" style="padding:5px 8px;font-size:13px" data-pdf="${esc(r._id)}">PDF</button><button class="btn" style="padding:5px 8px;font-size:13px" data-editrut="${esc(r._id)}">Abrir</button></span></li>`).join('')}
@@ -2199,7 +2204,15 @@ document.addEventListener('click',e=>{
 /* encabezado: inicial de la cuenta; el email y "Salir" quedan en el menú */
 (()=>{const um=$('#user-mail'),ui=$('#user-ini');if(!um||!ui)return;const f=()=>{ui.textContent=(um.textContent.trim()[0]||'·').toUpperCase()};f();new MutationObserver(f).observe(um,{childList:true,characterData:true,subtree:true})})();
 /* menús desplegables: se cierran al elegir una opción o al tocar afuera */
-document.addEventListener('click',ev=>{document.querySelectorAll('details.dmenu[open],details.umenu[open]').forEach(d=>{if(!d.contains(ev.target)||ev.target.closest('.dm-p button'))d.open=false})});
+/* Menús desplegables con la Popover API (popover="auto"): el navegador los pone por encima de todo,
+   los cierra al tocar afuera o con Esc y devuelve el foco al botón. Al elegir una opción se cierran. */
+document.addEventListener('click',ev=>{const it=ev.target.closest('.pmenu button');if(!it)return;const pm=it.closest('.pmenu');
+  setTimeout(()=>{if(POP){try{pm.hidePopover()}catch(_){}}else pm.classList.remove('open')},0)});
+/* Navegadores sin popover: los mismos botones abren y cierran el panel con una clase */
+if(!POP){document.documentElement.classList.add('no-pop');
+  document.addEventListener('click',ev=>{const t=ev.target.closest('[popovertarget]');const all=[...document.querySelectorAll('.pmenu.open')];
+    if(t){const pm=document.getElementById(t.getAttribute('popovertarget'));all.forEach(x=>{if(x!==pm)x.classList.remove('open')});if(pm){pm.classList.toggle('open');t.setAttribute('aria-expanded',pm.classList.contains('open'))}return}
+    all.forEach(x=>{if(!x.contains(ev.target))x.classList.remove('open')})})}
 $('#fab').addEventListener('click',()=>openSheet('__new','editar'));
 /* el botón "+ Nuevo entrenado" se achica a un círculo al bajar, para no tapar contenido */
 (()=>{let y0=scrollY,raf=0;addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const y=scrollY,f=$('#fab');if(!f)return;
