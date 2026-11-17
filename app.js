@@ -27,7 +27,7 @@ function normCfg(raw){
   c.avisos={...AVISOS_DEF,...(raw.avisos||{}),gyms:{...AVISOS_DEF.gyms,...(raw.avisos?.gyms||{})}};
   return c;
 }
-const S={evs:[],liqs:[],rends:[],pv:'ganado',ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
+const S={equipos:[],tests:[],eqSel:null,evs:[],liqs:[],rends:[],pv:'ganado',ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
 const WA='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.5-.3Z"/></svg>';
 
 /* ---------- fechas ---------- */
@@ -664,6 +664,9 @@ function renderSheet(){const ov=$('#overlay'),sh=ov.querySelector('.sheet'),k=op
 function renderSheet0(){
   const ov=$('#overlay');
   ov.oninput=null;ov.onchange=null;
+  if(openId==='__test'){const a=sheetArg||{};if(!S.ents[a.eid]){closeSheet();return}ov.innerHTML=shell(a.id?'Editar test':'Nuevo test',testFormHTML(a));bindTest(a);return}
+  if(openId==='__equipo'){const a=sheetArg||{};ov.innerHTML=shell(a.id?'Editar equipo':'Nuevo equipo',equipoFormHTML(a));bindEquipo(a);return}
+  if(openId==='__tlote'){const a=sheetArg||{};const q=(S.equipos||[]).find(x=>x._id===a.eq);if(!q){closeSheet();return}ov.innerHTML=shell('Tests · '+q.nombre,loteHTML(a));ov.querySelector('.sheet').classList.add('wide');bindLote(a);return}
   if(openId==='__bulk'){ov.innerHTML=shell('Envío de mensajes',bulkHTML());bindBulk();return}
   if(openId==='__rut'){const R=S.edit.data;ov.innerHTML=shell(S.edit.col==='plantillas'?(S.edit.id?'Plantilla':'Nueva plantilla'):(R.nombre||'Rutina'),editorHTML());ov.querySelector('.sheet').classList.add('wide');bindEditor();return}
   if(openId==='__ej'){ov.innerHTML=shell(S.ejEdit.id?'Ejercicio':'Nuevo ejercicio',ejHTML());bindEj();return}
@@ -1409,6 +1412,7 @@ function fichaRutinasHTML(e){
     <select id="rep-mes" class="search" style="flex:0 1 170px">${ms.map(k=>`<option value="${k}" ${k===def?'selected':''}>${mesLbl(k)}</option>`).join('')}</select>
     <span id="rep-vsw" hidden style="display:flex;gap:6px;align-items:center">vs <select id="rep-vs" class="search" style="flex:0 1 170px">${ms.map(k=>`<option value="${k}" ${k===vs?'selected':''}>${mesLbl(k)}</option>`).join('')}</select></span>
     <button class="btn pri" type="button" id="rep-go">Descargar</button></div></div>`})()}
+  ${testsFichaHTML(e)}
   <div class="card"><div class="pad" style="padding-bottom:4px"><b>Marcas (RM)</b><p class="hint">Los kg de los ejercicios con % se calculan con estas marcas, redondeando a ${S.cfg.redondeo||2.5} kg. Los grises se calculan solos.</p></div>
     <form id="rmf" class="pad form cols3" style="padding-top:6px">${(S.cfg.rmDefs||[]).map(d=>{const own=(e.rm||{})[d.mov];const der=!own&&rmValue(e,d.mov);return `<label>${esc(titleCase(d.mov))}<input data-rm="${esc(d.mov)}" type="number" min="0" step="0.5" value="${esc(own??'')}" placeholder="${der?String(+der.toFixed(1)):''}"></label>`}).join('')}
       <div class="full actions"><button class="btn" type="submit">Guardar marcas</button></div></form></div>`;
@@ -2123,7 +2127,7 @@ function expHTML(){const o=S.calExp;return `<div class="card pad">
   <p class="hint">Para un solo evento, tocalo en el calendario y usá “Agregar a Google Calendar”.</p></div>`}
 
 /* ---------- navegación ---------- */
-const VIEWS=['panel','lista','calendario','rutinas','ajustes'];
+const VIEWS=['panel','lista','calendario','rutinas','equipos','ajustes'];
 /* Transición suave entre vistas con la View Transitions API; sin soporte, el cambio es inmediato como antes */
 function conTransicion(fn){if(!document.startViewTransition){fn();return}try{document.startViewTransition(fn)}catch(_){fn()}}
 /* Varios cambios de datos que llegan juntos (al guardar se actualizan 2 o 3 colecciones) se dibujan una sola vez por cuadro */
@@ -2137,7 +2141,7 @@ function show(v){
 }
 function render(){const y=scrollY,v=$('#v-'+S.view);conservar(v,render0);if(Math.abs(scrollY-y)>2)scrollTo(0,y)}
 function render0(){
-  if(S.view==='panel')renderPanel();else if(S.view==='lista')renderLista();else if(S.view==='calendario')renderCalendario();else if(S.view==='rutinas')renderRutinas();else if(!document.querySelector('#v-ajustes input:focus'))renderAjustes();
+  if(S.view==='panel')renderPanel();else if(S.view==='lista')renderLista();else if(S.view==='calendario')renderCalendario();else if(S.view==='rutinas')renderRutinas();else if(S.view==='equipos')renderEquipos();else if(!document.querySelector('#v-ajustes input:focus'))renderAjustes();
   if(openId&&openId!=='__bulk'&&sheetMode==='ver')renderSheet();
 }
 document.querySelector('nav.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){if(location.hash!=='#'+b.dataset.view)location.hash=b.dataset.view;else show(b.dataset.view)}});
@@ -2219,6 +2223,146 @@ if(!POP){document.documentElement.classList.add('no-pop');
     all.forEach(x=>{if(!x.contains(ev.target))x.classList.remove('open')})})}
 $('#fab').addEventListener('click',()=>openSheet('__new','editar'));
 /* el botón "+ Nuevo entrenado" se achica a un círculo al bajar, para no tapar contenido */
+/* ---------- EQUIPO PRO · Etapa 1: plantel y tests ---------- */
+/* Tests físicos con historial (colección «tests») y equipos con su plantel (colección «equipos»).
+   La VAM y el sprint son la base de los ritmos; el 1RM sigue guardándose en la ficha (e.rm) para que las rutinas lo usen como siempre. */
+const TCAMPOS=[
+  {k:'vam',l:'VAM',u:'m/s',d:2,min:2,max:7,step:'0.01',mejor:1},
+  {k:'cmj',l:'CMJ',u:'cm',d:1,min:5,max:100,step:'0.5',mejor:1},
+  {k:'abk',l:'Abalakov',u:'cm',d:1,min:5,max:110,step:'0.5',mejor:1},
+  {k:'t10',l:'10 m',u:'s',d:2,min:1,max:4,step:'0.01',mejor:-1},
+  {k:'t20',l:'20 m',u:'s',d:2,min:2,max:6,step:'0.01',mejor:-1},
+  {k:'t30',l:'30 m',u:'s',d:2,min:3,max:8,step:'0.01',mejor:-1},
+  {k:'peso',l:'Peso',u:'kg',d:1,min:30,max:200,step:'0.1',mejor:0}
+];
+const nfx=(n,d=0)=>Number(n).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const testsDe=id=>(S.tests||[]).filter(t=>t.entrenadoId===id).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.ts||0)-(a.ts||0));
+/* último valor cargado de cada campo (un test puede no tener todos los campos) */
+function ultimoTest(id){const ts=testsDe(id),u={};TCAMPOS.forEach(c=>{const t=ts.find(x=>x[c.k]!=null&&x[c.k]!=='');if(t)u[c.k]={v:Number(t[c.k]),f:t.fecha}});
+  const y=ts.find(x=>x.yoyo);if(y)u.yoyo={v:y.yoyo,f:y.fecha};u.fecha=ts[0]?.fecha||null;return u}
+function deltaTest(id,c,t){const ts=testsDe(id),i=ts.indexOf(t),p=ts.slice(i+1).find(x=>x[c.k]!=null&&x[c.k]!=='');
+  if(!p||t[c.k]==null||t[c.k]==='')return '';const dv=Number(t[c.k])-Number(p[c.k]);if(Math.abs(dv)<1e-9)return '<span class="t-d">= anterior</span>';
+  const bien=c.mejor===0?null:Math.sign(dv)===c.mejor;return `<span class="t-d ${bien==null?'':bien?'up':'down'}">${dv>0?'▲':'▼'} ${nfx(Math.abs(dv),c.d)}</span>`}
+const semanasDesde=f=>f?Math.floor(days(today(),parse(f))/7):null;
+const eqDe=id=>(S.equipos||[]).filter(q=>(q.jugadores||[]).includes(id));
+
+function testsFichaHTML(e){
+  const ts=testsDe(e.id),u=ultimoTest(e.id),eqs=eqDe(e.id);
+  const head=`<div class="pad" style="padding-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div><b>Tests físicos</b>${eqs.length?` ${eqs.map(q=>`<span class="pill p-mute">${esc(q.nombre)}</span>`).join(' ')}`:''}<p class="hint">VAM, saltos y sprint con su historial. La VAM y el sprint marcan los ritmos de carrera; el 1RM, los kilos.</p></div><button class="btn" type="button" data-tnew="${esc(e.id)}">Cargar test</button></div>`;
+  if(!ts.length)return `<div class="card">${head}<div class="empty">Todavía no tiene tests cargados.</div></div>`;
+  const last=ts[0],sem=semanasDesde(u.fecha);
+  const vam=u.vam?u.vam.v:null;
+  return `<div class="card">${head}
+    <div class="t-grid">${TCAMPOS.filter(c=>u[c.k]).map(c=>`<div class="t-v"><span class="l">${c.l}</span><b>${nfx(u[c.k].v,c.d)}<small> ${c.u}</small></b>${u[c.k].f===last.fecha?deltaTest(e.id,c,last):`<span class="t-d">${fmtShort(u[c.k].f)}</span>`}</div>`).join('')}
+      ${u.yoyo?`<div class="t-v"><span class="l">Yo-Yo IR1</span><b>${esc(u.yoyo.v)}</b><span class="t-d">${fmtShort(u.yoyo.f)}</span></div>`:''}</div>
+    ${vam?`<p class="hint pad" style="padding-top:0">VAM ${nfx(vam*3.6,1)} km/h · 1000 m al 100 % en ${(()=>{const s=1000/vam;return Math.floor(s/60)+':'+String(Math.round(s%60)).padStart(2,'0')})()} · último test ${fmtD(u.fecha)}${sem!=null&&sem>=8?` <span class="pill p-warn">hace ${sem} semanas</span>`:''}</p>`:''}
+    <ul class="timeline">${ts.slice(0,6).map(t=>`<li><span class="d">${fmtD(t.fecha)}</span><span class="t">${TCAMPOS.filter(c=>t[c.k]!=null&&t[c.k]!=='').map(c=>`${c.l} ${nfx(t[c.k],c.d)}`).join(' · ')||'—'}${t.yoyo?' · Yo-Yo '+esc(t.yoyo):''}${t.notas?` <span class="hint" style="display:inline">· ${esc(t.notas)}</span>`:''}</span><button class="del" type="button" data-tedit="${esc(t._id)}" aria-label="Editar test del ${fmtD(t.fecha)}">Editar</button></li>`).join('')}</ul></div>`}
+
+function testFormHTML(a){
+  const e=S.ents[a.eid]||{},t=a.id?(S.tests||[]).find(x=>x._id===a.id)||{}:{},rm=e.rm||{};
+  const v=k=>t[k]!=null?t[k]:'';
+  return `<form id="tf" class="form pad" novalidate>
+    <p class="hint full">${esc(name(e))}${a.id?' · editando el test del '+fmtD(t.fecha):''}. Cargá solo lo que se midió; lo demás puede quedar vacío.</p>
+    <label>Fecha<input id="tf-fecha" type="date" required value="${esc(t.fecha||iso(today()))}"></label>
+    <label>Yo-Yo IR1 (nivel)<input id="tf-yoyo" placeholder="Ej: 15:1" value="${esc(v('yoyo'))}"></label>
+    ${TCAMPOS.map(c=>`<label>${c.l} (${c.u})<input id="tf-${c.k}" type="number" inputmode="decimal" min="${c.min}" max="${c.max}" step="${c.step}" value="${esc(v(c.k))}"></label>`).join('')}
+    <label class="full">Notas<input id="tf-notas" placeholder="Ej: cancha de parquet, después de entrar en calor 15 min" value="${esc(v('notas'))}"></label>
+    ${(S.cfg.rmDefs||[]).some(d=>!d.base)?`<fieldset class="full tf-rm"><legend>Marcas (1RM) medidas en este test</legend><div class="form cols3">${(S.cfg.rmDefs||[]).filter(d=>!d.base).map(d=>`<label>${esc(titleCase(d.mov))}<input data-trm="${esc(d.mov)}" type="number" min="0" step="0.5" inputmode="decimal" value="${esc((t.rm||{})[d.mov]??'')}" placeholder="${esc(rm[d.mov]??'')}"></label>`).join('')}</div>
+      <label class="av-g"><input type="checkbox" id="tf-upd" checked> Actualizar las marcas de la ficha con estos valores</label></fieldset>`:''}
+    <p class="hint full" id="tf-msg" role="alert"></p>
+    <div class="full actions">${a.id?`<button class="btn danger" type="button" data-tdel="${esc(a.id)}">${S.tArm===a.id?'Tocá de nuevo para borrar':'Borrar test'}</button>`:''}<span style="flex:1"></span><button class="btn" type="button" data-tback>Cancelar</button><button class="btn pri" type="submit">Guardar test</button></div>
+  </form>`}
+function leerTest(){
+  const d={fecha:$('#tf-fecha').value,yoyo:$('#tf-yoyo').value.trim(),notas:$('#tf-notas').value.trim()},rm={};let bad='';
+  TCAMPOS.forEach(c=>{const el=$('#tf-'+c.k),x=el.value.trim();if(x==='')return;const n=Number(x.replace(',','.'));if(!isFinite(n)||n<c.min||n>c.max){bad=bad||`${c.l}: tiene que estar entre ${c.min} y ${c.max} ${c.u}.`;return}d[c.k]=n});
+  document.querySelectorAll('[data-trm]').forEach(i=>{const n=Number(i.value);if(i.value!==''&&n>0)rm[i.dataset.trm]=n});
+  if(!d.fecha)bad='Elegí la fecha del test.';
+  if(!bad&&d.t10&&d.t20&&d.t10>=d.t20)bad='El tiempo de 10 m tiene que ser menor que el de 20 m.';
+  if(!bad&&d.t20&&d.t30&&d.t20>=d.t30)bad='El tiempo de 20 m tiene que ser menor que el de 30 m.';
+  if(!bad&&!TCAMPOS.some(c=>d[c.k]!=null)&&!d.yoyo&&!Object.keys(rm).length)bad='Cargá al menos un valor.';
+  if(Object.keys(rm).length)d.rm=rm;
+  return {d,bad}}
+function bindTest(a){const ov=$('#overlay');
+  ov.onclick=async ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
+    if(ev.target.closest('[data-tback]')){S.tArm=null;openSheet(a.eid);return}
+    const dl=ev.target.closest('[data-tdel]');if(dl){if(S.tArm!==a.id){S.tArm=a.id;renderSheet();return}S.tArm=null;
+      if(await write(()=>S.db.collection('tests').doc(a.id).delete())){toast('Test borrado');openSheet(a.eid)}}};
+  $('#tf').onsubmit=async ev=>{ev.preventDefault();const {d,bad}=leerTest();const msg=$('#tf-msg');if(bad){msg.textContent=bad;return}
+    const e=S.ents[a.eid];const doc={...d,entrenadoId:a.eid,ts:a.id?((S.tests||[]).find(x=>x._id===a.id)||{}).ts||Date.now():Date.now()};
+    const ok=a.id?await write(()=>S.db.collection('tests').doc(a.id).set(doc)):await write(()=>S.db.collection('tests').add(doc));if(!ok)return;
+    const up=$('#tf-upd');if(d.rm&&up&&up.checked)await write(()=>S.db.collection('entrenados').doc(a.eid).update({rm:{...(e.rm||{}),...d.rm}}));
+    if(!a.id)await addHist(a.eid,'Evaluación física','Test: '+[TCAMPOS.filter(c=>d[c.k]!=null).map(c=>`${c.l} ${nfx(d[c.k],c.d)} ${c.u}`).join(' · '),d.yoyo?'Yo-Yo '+d.yoyo:'',d.rm?Object.entries(d.rm).map(([k,v])=>`${titleCase(k)} ${v} kg`).join(' · '):''].filter(Boolean).join(' · '),d.fecha);
+    toast(a.id?'Test actualizado':'Test guardado');openSheet(a.eid)}}
+
+/* ----- vista Equipos ----- */
+function renderEquipos(){
+  const el=$('#v-equipos');if(!el)return;
+  const eqs=(S.equipos||[]).slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
+  if(!eqs.find(q=>q._id===S.eqSel))S.eqSel=eqs[0]?._id||null;
+  const q=eqs.find(x=>x._id===S.eqSel);
+  const top=`<div class="eq-top"><div><h2 class="eq-h">Equipos</h2><p class="hint">Plantel y tests de cada equipo. Es la primera etapa de Equipo Pro: después se suma la temporada y la planificación por semanas.</p></div><button class="btn pri" type="button" data-eqnew>Nuevo equipo</button></div>`;
+  if(!eqs.length){el.innerHTML=top+`<div class="card pad eq-empty"><b>Todavía no hay equipos.</b><p class="hint">Creá uno (por ejemplo «AFALP Primera»), sumá a los jugadores que ya son entrenados de la app y cargá sus tests: VAM, saltos, sprint y 1RM.</p><div><button class="btn pri" type="button" data-eqnew>Crear el primer equipo</button></div></div>`;return}
+  const mov=(S.cfg.rmDefs||[]).filter(d=>!d.base).slice(0,4).map(d=>d.mov);
+  const js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean).sort((a,b)=>(a.posicion||'~').localeCompare(b.posicion||'~')||name(a).localeCompare(name(b)));
+  const U=Object.fromEntries(js.map(e=>[e.id,ultimoTest(e.id)]));
+  const prom=k=>{const v=js.map(e=>U[e.id][k]?.v).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
+  const sinTest=js.filter(e=>!U[e.id].fecha).length,viejos=js.filter(e=>{const s=semanasDesde(U[e.id].fecha);return s!=null&&s>=8}).length;
+  const cell=(e,c)=>{const x=U[e.id][c.k];return x?`<td class="num">${nfx(x.v,c.d)}</td>`:'<td class="num muted">—</td>'};
+  el.innerHTML=top+`${eqs.length>1?`<div class="chips eq-chips">${eqs.map(x=>`<button class="chip" type="button" data-eqsel="${esc(x._id)}" aria-pressed="${x._id===q._id}">${esc(x.nombre)}</button>`).join('')}</div>`:''}
+  <div class="card"><div class="pad eq-head"><div><h3>${esc(q.nombre)}</h3><p class="hint">${esc([q.deporte,q.categoria].filter(Boolean).join(' · ')||'Equipo')} · ${plural(js.length,'jugador','jugadores')}</p></div>
+    <div class="actions"><button class="btn" type="button" data-eqedit="${esc(q._id)}">Editar equipo y plantel</button>${js.length?`<button class="btn pri" type="button" data-eqlote="${esc(q._id)}">Cargar tests del plantel</button>`:''}</div></div>
+    ${js.length?`<div class="eq-kpis"><div><b>${prom('vam')!=null?nfx(prom('vam'),2):'—'}</b><span>VAM media (m/s)</span></div><div><b>${prom('t30')!=null?nfx(prom('t30'),2):'—'}</b><span>30 m medio (s)</span></div><div><b>${prom('cmj')!=null?nfx(prom('cmj'),1):'—'}</b><span>CMJ medio (cm)</span></div><div><b>${sinTest+viejos}</b><span>${sinTest?plural(sinTest,'sin test','sin test'):'sin tests pendientes'}${viejos?` · ${viejos} con más de 8 semanas`:''}</span></div></div>
+    <div class="tbl-wrap"><table class="eq-t"><thead><tr><th>Jugador</th><th>Posición</th><th>Último test</th>${TCAMPOS.filter(c=>c.k!=='peso').map(c=>`<th class="num">${c.l} <small>${c.u}</small></th>`).join('')}${mov.map(m=>`<th class="num">${esc(titleCase(m))} <small>kg</small></th>`).join('')}<th></th></tr></thead>
+    <tbody>${js.map(e=>{const s=semanasDesde(U[e.id].fecha);return `<tr><td><button class="lnk" type="button" data-open="${esc(e.id)}">${esc(name(e))}</button></td><td>${esc(e.posicion||'—')}</td>
+      <td>${U[e.id].fecha?`${fmtShort(U[e.id].fecha)}${s>=8?' <span class="pill p-warn">'+s+' sem</span>':''}`:'<span class="pill p-mute">Sin test</span>'}</td>
+      ${TCAMPOS.filter(c=>c.k!=='peso').map(c=>cell(e,c)).join('')}${mov.map(m=>{const v=(e.rm||{})[m]??rmValue(e,m);return `<td class="num">${v?nfx(v,v%1?1:0):'<span class="muted">—</span>'}</td>`}).join('')}
+      <td><button class="btn sm" type="button" data-tnew="${esc(e.id)}">Test</button></td></tr>`}).join('')}</tbody></table></div>`
+    :`<div class="empty">El equipo no tiene jugadores. Tocá «Editar equipo y plantel» para sumar entrenados.</div>`}</div>`;
+}
+function equipoFormHTML(a){const q=a.id?(S.equipos||[]).find(x=>x._id===a.id)||{}:{};const sel=new Set(a.sel||q.jugadores||[]);
+  const ents=Object.values(S.ents).filter(e=>estado(e)!=='Baja'||sel.has(e.id)).sort((x,y)=>name(x).localeCompare(name(y)));const fq=(a.q||'').toLowerCase();
+  return `<form id="eqf" class="form pad">
+    <label class="full">Nombre del equipo<input id="eq-n" required placeholder="Ej: AFALP Primera" value="${esc(a.n??q.nombre??'')}"></label>
+    <label>Deporte<input id="eq-d" placeholder="Ej: Handball" value="${esc(a.d??q.deporte??'Handball')}"></label>
+    <label>Categoría<input id="eq-c" placeholder="Ej: Liga de Honor Plata" value="${esc(a.c??q.categoria??'')}"></label>
+    <div class="full"><div class="eq-pick-h"><b>Plantel</b> <span class="hint" style="display:inline" id="eq-cnt" aria-live="polite">${plural(sel.size,'elegido','elegidos')}</span><input id="eq-q" class="search" type="search" placeholder="Buscar entrenado" value="${esc(a.q||'')}" autocomplete="off"></div>
+      <div class="eq-pick">${ents.filter(e=>!fq||(e.nombre||'').toLowerCase().includes(fq)||sel.has(e.id)).map(e=>`<label class="av-g"><input type="checkbox" data-eqj="${esc(e.id)}" ${sel.has(e.id)?'checked':''}> ${esc(name(e))} <span class="hint" style="display:inline">${esc(e.posicion||gymOf(e)||'')}</span></label>`).join('')||'<p class="hint">No hay entrenados con ese nombre.</p>'}</div>
+      <p class="hint">La posición de cada jugador se edita en su ficha (Editar → Posición).</p></div>
+    <p class="hint full" id="eq-msg" role="alert"></p>
+    <div class="full actions">${a.id?`<button class="btn danger" type="button" data-eqdel>${S.eqArm===a.id?'Tocá de nuevo para borrar':'Borrar equipo'}</button>`:''}<span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`}
+function bindEquipo(a){const ov=$('#overlay');
+  const leer=()=>{a.n=$('#eq-n').value;a.d=$('#eq-d').value;a.c=$('#eq-c').value;a.sel=[...ov.querySelectorAll('[data-eqj]:checked')].map(i=>i.dataset.eqj).concat((a.sel||[]).filter(id=>!ov.querySelector(`[data-eqj="${CSS.escape(id)}"]`)))};
+  ov.oninput=ev=>{if(ev.target.id==='eq-q'){leer();a.q=ev.target.value;renderSheet()}};
+  ov.onchange=ev=>{if(ev.target.dataset.eqj!=null){leer();const c=$('#eq-cnt');if(c)c.textContent=plural(new Set(a.sel).size,'elegido','elegidos')}};
+  ov.onclick=async ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){S.eqArm=null;closeSheet();return}
+    if(ev.target.closest('[data-eqdel]')){if(S.eqArm!==a.id){S.eqArm=a.id;leer();renderSheet();return}S.eqArm=null;if(await write(()=>S.db.collection('equipos').doc(a.id).delete())){toast('Equipo borrado');closeSheet()}}};
+  $('#eqf').onsubmit=async ev=>{ev.preventDefault();leer();const n=(a.n||'').trim();if(!n){$('#eq-msg').textContent='Poné un nombre al equipo.';return}
+    const prev=a.id?(S.equipos||[]).find(x=>x._id===a.id)||{}:{};const doc={...prev,nombre:n,deporte:(a.d||'').trim(),categoria:(a.c||'').trim(),jugadores:[...new Set(a.sel||[])],ts:prev.ts||Date.now()};delete doc._id;
+    let ok;if(a.id)ok=await write(()=>S.db.collection('equipos').doc(a.id).set(doc));else{try{const r=await S.db.collection('equipos').add(doc);S.eqSel=r.id;ok=true}catch(_){toast('No se pudo guardar');ok=false}}
+    if(ok){toast(a.id?'Equipo actualizado':'Equipo creado');closeSheet()}}}
+/* carga de tests de todo el plantel en una sola pantalla (día de evaluación) */
+const LOTE=['vam','cmj','abk','t10','t20','t30'];
+function loteHTML(a){const q=(S.equipos||[]).find(x=>x._id===a.eq)||{};const js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean).sort((x,y)=>name(x).localeCompare(name(y)));const C=TCAMPOS.filter(c=>LOTE.includes(c.k));
+  return `<form id="lf" class="pad" novalidate><div class="form"><label>Fecha del test<input id="lf-fecha" type="date" required value="${esc(a.fecha||iso(today()))}"></label><p class="hint" style="align-self:end">Completá solo lo que se midió. Se guarda un test por jugador con al menos un valor.</p></div>
+    <div class="tbl-wrap" style="margin-top:12px"><table class="eq-t lote"><thead><tr><th>Jugador</th>${C.map(c=>`<th>${c.l} <small>${c.u}</small></th>`).join('')}</tr></thead>
+    <tbody>${js.map(e=>`<tr><td>${esc(name(e))}</td>${C.map(c=>`<td><input type="number" inputmode="decimal" data-lj="${esc(e.id)}" data-lk="${c.k}" min="${c.min}" max="${c.max}" step="${c.step}" aria-label="${esc(c.l+' de '+name(e))}" value="${esc(((a.v||{})[e.id]||{})[c.k]??'')}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <p class="hint" id="lf-msg" role="alert" style="margin-top:8px"></p>
+    <div class="actions" style="margin-top:8px"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Guardar tests</button></div></form>`}
+function bindLote(a){const ov=$('#overlay');
+  ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};
+  $('#lf').onsubmit=async ev=>{ev.preventDefault();const f=$('#lf-fecha').value,msg=$('#lf-msg');if(!f){msg.textContent='Elegí la fecha del test.';return}
+    const by={};let bad='';ov.querySelectorAll('[data-lj]').forEach(i=>{if(i.value==='')return;const c=TCAMPOS.find(x=>x.k===i.dataset.lk),n=Number(i.value);if(!isFinite(n)||n<c.min||n>c.max){bad=bad||`${name(S.ents[i.dataset.lj])} · ${c.l}: entre ${c.min} y ${c.max} ${c.u}.`;i.focus();return}(by[i.dataset.lj]=by[i.dataset.lj]||{})[c.k]=n});
+    if(!bad)for(const[id,d]of Object.entries(by)){if(d.t10&&d.t20&&d.t10>=d.t20||d.t20&&d.t30&&d.t20>=d.t30){bad=`${name(S.ents[id])}: los tiempos tienen que crecer de 10 a 30 m.`;break}}
+    if(bad){msg.textContent=bad;return}const ids=Object.keys(by);if(!ids.length){msg.textContent='No cargaste ningún valor.';return}
+    let n=0;for(const id of ids){const d=by[id];if(await write(()=>S.db.collection('tests').add({...d,fecha:f,entrenadoId:id,ts:Date.now()}))){n++;await addHist(id,'Evaluación física','Test: '+TCAMPOS.filter(c=>d[c.k]!=null).map(c=>`${c.l} ${nfx(d[c.k],c.d)} ${c.u}`).join(' · '),f)}}
+    toast(plural(n,'test guardado','tests guardados'));closeSheet()}}
+document.addEventListener('click',ev=>{const t=ev.target.closest&&ev.target.closest('[data-tnew],[data-tedit],[data-eqnew],[data-eqedit],[data-eqsel],[data-eqlote]');if(!t)return;const D=t.dataset;
+  if(D.tnew!=null){S.tArm=null;openSheet('__test','ver',{eid:D.tnew});return}
+  if(D.tedit!=null){const x=(S.tests||[]).find(y=>y._id===D.tedit);if(x){S.tArm=null;openSheet('__test','ver',{eid:x.entrenadoId,id:x._id})}return}
+  if(D.eqnew!=null){S.eqArm=null;openSheet('__equipo','ver',{});return}
+  if(D.eqedit!=null){S.eqArm=null;openSheet('__equipo','ver',{id:D.eqedit});return}
+  if(D.eqsel!=null){S.eqSel=D.eqsel;render();return}
+  if(D.eqlote!=null){openSheet('__tlote','ver',{eq:D.eqlote});return}});
 (()=>{let y0=scrollY,raf=0;addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const y=scrollY,f=$('#fab');if(!f)return;
   const nearEnd=innerHeight+y>=document.documentElement.scrollHeight-140;f.classList.toggle('min',y>80&&(y>y0||nearEnd));f.classList.toggle('lift',nearEnd);y0=y})},{passive:true})})();
 /* Esc lo maneja el <dialog> nativo */
@@ -2238,6 +2382,8 @@ show(location.hash.slice(1)||'panel');
   db.collection('rutinas').onSnapshot(s=>{S.rutinas=s.docs.map(d=>({...d.data(),_id:d.id}));got.r=true;done()},onErr);
   db.collection('ejercicios').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.ejs=m;S.ejsV++;got.j=true;done()},onErr);
   db.collection('plantillas').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.plantillas=m;got.t=true;done()},onErr);
+  db.collection('equipos').onSnapshot(s=>{S.equipos=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
+  db.collection('tests').onSnapshot(s=>{S.tests=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
   db.collection('eventos').onSnapshot(s=>{S.evs=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
   db.collection('liquidaciones').onSnapshot(s=>{S.liqs=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
   db.collection('rendiciones').onSnapshot(s=>{S.rends=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
