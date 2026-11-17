@@ -1068,7 +1068,7 @@ document.addEventListener('submit',async ev=>{
     const sem=D.rutina.fechaEntrega?Math.floor((today()-parse(D.rutina.fechaEntrega))/6048e5):0;
     const dist=D.rutina.distribucion&&D.rutina.distribucion[sem%D.rutina.distribucion.length];
     const k=D.rutina.id+':'+sem;
-    if(store.get('rut')!==k){store.set('rut',k);secI=0;diaI=dist?dist[0]:0;store.set('sec',secI);store.set('dia',diaI)}
+    if(store.get('rut')!==k){store.set('rut',k);secI=D.rutina.equipo?Math.max(0,Math.min(sem,(D.rutina.secciones||[]).length-1)):0;diaI=dist?dist[0]:0;if(D.rutina.equipo){const wd=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][(today().getDay()+6)%7],ds=((D.rutina.secciones||[])[secI]||{}).dias||[],ix=ds.findIndex(d=>String(d.nombre||'').endsWith(wd));if(ix>=0)diaI=ix}store.set('sec',secI);store.set('dia',diaI)}
     else{secI=Number(store.get('sec'))||0;diaI=Number(store.get('dia'))||0}
   }
   render();
