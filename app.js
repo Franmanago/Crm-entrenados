@@ -379,7 +379,7 @@ const liqsDe=g=>S.liqs.filter(l=>(l.gym||'CROSSFORCE')===g).sort((a,b)=>(b.mes||
 const liqMes=M=>liqsDe('CROSSFORCE').find(l=>l.mes===M)||null;
 function liqDeEnt(eid){const L=liqsDe('CROSSFORCE');if(!L.length)return null;const ult=L[0];for(const l of L){const f=(l.filas||[]).find(x=>x.eid===eid);if(f)return {l,f,ultima:l===ult,ult}}return {l:null,f:null,ult}}
 function esperadoFila(f){const e=f.eid&&S.ents[f.eid];const pc=pctFran('CROSSFORCE');if(e)return Math.round(monto(e)*pc);const b=Number(S.cfg.gyms.CROSSFORCE.tarifas[String(f.veces)])||0;return Math.round(b*pc)}
-async function leerXLSX(buf,hojaRe){
+async function leerXLSX(buf,hojaRe,opt={}){
   const u8=new Uint8Array(buf),dv=new DataView(buf);let eo=-1;
   for(let i=u8.length-22;i>=Math.max(0,u8.length-70000);i--)if(dv.getUint32(i,true)===0x06054b50){eo=i;break}
   if(eo<0)throw new Error('El archivo no parece un Excel (.xlsx).');
@@ -394,6 +394,7 @@ async function leerXLSX(buf,hojaRe){
   if(hojaRe){const wbx=await get('xl/workbook.xml'),rl=await get('xl/_rels/workbook.xml.rels');if(wbx&&rl){const sh=[...X(wbx).getElementsByTagName('sheet')],rels=[...X(rl).getElementsByTagName('Relationship')];
     const m=sh.find(s=>hojaRe.test((s.getAttribute('name')||'').trim()));if(m){const rid=m.getAttribute('r:id')||m.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');const r=rels.find(x=>x.getAttribute('Id')===rid);
       if(r){const tg=r.getAttribute('Target').replace(/^\/?(xl\/)?/,'');hoja='xl/'+tg}}}}
+  if(!hoja&&hojaRe&&opt.estricta)return null;
   if(!hoja)hoja=files['xl/worksheets/sheet1.xml']?'xl/worksheets/sheet1.xml':Object.keys(files).filter(k=>/^xl\/worksheets\/[^/]+\.xml$/.test(k)).sort()[0];
   if(!hoja)throw new Error('No encontré hojas en el Excel.');
   const doc=X(await get(hoja)),aoa=[];
@@ -402,7 +403,7 @@ async function leerXLSX(buf,hojaRe){
     if(t==='s')val=ss[Number(v)]??'';else if(t==='inlineStr')val=[...c.getElementsByTagName('t')].map(x=>x.textContent).join('');else if(t==='str'||t==='e')val=v??'';else if(t==='b')val=v==='1';else if(v!=null&&v!=='')val=Number(v);
     row[ci]=val});aoa[ri]=row});
   /* celdas combinadas: con hoja elegida por nombre, se copia el valor a todo el rango (ej. «PRETEMPORADA» en 6 semanas) */
-  if(hojaRe){const col=t=>{let c=0;for(const ch of t)c=c*26+ch.charCodeAt(0)-64;return c-1};
+  if(hojaRe&&!opt.sinComb){const col=t=>{let c=0;for(const ch of t)c=c*26+ch.charCodeAt(0)-64;return c-1};
     doc.querySelectorAll('mergeCells > mergeCell').forEach(m=>{const mm=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m.getAttribute('ref')||'');if(!mm)return;
       const c0=col(mm[1]),r0=+mm[2]-1,c1=col(mm[3]),r1=+mm[4]-1,v=aoa[r0]&&aoa[r0][c0];if(v==null||v==='')return;
       for(let r=r0;r<=r1;r++){aoa[r]=aoa[r]||[];for(let c=c0;c<=c1;c++)if(aoa[r][c]==null||aoa[r][c]==='')aoa[r][c]=v}})}
@@ -681,6 +682,7 @@ function renderSheet0(){
   if(openId==='__tptab'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Tabla de la temporada',tpTabHTML(a));ov.querySelector('.sheet').classList.add('wide');bindTpTab(a);return}
   if(openId==='__tpent'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Entregar al plantel',tpEntHTML(a));bindTpEnt(a);return}
   if(openId==='__epform'){const a=sheetArg||{};ov.innerHTML=shell('Fórmulas de Equipo Pro',epFormHTML(a));ov.querySelector('.sheet').classList.add('wide');bindEpForm(a);return}
+  if(openId==='__tpsync'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Actualizar desde Excel',tpSyncHTML(a));bindTpSync(a);return}
   if(openId==='__tpcfg'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Ajustes de la temporada',tpCfgHTML(a));bindTpCfg(a);return}
   if(openId==='__bulk'){ov.innerHTML=shell('Envío de mensajes',bulkHTML());bindBulk();return}
   if(openId==='__rut'){const R=S.edit.data;ov.innerHTML=shell(S.edit.col==='plantillas'?(S.edit.id?'Plantilla':'Nueva plantilla'):(R.nombre||'Rutina'),editorHTML());ov.querySelector('.sheet').classList.add('wide');bindEditor();return}
@@ -757,7 +759,8 @@ function fichaHTML(e){
     <div><dt>Último pago</dt><dd>${fmtD(e.ultPago)}</dd></div>
     <div><dt>Próximo vencimiento</dt><dd>${fmtD(e.proxVenc)}${dv!==null&&es==='Activo'?` <span class="hint" style="display:inline">(${dv<0?'hace '+(-dv)+' d':dv===0?'hoy':'en '+dv+' d'})</span>`:''}</dd></div>
     ${(()=>{const a=activaDe(e.id);if(a){const w=a.fechaEntrega?Math.floor(days(today(),parse(a.fechaEntrega))/7)+1:null,dur=Number(a.duracionSemanas)||4;
-      return `<div><dt>Rutina activa</dt><dd>${esc(a.nombre||'Rutina')}</dd></div><div><dt>Entregada</dt><dd>${fmtD(a.fechaEntrega)}${w?` <span class="hint" style="display:inline">(semana ${Math.min(w,dur)} de ${dur})</span>`:''}</dd></div>`}
+      const pe=a.equipo?null:rutDe(e.id).find(r=>r.estado==='activa'&&r.equipo);
+      return `<div><dt>${a.equipo?'Plan del equipo':'Rutina activa'}</dt><dd>${esc(a.nombre||'Rutina')}</dd></div><div><dt>Entregada</dt><dd>${fmtD(a.fechaEntrega)}${w?` <span class="hint" style="display:inline">(semana ${Math.min(w,dur)} de ${dur})</span>`:''}</dd></div>${pe?`<div><dt>Plan del equipo</dt><dd>${esc(pe.nombre)} <span class="hint" style="display:inline">(también lo ve en su link)</span></dd></div>`:''}`}
       return `<div><dt>Rutina</dt><dd>${esc(e.modalidad||'—')}</dd></div><div><dt>Última rutina</dt><dd>${fmtD(e.ultRutina)}${dr!==null?` <span class="hint" style="display:inline">(${dr} d · ${periodo(e)})</span>`:''}</dd></div>`})()}
     ${e.inicio?`<div><dt>Fecha de inicio</dt><dd>${fmtD(e.inicio)}</dd></div>`:''}
     <div><dt>Pago registrado</dt><dd>${esc(e.pagoRegistrado)}</dd></div>
@@ -1032,8 +1035,9 @@ function kgItem(it,e){
   if(it.pct&&it.rm&&e){const rv=rmValue(e,it.rm);if(rv){const k=mround(rv*Number(it.pct)/100,S.cfg.redondeo);return {txt:String(+k.toFixed(2)),calc:true}}return {txt:'',calc:false,falta:true}}
   return {txt:it.kg||'',calc:false};
 }
-const rutDe=id=>S.rutinas.filter(r=>r.entrenadoId===id);
-const activaDe=id=>rutDe(id).filter(r=>r.estado==='activa').sort((a,b)=>(b.fechaEntrega||'').localeCompare(a.fechaEntrega||''))[0];
+/* las rutinas de equipo activas van al final: «la rutina activa» del entrenado es siempre la propia si tiene una */
+const rutDe=id=>{const a=S.rutinas.filter(r=>r.entrenadoId===id),eq=r=>r.equipo&&r.estado==='activa';return [...a.filter(r=>!eq(r)),...a.filter(eq)]};
+const activaDe=id=>rutDe(id).filter(r=>r.estado==='activa').sort((a,b)=>(!!a.equipo)-(!!b.equipo)||(b.fechaEntrega||'').localeCompare(a.fechaEntrega||''))[0];
 const colaDe=id=>rutDe(id).filter(r=>r.estado==='cola').sort((a,b)=>(a.fechaSugerida||'9').localeCompare(b.fechaSugerida||'9'));
 const diasDe=r=>Math.max(0,...(r.secciones||[]).map(s=>(s.dias||[]).length));
 function portalUrl(e){
@@ -1468,7 +1472,7 @@ async function entregar(rid,btn){
   if(f.length&&btn&&btn.dataset.armed!=='1'){btn.dataset.armed='1';btn.classList.add('danger');btn.textContent='Sin terminar: tocá de nuevo para entregar igual';toast('Falta completar: '+f.slice(0,2).map(x=>x.lugar+' ('+x.txt+')').join(' · '));return}
   const e=S.ents[r.entrenadoId];
   const t=iso(today());
-  for(const a of rutDe(r.entrenadoId).filter(x=>x.estado==='activa'))await write(()=>S.db.collection('rutinas').doc(a._id).update({estado:'finalizada',fechaFin:t}));
+  for(const a of rutDe(r.entrenadoId).filter(x=>x.estado==='activa'&&!x.equipo))await write(()=>S.db.collection('rutinas').doc(a._id).update({estado:'finalizada',fechaFin:t}));
   if(!await write(()=>S.db.collection('rutinas').doc(rid).update({estado:'activa',fechaEntrega:t})))return;
   await ensureToken(e);
   await write(()=>S.db.collection('entrenados').doc(e.id).update({ultRutina:t,modalidad:'Periodizada'}));
@@ -2467,7 +2471,8 @@ function tpNewHTML(a){
     <fieldset class="full tf-rm"><legend>Punto de partida</legend>
       <label class="av-g"><input type="radio" name="tp-src" value="tp" ${a.src!=='xl'&&a.src!=='vac'?'checked':''}> Planilla del TP final (42 semanas de handball, 2 torneos de 15 fechas)</label>
       <label class="av-g"><input type="radio" name="tp-src" value="xl" ${a.src==='xl'?'checked':''}> Importar la hoja MACRO de un Excel</label>
-      ${a.src==='xl'?`<div class="tp-xl"><label class="btn" style="cursor:pointer">Elegir Excel<input id="tp-file" type="file" accept=".xlsx" hidden></label><span class="hint">${a.prev?`<b>${esc(a.arch)}</b> · ${esc(tResumen(a.prev))}`:a.err?`<span style="color:var(--bad)">${esc(a.err)}</span>`:'Busca la hoja que se llame MACRO (o la primera).'}</span></div>`:''}
+      ${a.src==='xl'?`<div class="tp-xl"><label class="btn" style="cursor:pointer">Elegir Excel<input id="tp-file" type="file" accept=".xlsx" hidden></label><span class="hint">${a.xl?`<b>${esc(a.arch)}</b> · ${esc(xlResumen(a.xl))}`:a.err?`<span style="color:var(--bad)">${esc(a.err)}</span>`:'Lee el plan de la hoja MACRO y las dosis de MICROCICLOS y PESAS. Si trae DIAGNÓSTICO, lo podés cargar como test de un jugador.'}</span></div>
+      ${a.xl&&a.xl.diag?(()=>{const q=(S.equipos||[]).find(x=>x._id===a.eq)||{},js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean);return js.length?`<label class="av-g" style="padding-left:26px">Cargar el diagnóstico (VAM ${a.xl.diag.vam?nfx(a.xl.diag.vam,2):'—'}) como test de <select id="tp-dj"><option value="">(no cargar)</option>${js.map(e=>`<option value="${esc(e.id)}" ${a.dj===e.id?'selected':''}>${esc(name(e))}</option>`).join('')}</select></label>`:''})():''}`:''}
       <label class="av-g"><input type="radio" name="tp-src" value="vac" ${a.src==='vac'?'checked':''}> En blanco con <input id="tp-nsem" type="number" min="4" max="60" value="${esc(a.nsem||42)}" style="width:70px"> semanas</label>
     </fieldset>
     <p class="hint full">Las fechas de cada semana salen del lunes de inicio. Después se edita todo: tipo, relación de carga, competencia, tests, cualidades y métodos de cada día.</p>
@@ -2478,7 +2483,8 @@ function bindTpNew(a){const ov=$('#overlay');
   ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};
   ov.onchange=async ev=>{if(ev.target.name==='tp-src'){leer();renderSheet();return}
     if(ev.target.id==='tp-file'){leer();const f=ev.target.files[0];if(!f)return;a.arch=f.name;a.prev=null;a.err='';
-      try{const aoa=await leerXLSX(await f.arrayBuffer(),/^macro$/i);a.prev=macroDesdeAOA(aoa)}catch(x){a.err=x.message||'No pude leer el Excel.'}renderSheet()}};
+      try{a.xl=await leerPlanilla(await f.arrayBuffer());a.prev=a.xl.W}catch(x){a.err=x.message||'No pude leer el Excel.';a.xl=null}renderSheet()}
+    if(ev.target.id==='tp-dj')a.dj=ev.target.value};
   $('#tpf').onsubmit=async ev=>{ev.preventDefault();leer();const msg=$('#tp-msg');
     if(!a.ini){msg.textContent='Elegí el lunes de la semana 1.';return}
     if(parse(a.ini).getDay()!==1){msg.textContent='La semana 1 tiene que empezar un lunes.';return}
@@ -2486,7 +2492,8 @@ function bindTpNew(a){const ov=$('#overlay');
     else if(a.src==='vac'){const n=Math.min(60,Math.max(4,Number(a.nsem)||42));W=Array.from({length:n},(_,i)=>({per:'PREPARATORIO',meso:Math.floor(i/4)+1,tipo:'CARGA',rel:'2:3',comp:'',test:false,days:T_DIAS.map(()=>({q:'',met:[]}))}))}
     else W=tpSemanas();
     const doc={equipoId:a.eq,nombre:(a.n||'').trim(),inicio:a.ini,partido:a.par||'Sábado',semanas:W,origen:a.src==='xl'?'Excel: '+a.arch:a.src==='vac'?'En blanco':'Planilla del TP final',ts:Date.now()};
-    if(await write(()=>S.db.collection('temporadas').add(doc))){toast('Temporada creada');closeSheet()}}}
+    const dj=a.src==='xl'&&$('#tp-dj')?$('#tp-dj').value:'';
+    if(await write(()=>S.db.collection('temporadas').add(doc))){if(dj)await cargarDiag(dj,a.xl.diag);toast('Temporada creada'+(dj?' y diagnóstico cargado':''));closeSheet()}}}
 
 /* --- hoja: editar una semana --- */
 function tpSemHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const w=a.w;const i=a.i;
@@ -2549,7 +2556,8 @@ function tpCfgHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);
     <label class="full">Nombre<input id="tc-n" value="${esc(t.nombre||'')}"></label>
     <label>Lunes de la semana 1<input id="tc-ini" type="date" required value="${esc(t.inicio)}"></label>
     <label>Día de partido<select id="tc-par">${['Sábado','Domingo'].map(d=>`<option ${d===(t.partido||'Sábado')?'selected':''}>${d}</option>`).join('')}</select></label>
-    <p class="hint full">Origen: ${esc(t.origen||'—')}. Si movés el inicio, todas las semanas se corren con él.</p>
+    <p class="hint full">Origen: ${esc(t.origen||'—')}${t.actualizado?' · actualizada el '+fmtD(t.actualizado):''}. Si movés el inicio, todas las semanas se corren con él.</p>
+    <div class="full"><button class="btn" type="button" data-tpsync="${esc(t._id)}">Actualizar desde Excel</button> <span class="hint" style="display:inline">Trae los cambios de la planilla (plan y dosis) sin tocar el inicio ni el plantel.</span></div>
     <p class="hint full" id="tc-msg" role="alert"></p>
     <div class="full actions"><button class="btn danger" type="button" data-tcdel>${S.tcArm===t._id?'Tocá de nuevo para borrar la temporada':'Borrar temporada'}</button><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`}
 function bindTpCfg(a){const ov=$('#overlay');
@@ -2727,24 +2735,26 @@ function tpEntHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid),q=(S.equipos|
   const opt=v=>W.map((w,i)=>`<option value="${i}" ${i===v?'selected':''}>Semana ${i+1} · ${fmtShort(iso(tLun(t,i)))} · ${T_TIPOS[w.tipo]||w.tipo}${epConDosis(w)?'':' (sin dosis)'}</option>`).join('');
   const sinD=[];for(let i=a.a;i<=a.b;i++)if(!epConDosis(W[i]))sinD.push(i+1);
   const ej=js.find(e=>sel.includes(e.id));let prev='';if(ej){const P=epPerfil(ej);for(let i=a.a;i<=a.b&&!prev;i++)for(const d of W[i].days){const it=(d.run||[])[0];if(it){const c=epRun(it,P);prev=`${name(ej)} · semana ${i+1}: ${it.s>1?it.s+' × ':''}${it.r} × ${distMil(it.d)} m ${c.falta?'(sin '+c.falta+')':'en '+epT(c.t)+(c.cont?' total':' cada tramo')}`;break}}}
-  return `<form id="tef" class="pad"><p class="hint">Se arma una rutina para cada jugador con las semanas elegidas: los tiempos de carrera y sprint salen de sus tests y los kilos de sus marcas. La ven en su link de siempre, una semana por vez, con tildes, temporizador y registro.</p>
+  return `<form id="tef" class="pad"><p class="hint">Se arma una rutina para cada jugador con las semanas elegidas: los tiempos de carrera y sprint salen de sus tests y los kilos de sus marcas. La ven en su link de siempre, una semana por vez, con tildes, temporizador y registro. A quien ya tiene su propia rutina le podés <b>sumar</b> el plan (en su link elige entre «Mi rutina» y «Plan del equipo») o <b>reemplazarla</b> (queda en su historial).</p>
     <div class="form" style="margin-top:12px"><label>Desde<select id="te-a">${opt(a.a)}</select></label><label>Hasta<select id="te-b">${opt(a.b)}</select></label></div>
     ${sinD.length?`<p class="pill p-warn" style="margin-top:8px">Sin dosis: ${sinD.map(n=>'S'+n).join(', ')}. Esas semanas llegan vacías.</p>`:''}
-    <fieldset class="tf-rm" style="margin-top:12px"><legend>Jugadores</legend><div class="eq-pick" style="max-height:220px">${js.map(e=>{const P=epPerfil(e),ac=rutDe(e.id).find(r=>r.estado==='activa');return `<label class="av-g"><input type="checkbox" data-tej="${esc(e.id)}" ${sel.includes(e.id)?'checked':''}> ${esc(name(e))} ${P.vam?'':'<span class="pill p-warn">sin VAM</span>'}${ac&&!ac.equipo?' <span class="pill p-mute">reemplaza su rutina</span>':''}</label>`}).join('')||'<p class="hint">El equipo no tiene jugadores.</p>'}</div></fieldset>
+    <fieldset class="tf-rm" style="margin-top:12px"><legend>Jugadores</legend><div class="eq-pick" style="max-height:220px">${js.map(e=>{const P=epPerfil(e),ac=rutDe(e.id).find(r=>r.estado==='activa');return `<label class="av-g"><input type="checkbox" data-tej="${esc(e.id)}" ${sel.includes(e.id)?'checked':''}> ${esc(name(e))} ${P.vam?'':'<span class="pill p-warn">sin VAM</span>'}</label>${ac&&!ac.equipo?`<select class="te-modo" data-tem="${esc(e.id)}" aria-label="Qué hacer con la rutina de ${esc(name(e))}"><option value="sumar" ${(a.modo||{})[e.id]!=='reemplazar'?'selected':''}>Sumar: ve su rutina y el plan</option><option value="reemplazar" ${(a.modo||{})[e.id]==='reemplazar'?'selected':''}>Reemplazar su rutina</option></select>`:''}`}).join('')||'<p class="hint">El equipo no tiene jugadores.</p>'}</div></fieldset>
     <div class="form" style="margin-top:10px"><label class="av-g"><input type="checkbox" id="te-carga" ${a.carga!==false?'checked':''}> Pedir minutos y esfuerzo (RPE) al terminar cada sesión</label><label class="av-g"><input type="checkbox" id="te-bien" ${a.bien!==false?'checked':''}> Pedir el bienestar antes de entrenar</label></div>
     ${prev?`<p class="hint" style="margin-top:8px">Ejemplo: ${esc(prev)}</p>`:''}
     <p class="hint" id="te-msg" role="alert"></p>
     <div class="actions" style="margin-top:10px"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Entregar a ${plural(sel.length,'jugador','jugadores')}</button></div></form>`}
 function bindTpEnt(a){const ov=$('#overlay');
-  const leer=()=>{a.a=Number($('#te-a').value);a.b=Number($('#te-b').value);a.sel=[...ov.querySelectorAll('[data-tej]:checked')].map(i=>i.dataset.tej);a.carga=$('#te-carga').checked;a.bien=$('#te-bien').checked};
+  const leer=()=>{a.a=Number($('#te-a').value);a.b=Number($('#te-b').value);a.sel=[...ov.querySelectorAll('[data-tej]:checked')].map(i=>i.dataset.tej);a.carga=$('#te-carga').checked;a.bien=$('#te-bien').checked;a.modo={...(a.modo||{})};ov.querySelectorAll('[data-tem]').forEach(x=>a.modo[x.dataset.tem]=x.value)};
   ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};
-  ov.onchange=ev=>{if(ev.target.matches('#te-a,#te-b,[data-tej]')){leer();if(a.b<a.a)a.b=a.a;renderSheet()}};
+  ov.onchange=ev=>{if(ev.target.matches('#te-a,#te-b,[data-tej]')){leer();if(a.b<a.a)a.b=a.a;renderSheet()}else if(ev.target.matches('[data-tem]'))leer()};
   $('#tef').onsubmit=async ev=>{ev.preventDefault();leer();const msg=$('#te-msg');if(!a.sel.length){msg.textContent='Elegí al menos un jugador.';return}if(a.b<a.a){msg.textContent='«Hasta» no puede ser antes que «Desde».';return}
     const t=(S.temps||[]).find(x=>x._id===a.tid),q=(S.equipos||[]).find(x=>x._id===t.equipoId),hoy=iso(today());let n=0;
     const btn=ev.submitter;if(btn){btn.disabled=true;btn.textContent='Entregando…'}
     for(const id of a.sel){const e=S.ents[id];if(!e)continue;const doc=epRutina(t,q,e,a.a,a.b,{carga:a.carga,bien:a.bien});
       const prev=rutDe(id).find(r=>r.equipo&&r.equipo.tid===t._id&&r.equipo.desde===a.a);
-      for(const r of rutDe(id).filter(r=>r.estado==='activa'&&r!==prev))await write(()=>S.db.collection('rutinas').doc(r._id).update({estado:'finalizada',fechaFin:hoy}));
+      /* el plan anterior de este equipo siempre se cierra; la rutina propia del jugador solo si elegiste «Reemplazar» */
+      const reemplazar=(a.modo||{})[id]==='reemplazar';
+      for(const r of rutDe(id).filter(r=>r.estado==='activa'&&r!==prev&&(r.equipo?r.equipo.eq===q._id:reemplazar)))await write(()=>S.db.collection('rutinas').doc(r._id).update({estado:'finalizada',fechaFin:hoy}));
       const ok=prev?await write(()=>S.db.collection('rutinas').doc(prev._id).set(doc)):await write(()=>S.db.collection('rutinas').add(doc));
       if(ok){n++;await ensureToken(e);await write(()=>S.db.collection('entrenados').doc(id).update({ultRutina:hoy,modalidad:'Periodizada'}));await addHist(id,'Rutina',`Plan del equipo ${q.nombre}: ${doc.nombre.split(' · ')[1]}`)}}
     toast(plural(n,'rutina entregada','rutinas entregadas'));closeSheet()}}
@@ -2808,6 +2818,84 @@ document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.clos
   if(D.tpent!=null){const t=(S.temps||[]).find(x=>x._id===D.tpent);if(!t)return;const h=tSemHoy(t);let a0=h??0;if(days(today(),parse(t.inicio))<0)a0=0;const m=t.semanas[a0].meso;let b0=a0;while(b0+1<t.semanas.length&&t.semanas[b0+1].meso===m)b0++;openSheet('__tpent','ver',{tid:t._id,a:a0,b:b0});return}
   if(D.tppdf!=null){epPDFs(D.tppdf);return}
   if(D.epform!=null){openSheet('__epform','ver',{})}});
+/* ---------- EQUIPO PRO · importar la planilla completa (MACRO + MICROCICLOS + PESAS + DIAGNÓSTICO) ---------- */
+const XL_RUN={'continuo extensivo':'CE','continuo intensivo':'CI','continuo variable i':'CV1','continuo variable ii':'CV2','interv ext c/ i largo':'IE-IL','interv ext c/ i medios':'IE-IM','interv intensivos c/ i cortos':'II-IC','interv intensivos c/ ie cortos':'II-IEC','repeticiones c/ i largos':'Rep-IL','repeticiones c/ i medios':'Rep-IM','repeticiones c/ i cortos':'Rep-IC','repeticiones cortas maximas':'RCM','rsa':'RSA','salidas a estimulos variables':'SEV','velocidad maxima':'FS','velocidad maxima (fs)':'FS'};
+const XL_STR={'rep iii':'Rep III','rep ii':'Rep II','rep i':'Rep I','i max':'I Máx','i max 2':'I Máx II','i max ii':'I Máx II','piramide':'Pirámide','contraste':'Contraste','contrastes':'Contraste','concentrico':'Concéntrico','concentrico puro':'Concéntrico','pliometria':'Pliometría','pliometrico':'Pliometría'};
+const xlLow=v=>v==null?'':String(v).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ');
+const xlNum=v=>typeof v==='number'?v:(v==null||v==='')?NaN:Number(String(v).replace(',','.').replace(/[^\d.\-]/g,''));
+/* pausa: número de Excel (fracción de día), «04:00», «0:02:30» o «SNC FRESC.» → 4' · 2'30" · hasta recuperar */
+function xlPausa(v){if(v==null||v==='')return '';let s;
+  if(typeof v==='number'){if(!v)return '';s=v<1?Math.round(v*86400):v}
+  else{const t=String(v).trim();if(/snc/i.test(t))return 'hasta recuperar';if(/^0([.,]0)?$/.test(t)||/^none$/i.test(t))return '';const p=t.split(':').map(x=>Number(x)||0);if(p.length<2)return t;s=p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1]}
+  const m=Math.floor(s/60),ss=Math.round(s%60);if(!m&&!ss)return '';return (m?m+"'":'')+(ss?ss+'"':'')}
+const xlNumSem=(a,b)=>{const m=/(\d+)/.exec(String(a||''));return m?Number(m[1]):Number(b)||0};
+/* MICROCICLOS → {semana: [5 días de carrera/velocidad]} */
+function microDesdeAOA(aoa){const out={},DC=[3,14,25,36,47];
+  aoa.forEach((row,r)=>{if(!row||!/^microciclo/i.test(String(row[3]||'').trim()))return;const n=xlNumSem(row[3],row[4]);if(!n)return;
+    let h=-1;for(let k=r;k<r+6;k++)if(aoa[k]&&xlLow(aoa[k][3])==='metodo'){h=k;break}if(h<0)return;
+    let t=-1;for(let k=h+1;k<h+40;k++)if(aoa[k]&&/^v\.? ?total/i.test(String(aoa[k][8]||'').trim())){t=k;break}if(t<0)return;
+    out[n]=DC.map(c=>{const it=[];for(let k=h+1;k<t;k++){const x=aoa[k]||[];const m=XL_RUN[xlLow(x[c])],d=xlNum(x[c+3]);if(!m||!isFinite(d))continue;
+      it.push({m,s:xlNum(x[c+1])||1,r:xlNum(x[c+2])||1,d,p:xlNum(x[c+4])||0,pr:xlPausa(x[c+7]),ps:xlPausa(x[c+8])})}return it})});
+  return out}
+/* PESAS → {semana: {díaIndex: [fuerza]}} (martes y jueves en la planilla del TP; el día sale del rótulo «DIA:») */
+function pesasDesdeAOA(aoa){const out={},DI={lunes:0,martes:1,miercoles:2,jueves:3,viernes:4};
+  aoa.forEach((row,r)=>{if(!row||!/^microciclo/i.test(String(row[1]||'').trim()))return;const n=xlNumSem(row[1],row[2]);if(!n)return;
+    let h=-1;for(let k=r;k<r+6;k++)if(aoa[k]&&xlLow(aoa[k][1])==='metodo'){h=k;break}if(h<0)return;
+    let t=-1;for(let k=h+1;k<h+30;k++)if(aoa[k]&&xlLow(aoa[k][4])==='total'){t=k;break}if(t<0)return;
+    const sem=out[n]=out[n]||{};
+    [[1,1],[16,3]].forEach(([c0,def])=>{const lab=xlLow((aoa[r+1]||[])[c0]).replace(/^dia:?\s*/,'');const di=DI[lab]??def;const it=[];
+      for(let k=h+1;k<t;k++){const x=aoa[k]||[];const m=XL_STR[xlLow(x[c0])],e=String(x[c0+1]||'').trim(),s=xlNum(x[c0+2]);if(!m||!e||!isFinite(s))continue;
+        it.push({m,e,s,r:xlNum(x[c0+3])||1,p:xlNum(x[c0+6])||0,pr:xlPausa(x[c0+7]),ps:xlPausa(x[c0+8])})}
+      if(it.length)sem[di]=(sem[di]||[]).concat(it)})});
+  return out}
+/* DIAGNÓSTICO → test + 1RM */
+function diagDesdeAOA(aoa){const d={rm:{}},lab=r=>xlLow(r&&r[1]);let enRM=false;
+  aoa.forEach(r=>{if(!r)return;const l=lab(r),v=r[2];
+    if(/^movimi/.test(l)){enRM=true;return}if(enRM&&(!l||/^test/.test(l))){enRM=false}
+    if(enRM&&typeof r[1]==='string'&&!/^test/.test(l)&&isFinite(xlNum(v))){d.rm[String(r[1]).trim().toUpperCase()]=xlNum(v);return}
+    if(l==='vam'){const n=xlNum(v);if(isFinite(n))d.vam=n}else if(/^yo-?yo/.test(l))d.yoyo=String(v||'').trim();
+    else if(l==='cmj'){const n=xlNum(v);if(isFinite(n))d.cmj=n}else if(/^abalakov|^abk/.test(l)){const n=xlNum(v);if(isFinite(n))d.abk=n}
+    else if(/^peso:/.test(l)){const n=xlNum(l.replace('peso:',''));if(isFinite(n))d.peso=n}
+    else if(typeof r[1]==='number'&&isFinite(xlNum(v))&&[10,20,30].includes(r[1]))d['t'+r[1]]=xlNum(v)});
+  if(!Object.keys(d.rm).length)delete d.rm;return d}
+/* lee todo el libro: devuelve semanas con plan y dosis, más el diagnóstico si está */
+async function leerPlanilla(buf){
+  const macro=await leerXLSX(buf,/^macro$/i);const W=macroDesdeAOA(macro);
+  let mic={},pes={},diag=null,hojas=['MACRO'];
+  try{const a=await leerXLSX(buf,/^microciclos?$/i,{estricta:true,sinComb:true});if(a){mic=microDesdeAOA(a);hojas.push('MICROCICLOS')}}catch(_){}
+  try{const a=await leerXLSX(buf,/^pesas$/i,{estricta:true,sinComb:true});if(a){pes=pesasDesdeAOA(a);hojas.push('PESAS')}}catch(_){}
+  try{const a=await leerXLSX(buf,/^diagn/i,{estricta:true,sinComb:true});if(a){diag=diagDesdeAOA(a);if(!Object.keys(diag).length)diag=null;else hojas.push('DIAGNÓSTICO')}}catch(_){}
+  W.forEach((w,i)=>{const n=i+1;w.days.forEach((d,k)=>{d.run=(mic[n]&&mic[n][k])||[];d.str=((pes[n]||{})[k]||[]).map(x=>({...x,e:epMov(x.e)}))})});
+  return {W,diag,hojas}}
+const xlResumen=x=>{const W=x.W,dos=W.filter(epConDosis).length,ej=W.reduce((a,w)=>a+w.days.reduce((b,d)=>b+d.run.length+d.str.length,0),0);
+  return `${tResumen(W)} · ${dos} semanas con dosis (${ej} ejercicios) · hojas leídas: ${x.hojas.join(', ')}`};
+/* diferencias entre la temporada actual y lo que trae el Excel (para «Actualizar desde Excel») */
+function xlDiff(t,W,mantener){const res={plan:0,dosis:0,nuevas:Math.max(0,W.length-t.semanas.length),quitadas:Math.max(0,t.semanas.length-W.length),mant:0};
+  const out=W.map((w,i)=>{const o=t.semanas[i];if(!o)return w;const pl=o.per!==w.per||o.meso!==w.meso||o.tipo!==w.tipo||o.rel!==w.rel||o.comp!==w.comp||!!o.test!==!!w.test||JSON.stringify(o.days.map(d=>[d.q,d.met]))!==JSON.stringify(w.days.map(d=>[d.q,d.met]));
+    let nw=w;if(mantener&&!epConDosis(w)&&epConDosis(o)){nw={...w,days:w.days.map((d,k)=>({...d,run:o.days[k].run||[],str:o.days[k].str||[]}))};res.mant++}
+    const ds=JSON.stringify(o.days.map(d=>[d.run||[],d.str||[]]))!==JSON.stringify(nw.days.map(d=>[d.run||[],d.str||[]]));if(pl)res.plan++;if(ds)res.dosis++;return nw});
+  return {out,res}}
+function tpSyncHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const q=(S.equipos||[]).find(x=>x._id===t.equipoId)||{};const js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean);
+  let prev='';if(a.x){const {res}=xlDiff(t,a.x.W,a.mant!==false);prev=`<div class="tp-sum"><b>${esc(a.arch)}</b><span>${esc(xlResumen(a.x))}</span><span>Cambios: ${plural(res.plan,'semana con cambios de plan','semanas con cambios de plan')} · ${plural(res.dosis,'semana con cambios de dosis','semanas con cambios de dosis')}${res.nuevas?` · ${plural(res.nuevas,'semana nueva','semanas nuevas')}`:''}${res.quitadas?` · se quitan ${plural(res.quitadas,'semana','semanas')}`:''}${res.mant?` · se conservan las dosis de la app en ${plural(res.mant,'semana','semanas')} vacías en el Excel`:''}</span></div>`}
+  return `<form id="tsyf" class="pad"><p class="hint">Cargá la versión actualizada del Excel: la temporada toma el plan de la hoja MACRO y las dosis de MICROCICLOS y PESAS. Se mantienen el lunes de inicio, el día de partido y el plantel. Antes de aplicar ves cuántas semanas cambian.</p>
+    <div class="tp-xl" style="padding-left:0;margin-top:10px"><label class="btn" style="cursor:pointer">Elegir Excel<input id="tsy-file" type="file" accept=".xlsx" hidden></label>${a.err?`<span class="hint" style="color:var(--bad)">${esc(a.err)}</span>`:''}</div>
+    ${prev}
+    <label class="av-g" style="margin-top:10px"><input type="checkbox" id="tsy-mant" ${a.mant!==false?'checked':''}> Conservar las dosis cargadas en la app en las semanas que el Excel trae vacías</label>
+    ${a.x&&a.x.diag&&js.length?`<label class="av-g" style="margin-top:6px">Cargar el diagnóstico del Excel como test de <select id="tsy-dj"><option value="">(no cargar)</option>${js.map(e=>`<option value="${esc(e.id)}">${esc(name(e))}</option>`).join('')}</select></label>`:''}
+    <p class="hint" id="tsy-msg" role="alert"></p>
+    <div class="actions" style="margin-top:10px"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit" ${a.x?'':'disabled'}>Actualizar temporada</button></div></form>`}
+async function cargarDiag(eid,dg,fecha){const e=S.ents[eid];if(!e||!dg)return;const doc={entrenadoId:eid,fecha:fecha||iso(today()),ts:Date.now(),notas:'Importado del Excel (Diagnóstico)'};
+  ['vam','cmj','abk','t10','t20','t30','peso','yoyo'].forEach(k=>{if(dg[k]!=null&&dg[k]!=='')doc[k]=dg[k]});
+  if(dg.rm){doc.rm={};Object.entries(dg.rm).forEach(([k,v])=>doc.rm[epMov(k)]=v)}
+  if(await write(()=>S.db.collection('tests').add(doc))){if(doc.rm)await write(()=>S.db.collection('entrenados').doc(eid).update({rm:{...(e.rm||{}),...doc.rm}}));await addHist(eid,'Evaluación física','Diagnóstico importado del Excel'+(doc.vam?' · VAM '+nfx(doc.vam,2)+' m/s':''),doc.fecha)}}
+function bindTpSync(a){const ov=$('#overlay');
+  ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};
+  ov.onchange=async ev=>{if(ev.target.id==='tsy-mant'){a.mant=ev.target.checked;renderSheet();return}
+    if(ev.target.id==='tsy-file'){const f=ev.target.files[0];if(!f)return;a.arch=f.name;a.x=null;a.err='';try{a.x=await leerPlanilla(await f.arrayBuffer())}catch(x){a.err=x.message||'No pude leer el Excel.'}renderSheet()}};
+  $('#tsyf').onsubmit=async ev=>{ev.preventDefault();if(!a.x)return;const t=(S.temps||[]).find(x=>x._id===a.tid);const {out}=xlDiff(t,a.x.W,a.mant!==false);const {_id,...doc}=t;
+    const dj=$('#tsy-dj')?.value;
+    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:out,origen:'Excel: '+a.arch,actualizado:iso(today())}))){if(dj)await cargarDiag(dj,a.x.diag);toast('Temporada actualizada desde el Excel');closeSheet()}}}
+document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-tpsync]');if(b){openSheet('__tpsync','ver',{tid:b.dataset.tpsync})}});
 (()=>{let y0=scrollY,raf=0;addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const y=scrollY,f=$('#fab');if(!f)return;
   const nearEnd=innerHeight+y>=document.documentElement.scrollHeight-140;f.classList.toggle('min',y>80&&(y>y0||nearEnd));f.classList.toggle('lift',nearEnd);y0=y})},{passive:true})})();
 /* Esc lo maneja el <dialog> nativo */

@@ -804,3 +804,6 @@ select.mini{font:inherit;font-size:12.5px;padding:3px 4px;border:1px dashed var(
 .ep-steps .on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}.ep-steps .ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
 .ep-ok{color:var(--ok);font-weight:700}.ep-no{color:var(--bad);font-weight:700}
 .ep-ed .pill{white-space:normal;border-radius:8px}
+.te-modo{font:inherit;font-size:13px;padding:4px 6px;border:1.5px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);margin:0 0 6px 26px;max-width:calc(100% - 26px)}
+.tp-sum{display:flex;flex-direction:column;gap:2px;background:var(--surface-2);border-radius:var(--r);padding:10px 12px;margin-top:10px;font-size:13.5px}
+.tp-sum span{color:var(--muted)}

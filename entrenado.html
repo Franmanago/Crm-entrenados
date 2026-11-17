@@ -455,6 +455,9 @@ body.mini-on .tmr-fab{display:none}
 @supports not (animation-timeline:scroll()){
   .tabs,.mh-bl .wrap{-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
 }
+.rsw{display:flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:10px}
+.rsw button{flex:1;border:0;background:none;font:inherit;font-weight:700;font-size:14px;padding:10px 6px;border-radius:10px;color:var(--muted);cursor:pointer;min-height:40px}
+.rsw button[aria-pressed="true"]{background:var(--accent-ink);color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
 </style>
 </head>
 <body>
@@ -497,6 +500,14 @@ function avisoPagoHTML(av){const E=D.entrenado,A=av.A;const wa=A.wa?`https://api
     ${A.alias?`<div class="av-alias"><span>Alias / CBU${A.banco?' · '+esc(A.banco):''}</span><b>${esc(A.alias)}</b>${A.banco?`<small>Cuenta en ${esc(A.banco)}</small>`:''}<button type="button" class="av-cp" data-copyalias="${esc(A.alias)}">Copiar</button></div>`:''}
     <div class="av-acc">${wa?`<a class="av-wa" href="${esc(wa)}" target="_blank" rel="noopener">Enviar comprobante por WhatsApp</a>`:''}<button type="button" class="av-ok" data-avok="1">${sig}</button></div>
     <p class="hint">Si ya pagaste, ignorá este mensaje: desaparece cuando tu entrenador registra el pago.</p></div>`}
+/* posición (semana y día) recordada por rutina */
+const sk=k=>k+':'+((typeof D!=='undefined'&&D&&D.rutina&&D.rutina.id)||'');
+function initRut(){if(!D||!D.rutina)return;
+    const sem=D.rutina.fechaEntrega?Math.floor((today()-parse(D.rutina.fechaEntrega))/6048e5):0;
+    const dist=D.rutina.distribucion&&D.rutina.distribucion[sem%D.rutina.distribucion.length];
+    const k=D.rutina.id+':'+sem;
+    if(store.get(sk('rut'))!==k){store.set(sk('rut'),k);secI=D.rutina.equipo?Math.max(0,Math.min(sem,(D.rutina.secciones||[]).length-1)):0;diaI=dist?dist[0]:0;if(D.rutina.equipo){const wd=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][(today().getDay()+6)%7],ds=((D.rutina.secciones||[])[secI]||{}).dias||[],ix=ds.findIndex(d=>String(d.nombre||'').endsWith(wd));if(ix>=0)diaI=ix}store.set(sk('sec'),secI);store.set(sk('dia'),diaI)}
+    else{secI=Number(store.get(sk('sec')))||0;diaI=Number(store.get(sk('dia')))||0}}
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 let D=null,sb=null,secI=0,diaI=0,open={},vista='rutina',progEj=null;
 const IC={cal:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
@@ -582,7 +593,8 @@ function kg(it){const a=ajusteHoy();if(a&&ajustable(it))return kgBase({...it,pct
 function ytId(u){if(!u)return null;let m=u.match(/shorts\/([\w-]{6,})/)||u.match(/[?&]v=([\w-]{6,})/)||u.match(/youtu\.be\/([\w-]{6,})/)||u.match(/embed\/([\w-]{6,})/);return m?{id:m[1],short:/shorts\//.test(u)}:null}
 const regsFor=uid=>(D.registros||[]).filter(r=>r.item===uid).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.ts||0)-(a.ts||0));
 
-const vistaTabs=()=>`<div class="vistas" role="tablist"><button class="vista" data-vista="rutina" aria-pressed="${vista==='rutina'}">Mi rutina</button><button class="vista" data-vista="progreso" aria-pressed="${vista==='progreso'}">Mi progreso</button></div>`;
+const rutSwitch=()=>D&&D.rutinas&&D.rutinas.length>1?`<div class="rsw" role="group" aria-label="Qué rutina ver">${D.rutinas.map(r=>`<button type="button" data-rsel="${esc(r.id)}" aria-pressed="${r.id===D.rutina.id}">${r.equipo?'Plan del equipo':'Mi rutina personal'}</button>`).join('')}</div>`:'';
+const vistaTabs=()=>rutSwitch()+`<div class="vistas" role="tablist"><button class="vista" data-vista="rutina" aria-pressed="${vista==='rutina'}">Mi rutina</button><button class="vista" data-vista="progreso" aria-pressed="${vista==='progreso'}">Mi progreso</button></div>`;
 const isoW=d=>{const x=new Date(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
 const asisRegs=()=>(D.registros||[]).filter(r=>String(r.item||'').startsWith('asis:'));
 function findItem(uid){for(const s of D.rutina?.secciones||[])for(const d of s.dias||[])for(const b of d.bloques||[])for(const i of b.items||[])if(i.uid===uid)return i;return null}
@@ -856,8 +868,9 @@ document.addEventListener('click',ev=>{
   if(b=t.closest('[data-bv]')){const f=b.closest('form');f[b.dataset.bv].value=b.dataset.n;f.querySelectorAll(`[data-bv="${b.dataset.bv}"]`).forEach(x=>x.setAttribute('aria-pressed',x===b));return}
   if(b=t.closest('[data-editb]')){editB=true;render();return}
   if(b=t.closest('[data-editc]')){editC[b.dataset.editc]=true;render();return}
-  if(b=t.closest('[data-sec]')){secI=Number(b.dataset.sec);diaI=0;store.set('sec',secI);render();return}
-  if(b=t.closest('[data-dia]')){diaI=Number(b.dataset.dia);movOpen=false;diaOpen=false;blOpen={};store.set('dia',diaI);conTransicion(render);return}
+  if(b=t.closest('[data-rsel]')){const r=D.rutinas.find(x=>x.id===b.dataset.rsel);if(r&&r!==D.rutina){D.rutina=r;store.set('rutSel',r.id);blOpen={};diaOpen=false;movOpen=false;initRut();render();window.scrollTo({top:0})}return}
+  if(b=t.closest('[data-sec]')){secI=Number(b.dataset.sec);diaI=0;store.set(sk('sec'),secI);render();return}
+  if(b=t.closest('[data-dia]')){diaI=Number(b.dataset.dia);movOpen=false;diaOpen=false;blOpen={};store.set(sk('dia'),diaI);conTransicion(render);return}
   if(b=t.closest('[data-hmov]')){movOpen=true;render();return}
   if(b=t.closest('[data-hcancel]')){movOpen=false;render();return}
   if(b=t.closest('[data-hdel]')){asisMover(b.dataset.hdel,b.dataset.f,null,b);return}
@@ -902,7 +915,7 @@ function tildar(b){
 }
 function blDe(uid){for(const s2 of D.rutina?.secciones||[])for(const d of s2.dias||[])for(const b of d.bloques||[])if((b.items||[]).some(i=>i.uid===uid))return b;return null}
 document.addEventListener('change',async ev=>{
-  const ss=ev.target.closest('[data-secsel]');if(ss){secI=Number(ss.value);diaI=0;store.set('sec',secI);render();return}
+  const ss=ev.target.closest('[data-secsel]');if(ss){secI=Number(ss.value);diaI=0;store.set(sk('sec'),secI);render();return}
   const fo=ev.target.closest('[data-fotra]');if(fo){const v=fo.value;if(v&&v<=iso(today())&&v>=fo.min){fechaSel=v===iso(today())?null:v;draft={};render()}return}
   const inp=ev.target.closest('[data-in]');if(!inp)return;
   const uid=inp.dataset.uid;const v=valores(uid);draft[uid]={...v};
@@ -1064,13 +1077,10 @@ document.addEventListener('submit',async ev=>{
   if(error)return fail('No pudimos cargar tu rutina','Revisá tu conexión y volvé a abrir el link.');
   if(!data)return fail('Este link no es válido','Pedile a tu entrenador que te lo reenvíe.');
   D=data;D.videos=D.videos||{};
-  if(D.rutina){
-    const sem=D.rutina.fechaEntrega?Math.floor((today()-parse(D.rutina.fechaEntrega))/6048e5):0;
-    const dist=D.rutina.distribucion&&D.rutina.distribucion[sem%D.rutina.distribucion.length];
-    const k=D.rutina.id+':'+sem;
-    if(store.get('rut')!==k){store.set('rut',k);secI=D.rutina.equipo?Math.max(0,Math.min(sem,(D.rutina.secciones||[]).length-1)):0;diaI=dist?dist[0]:0;if(D.rutina.equipo){const wd=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][(today().getDay()+6)%7],ds=((D.rutina.secciones||[])[secI]||{}).dias||[],ix=ds.findIndex(d=>String(d.nombre||'').endsWith(wd));if(ix>=0)diaI=ix}store.set('sec',secI);store.set('dia',diaI)}
-    else{secI=Number(store.get('sec'))||0;diaI=Number(store.get('dia'))||0}
-  }
+  /* puede haber dos rutinas activas: la propia y el plan del equipo (se elige arriba) */
+  D.rutinas=(Array.isArray(D.rutinas)&&D.rutinas.length?D.rutinas:(D.rutina?[D.rutina]:[]));
+  {const sel=store.get('rutSel');D.rutina=D.rutinas.find(r=>r.id===sel)||D.rutina||D.rutinas[0]||null}
+  initRut();
   render();
 })();
 })();
