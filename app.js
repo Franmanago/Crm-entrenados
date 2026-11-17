@@ -27,7 +27,7 @@ function normCfg(raw){
   c.avisos={...AVISOS_DEF,...(raw.avisos||{}),gyms:{...AVISOS_DEF.gyms,...(raw.avisos?.gyms||{})}};
   return c;
 }
-const S={equipos:[],tests:[],eqSel:null,evs:[],liqs:[],rends:[],pv:'ganado',ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
+const S={equipos:[],tests:[],temps:[],eqSel:null,evs:[],liqs:[],rends:[],pv:'ganado',ents:{},hist:[],pagos:[],meses:{},rutinas:[],ejs:{},ejsV:0,plantillas:{},regs:[],cfgRaw:{},mes:null,cfg:normCfg(),db:null,loaded:false,view:'panel',filter:'activos',q:''};
 const WA='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.5-.3Z"/></svg>';
 
 /* ---------- fechas ---------- */
@@ -379,7 +379,7 @@ const liqsDe=g=>S.liqs.filter(l=>(l.gym||'CROSSFORCE')===g).sort((a,b)=>(b.mes||
 const liqMes=M=>liqsDe('CROSSFORCE').find(l=>l.mes===M)||null;
 function liqDeEnt(eid){const L=liqsDe('CROSSFORCE');if(!L.length)return null;const ult=L[0];for(const l of L){const f=(l.filas||[]).find(x=>x.eid===eid);if(f)return {l,f,ultima:l===ult,ult}}return {l:null,f:null,ult}}
 function esperadoFila(f){const e=f.eid&&S.ents[f.eid];const pc=pctFran('CROSSFORCE');if(e)return Math.round(monto(e)*pc);const b=Number(S.cfg.gyms.CROSSFORCE.tarifas[String(f.veces)])||0;return Math.round(b*pc)}
-async function leerXLSX(buf){
+async function leerXLSX(buf,hojaRe){
   const u8=new Uint8Array(buf),dv=new DataView(buf);let eo=-1;
   for(let i=u8.length-22;i>=Math.max(0,u8.length-70000);i--)if(dv.getUint32(i,true)===0x06054b50){eo=i;break}
   if(eo<0)throw new Error('El archivo no parece un Excel (.xlsx).');
@@ -390,13 +390,22 @@ async function leerXLSX(buf){
     if(f.meth===0)return td.decode(raw);const ds=new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));return await new Response(ds).text()};
   const X=t=>new DOMParser().parseFromString(t,'application/xml');
   const ss=[];const sst=await get('xl/sharedStrings.xml');if(sst)X(sst).querySelectorAll('si').forEach(si=>ss.push([...si.getElementsByTagName('t')].map(t=>t.textContent).join('')));
-  const hoja=files['xl/worksheets/sheet1.xml']?'xl/worksheets/sheet1.xml':Object.keys(files).filter(k=>/^xl\/worksheets\/[^/]+\.xml$/.test(k)).sort()[0];
+  let hoja=null;
+  if(hojaRe){const wbx=await get('xl/workbook.xml'),rl=await get('xl/_rels/workbook.xml.rels');if(wbx&&rl){const sh=[...X(wbx).getElementsByTagName('sheet')],rels=[...X(rl).getElementsByTagName('Relationship')];
+    const m=sh.find(s=>hojaRe.test((s.getAttribute('name')||'').trim()));if(m){const rid=m.getAttribute('r:id')||m.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');const r=rels.find(x=>x.getAttribute('Id')===rid);
+      if(r){const tg=r.getAttribute('Target').replace(/^\/?(xl\/)?/,'');hoja='xl/'+tg}}}}
+  if(!hoja)hoja=files['xl/worksheets/sheet1.xml']?'xl/worksheets/sheet1.xml':Object.keys(files).filter(k=>/^xl\/worksheets\/[^/]+\.xml$/.test(k)).sort()[0];
   if(!hoja)throw new Error('No encontré hojas en el Excel.');
   const doc=X(await get(hoja)),aoa=[];
   doc.querySelectorAll('sheetData > row').forEach(r=>{const ri=Number(r.getAttribute('r'))-1;const row=[];r.querySelectorAll('c').forEach(c=>{const ref=c.getAttribute('r')||'';let ci=0;for(const ch of ref.replace(/\d/g,''))ci=ci*26+ch.charCodeAt(0)-64;ci--;
     const t=c.getAttribute('t'),v=c.querySelector('v')?.textContent;let val=null;
     if(t==='s')val=ss[Number(v)]??'';else if(t==='inlineStr')val=[...c.getElementsByTagName('t')].map(x=>x.textContent).join('');else if(t==='str'||t==='e')val=v??'';else if(t==='b')val=v==='1';else if(v!=null&&v!=='')val=Number(v);
     row[ci]=val});aoa[ri]=row});
+  /* celdas combinadas: con hoja elegida por nombre, se copia el valor a todo el rango (ej. «PRETEMPORADA» en 6 semanas) */
+  if(hojaRe){const col=t=>{let c=0;for(const ch of t)c=c*26+ch.charCodeAt(0)-64;return c-1};
+    doc.querySelectorAll('mergeCells > mergeCell').forEach(m=>{const mm=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m.getAttribute('ref')||'');if(!mm)return;
+      const c0=col(mm[1]),r0=+mm[2]-1,c1=col(mm[3]),r1=+mm[4]-1,v=aoa[r0]&&aoa[r0][c0];if(v==null||v==='')return;
+      for(let r=r0;r<=r1;r++){aoa[r]=aoa[r]||[];for(let c=c0;c<=c1;c++)if(aoa[r][c]==null||aoa[r][c]==='')aoa[r][c]=v}})}
   return aoa}
 function liqNueva(){const prev=mesShift(curMes(),-1);return {id:null,mes:liqMes(prev)?curMes():prev,fecha:iso(today()),monto:'',forma:'efectivo',filas:[],archivo:'',msg:''}}
 function liqHTML(){
@@ -667,6 +676,10 @@ function renderSheet0(){
   if(openId==='__test'){const a=sheetArg||{};if(!S.ents[a.eid]){closeSheet();return}ov.innerHTML=shell(a.id?'Editar test':'Nuevo test',testFormHTML(a));bindTest(a);return}
   if(openId==='__equipo'){const a=sheetArg||{};ov.innerHTML=shell(a.id?'Editar equipo':'Nuevo equipo',equipoFormHTML(a));bindEquipo(a);return}
   if(openId==='__tlote'){const a=sheetArg||{};const q=(S.equipos||[]).find(x=>x._id===a.eq);if(!q){closeSheet();return}ov.innerHTML=shell('Tests · '+q.nombre,loteHTML(a));ov.querySelector('.sheet').classList.add('wide');bindLote(a);return}
+  if(openId==='__tpnew'){const a=sheetArg||{};ov.innerHTML=shell('Nueva temporada',tpNewHTML(a));bindTpNew(a);return}
+  if(openId==='__tpsem'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Semana '+(a.i+1),tpSemHTML(a));ov.querySelector('.sheet').classList.add('wide');bindTpSem(a);return}
+  if(openId==='__tptab'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Tabla de la temporada',tpTabHTML(a));ov.querySelector('.sheet').classList.add('wide');bindTpTab(a);return}
+  if(openId==='__tpcfg'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Ajustes de la temporada',tpCfgHTML(a));bindTpCfg(a);return}
   if(openId==='__bulk'){ov.innerHTML=shell('Envío de mensajes',bulkHTML());bindBulk();return}
   if(openId==='__rut'){const R=S.edit.data;ov.innerHTML=shell(S.edit.col==='plantillas'?(S.edit.id?'Plantilla':'Nueva plantilla'):(R.nombre||'Rutina'),editorHTML());ov.querySelector('.sheet').classList.add('wide');bindEditor();return}
   if(openId==='__ej'){ov.innerHTML=shell(S.ejEdit.id?'Ejercicio':'Nuevo ejercicio',ejHTML());bindEj();return}
@@ -2300,7 +2313,7 @@ function renderEquipos(){
   const eqs=(S.equipos||[]).slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
   if(!eqs.find(q=>q._id===S.eqSel))S.eqSel=eqs[0]?._id||null;
   const q=eqs.find(x=>x._id===S.eqSel);
-  const top=`<div class="eq-top"><div><h2 class="eq-h">Equipos</h2><p class="hint">Plantel y tests de cada equipo. Es la primera etapa de Equipo Pro: después se suma la temporada y la planificación por semanas.</p></div><button class="btn pri" type="button" data-eqnew>Nuevo equipo</button></div>`;
+  const top=`<div class="eq-top"><div><h2 class="eq-h">Equipos</h2><p class="hint">Plantel, tests y temporada de cada equipo. La dosis de cada sesión (tiempos y kilos por jugador) llega en la próxima etapa.</p></div><button class="btn pri" type="button" data-eqnew>Nuevo equipo</button></div>`;
   if(!eqs.length){el.innerHTML=top+`<div class="card pad eq-empty"><b>Todavía no hay equipos.</b><p class="hint">Creá uno (por ejemplo «AFALP Primera»), sumá a los jugadores que ya son entrenados de la app y cargá sus tests: VAM, saltos, sprint y 1RM.</p><div><button class="btn pri" type="button" data-eqnew>Crear el primer equipo</button></div></div>`;return}
   const mov=(S.cfg.rmDefs||[]).filter(d=>!d.base).slice(0,4).map(d=>d.mov);
   const js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean).sort((a,b)=>(a.posicion||'~').localeCompare(b.posicion||'~')||name(a).localeCompare(name(b)));
@@ -2317,7 +2330,9 @@ function renderEquipos(){
       <td>${U[e.id].fecha?`${fmtShort(U[e.id].fecha)}${s>=8?' <span class="pill p-warn">'+s+' sem</span>':''}`:'<span class="pill p-mute">Sin test</span>'}</td>
       ${TCAMPOS.filter(c=>c.k!=='peso').map(c=>cell(e,c)).join('')}${mov.map(m=>{const v=(e.rm||{})[m]??rmValue(e,m);return `<td class="num">${v?nfx(v,v%1?1:0):'<span class="muted">—</span>'}</td>`}).join('')}
       <td><button class="btn sm" type="button" data-tnew="${esc(e.id)}">Test</button></td></tr>`}).join('')}</tbody></table></div>`
-    :`<div class="empty">El equipo no tiene jugadores. Tocá «Editar equipo y plantel» para sumar entrenados.</div>`}</div>`;
+    :`<div class="empty">El equipo no tiene jugadores. Tocá «Editar equipo y plantel» para sumar entrenados.</div>`}</div>${temporadaHTML(q)}`;
+  /* la primera vez, el tablero se corre hasta la semana actual */
+  const tp=tempDe(q._id);S.tpVisto=S.tpVisto||{};if(tp&&!S.tpVisto[tp._id]){const h=el.querySelector('.tp-season .wk.hoy'),sc=el.querySelector('.tp-scroll');if(h&&sc){S.tpVisto[tp._id]=1;requestAnimationFrame(()=>{sc.scrollLeft=Math.max(0,h.offsetLeft-96-sc.clientWidth/3)})}}
 }
 function equipoFormHTML(a){const q=a.id?(S.equipos||[]).find(x=>x._id===a.id)||{}:{};const sel=new Set(a.sel||q.jugadores||[]);
   const ents=Object.values(S.ents).filter(e=>estado(e)!=='Baja'||sel.has(e.id)).sort((x,y)=>name(x).localeCompare(name(y)));const fq=(a.q||'').toLowerCase();
@@ -2363,6 +2378,188 @@ document.addEventListener('click',ev=>{const t=ev.target.closest&&ev.target.clos
   if(D.eqedit!=null){S.eqArm=null;openSheet('__equipo','ver',{id:D.eqedit});return}
   if(D.eqsel!=null){S.eqSel=D.eqsel;render();return}
   if(D.eqlote!=null){openSheet('__tlote','ver',{eq:D.eqlote});return}});
+/* ---------- EQUIPO PRO · Etapa 2: temporada (macrociclo) ---------- */
+/* Colección «temporadas»: {equipoId, nombre, inicio (lunes de la semana 1), partido, semanas:[{per, meso, tipo, rel, comp, test, days:[{q, met[]}]}]}.
+   Las fechas y los meses salen solos de «inicio». La dosis de cada sesión llega en la etapa 3. */
+const T_TIPOS={INTRODUCTORIO:'Introductorio',CARGA:'Carga',CHOQUE:'Choque',REGENERATIVO:'Regenerativo',TRANSICION:'Transición'};
+const T_PERS=['PREPARATORIO','COMPETITIVO 1','TRANSITORIO 1','COMPETITIVO 2','TRANSITORIO 2'];
+const T_RELS=['1:4','2:3','3:2','4:1'];
+const T_DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes'];
+const T_Q={R:'Resistencia',F:'Fuerza',V:'Velocidad'};
+/* métodos de la planilla: abreviatura → [nombre, cualidad, objetivo] */
+const T_MET={'CE':['Continuo extensivo','R','Eficiencia aeróbica'],'CI':['Continuo intensivo','R','Capacidad aeróbica'],'CV1':['Continuo variable I','R','Eficiencia aeróbica'],'CV2':['Continuo variable II','R','Capacidad aeróbica'],
+ 'IE-IL':['Interválico extensivo, pausa larga','R','Capacidad aeróbica'],'IE-IM':['Interválico extensivo, pausa media','R','Potencia aeróbica'],'II-IC':['Interválico intensivo, pausa corta','R','Potencia aeróbica'],'II-IEC':['Interválico intensivo, pausa extra corta','R','Potencia aeróbica'],
+ 'Rep-IL':['Repeticiones, pausa larga','R','Potencia aeróbica'],'Rep-IM':['Repeticiones, pausa media','R','Potencia láctica'],'Rep-IC':['Repeticiones, pausa corta','R','Potencia aláctica'],
+ 'Rep III':['Repeticiones III','F','Acondicionamiento músculo-tendinoso'],'Rep II':['Repeticiones II','F','Fuerza máxima e hipertrofia'],'Rep I':['Repeticiones I','F','Fuerza máxima e hipertrofia'],'I Máx':['Intensidades máximas','F','Coordinación intramuscular y fuerza máxima'],'I Máx II':['Intensidades máximas II','F','Coordinación intramuscular y fuerza máxima'],'Pirámide':['Pirámide','F','Fuerza máxima e hipertrofia'],'Contraste':['Contraste','F','Fuerza máxima y explosiva'],'Concéntrico':['Concéntrico puro','F','Activación nerviosa y fuerza explosiva'],'Pliometría':['Pliometría','F','Fuerza explosiva y reactividad'],
+ 'FS':['Velocidad máxima (lanzada)','V','Potencia aláctica'],'RCM':['Aceleración (repeticiones cortas máximas)','V','Potencia aláctica'],'SEV':['Salidas a estímulos variables','V','Potencia aláctica'],'RSA':['Resistencia a la velocidad (RSA)','V','Capacidad aláctica']};
+/* nombres tal como aparecen en la hoja MACRO → abreviatura */
+const T_XL={'continuo extensivo':'CE','continuo intensivo':'CI','continuo variable i':'CV1','continuo variable ii':'CV2','interv ext c/ i largo':'IE-IL','interv ext c/ i medios':'IE-IM','interv intensivos c/ i cortos':'II-IC','interv intensivos c/ ie cortos':'II-IEC',
+ 'repeticiones c/ i largos':'Rep-IL','repeticiones c/ i medios':'Rep-IM','repeticiones c/ i cortos':'Rep-IC','repeticiones i':'Rep I','repeticiones ii':'Rep II','repeticiones iii':'Rep III','intensidades maximas':'I Máx','intensidades máximas':'I Máx','intensidades máximas ii':'I Máx II','intensidades maximas ii':'I Máx II',
+ 'piramide':'Pirámide','pirámide':'Pirámide','contrastes':'Contraste','concéntrico puro':'Concéntrico','concentrico puro':'Concéntrico','pliométrico':'Pliometría','pliometrico':'Pliometría','velocidad máxima (fs)':'FS','velocidad maxima (fs)':'FS','aceleración (rcm)':'RCM','aceleracion (rcm)':'RCM','velocidad de reaccion (sev)':'SEV','velocidad de reacción (sev)':'SEV','resistencia a la velocidad (rsa)':'RSA'};
+/* plantilla: la hoja MACRO del TP final (42 semanas de handball) */
+const T_TP=[["PREPARATORIO",1,"INTRODUCTORIO","1:4","PRETEMPORADA",0,[["R",["CE","IE-IL"]],["RF",["IE-IM","II-IC","Rep III"]],["RV",["CE","IE-IL","RCM","RSA"]],["RF",["IE-IM","II-IC","Rep III"]],["R",["CE","IE-IL"]]]],["PREPARATORIO",1,"INTRODUCTORIO","2:3","PRETEMPORADA",0,[["R",["CE","IE-IL"]],["RF",["IE-IM","II-IC","Rep III","Contraste"]],["RV",["CE","IE-IL","RCM"]],["RF",["IE-IM","II-IC","Rep III","Contraste"]],["RV",["CE","IE-IL","RCM","RSA"]]]],["PREPARATORIO",1,"CARGA","3:2","PRETEMPORADA",0,[["R",["IE-IL","Rep-IC"]],["RF",["CE","IE-IM","Rep II","Rep III","Contraste"]],["RV",["IE-IL","Rep-IC","RCM","RSA"]],["RF",["CE","IE-IM","Rep II","Rep III","Contraste"]],["RV",["IE-IL","Rep-IC","RCM"]]]],["PREPARATORIO",1,"CHOQUE","4:1","PRETEMPORADA",0,[["RV",["IE-IL","RSA"]],["RF",["IE-IM","Rep-IC","I Máx","Contraste"]],["RV",["IE-IL","RCM"]],["RF",["IE-IM","Rep-IC","I Máx","Contraste"]],["RV",["IE-IL","SEV","RSA"]]]],["PREPARATORIO",1,"CARGA","3:2","PRETEMPORADA",0,[["RV",["CI","IE-IL","RSA"]],["RF",["IE-IM","Rep-IM","Rep I","I Máx"]],["RV",["CI","IE-IL","RSA"]],["RF",["IE-IM","Rep-IM","Rep I","I Máx"]],["RV",["CI","IE-IL","SEV"]]]],["PREPARATORIO",2,"REGENERATIVO","2:3","PRETEMPORADA",1,[["RV",["CE","IE-IM","RSA"]],["RF",["IE-IM","Rep-IM","Rep I","I Máx"]],["RV",["CE","IE-IM","RSA"]],["RF",["CE","Rep-IM","Rep I","I Máx"]],["RV",["CE","IE-IL","SEV"]]]],["COMPETITIVO 1",2,"CARGA","2:3","FECHA 1",0,[["R",["CE","IE-IL"]],["RF",["II-IC","Rep-IM","I Máx","Contraste"]],["RV",["CE","IE-IL","RCM"]],["RF",["II-IC","Rep-IM","I Máx","Contraste"]],["RV",["CE","IE-IL","SEV"]]]],["COMPETITIVO 1",2,"CARGA","2:3","FECHA 2",0,[["R",["CI","Rep-IM"]],["RF",["II-IC","Rep-IL","I Máx","Contraste"]],["RV",["CI","Rep-IM","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Contraste"]],["RV",["CI","Rep-IM","SEV"]]]],["COMPETITIVO 1",2,"CHOQUE","4:1","LIBRE",0,[["R",["CI","IE-IL"]],["F",["IE-IM","Rep-IC","I Máx II","Contraste"]],["R",["CI","IE-IL"]],["F",["IE-IM","Rep-IC","I Máx II","Contraste"]],["V",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",3,"REGENERATIVO","2:3","FECHA 3",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",3,"CARGA","3:2","FECHA 4",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",3,"CARGA","2:3","FECHA 5",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",3,"CHOQUE","4:1","FECHA 6",1,[["R",["CI","IE-IL"]],["RF",["IE-IM","Rep-IC","I Máx","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["IE-IM","Rep-IC","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",4,"REGENERATIVO","2:3","FECHA 7",0,[["R",["CI","IE-IL"]],["RF",["CI","IE-IM","I Máx","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["CI","Rep-IM","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",4,"CARGA","3:2","FECHA 8",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",4,"CARGA","2:3","FECHA 9",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",4,"CHOQUE","3:2","FECHA 10",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",5,"REGENERATIVO","1:4","FECHA 11",0,[["R",["CI","IE-IL"]],["RF",["CI","IE-IM","Rep III","Pirámide"]],["RV",["CI","IE-IL","RCM"]],["RF",["CI","Rep-IM","Rep III","Pirámide"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",5,"CARGA","2:3","FECHA 12",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Rep II","I Máx II"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","Rep II","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",5,"CHOQUE","4:1","LIBRE",0,[["R",["CI","IE-IL"]],["F",["IE-IM","Rep-IC","Rep I","Rep III"]],["R",["CI","IE-IL"]],["F",["IE-IM","Rep-IC","Rep I","Rep III"]],["",["CI","IE-IL"]]]],["COMPETITIVO 1",5,"CARGA","2:3","FECHA 13",0,[["R",["CI","Rep-IM"]],["RF",["II-IC","Rep-IL","Rep I","Pliometría"]],["RV",["CI","Rep-IM","RCM"]],["RF",["II-IC","Rep-IL","Rep I","Pliometría"]],["RV",["CI","Rep-IM","SEV"]]]],["COMPETITIVO 1",5,"CARGA","3:2","FECHA 14",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Rep I","Pliometría"]],["RV",["CI","IE-IL","RSA"]],["RF",["II-IC","Rep-IL","Rep I","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 1",5,"CARGA","2:3","FECHA 15",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Rep I","Pliometría"]],["RV",["CI","IE-IL","RSA"]],["RF",["II-IC","Rep-IL","Rep I","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["TRANSITORIO 1",6,"TRANSICION","1:4","RESC INV.",0,[["R",["CI","IE-IL"]],["F",["CI","IE-IM","Rep III","Pirámide"]],["R",["CI","II-IEC"]],["F",["CI","Rep-IM","Rep III","Pirámide"]],["V",["CI","IE-IL","RSA"]]]],["TRANSITORIO 1",6,"CARGA","2:3","RESC INV.",1,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Rep III","I Máx II"]],["RV",["CI","IE-IL","RSA"]],["RF",["II-IC","Rep-IL","Rep III","I Máx II"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",6,"CARGA","3:2","FECHA 1",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Rep II","Concéntrico"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","Rep II","Concéntrico"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",6,"CHOQUE","4:1","FECHA 2",0,[["R",["CI","IE-IL"]],["RF",["IE-IM","Rep-IC","Rep II","Concéntrico"]],["RV",["CI","IE-IL","RCM"]],["RF",["IE-IM","Rep-IC","Rep II","Concéntrico"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",7,"REGENERATIVO","2:3","FECHA 3",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Rep II","Concéntrico"]],["RV",["CI","IE-IM","RCM"]],["RF",["II-IC","Rep-IL","Rep II","Concéntrico"]],["RV",["CI","II-IEC","SEV"]]]],["COMPETITIVO 2",7,"CARGA","3:2","FECHA 4",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Rep II","Concéntrico"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","Rep II","Concéntrico"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",7,"CARGA","2:3","FECHA 5",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Contraste"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Contraste"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",7,"CHOQUE","4:1","FECHA 6",0,[["R",["CI","IE-IL"]],["RF",["IE-IM","Rep-IC","I Máx","Pliometría"]],["RV",["CI","IE-IL","RCM"]],["RF",["IE-IM","Rep-IC","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",8,"REGENERATIVO","2:3","FECHA 7",0,[["R",["CI","Rep-IL"]],["RF",["CI","IE-IM","I Máx","Pliometría"]],["RV",["CI","Rep-IC","RCM"]],["RF",["CI","Rep-IM","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",8,"CARGA","3:2","FECHA 8",1,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",8,"CARGA","2:3","FECHA 9",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","I Máx","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",8,"CHOQUE","4:1","FECHA 10",0,[["R",["CI","IE-IL"]],["RF",["IE-IM","Rep-IC","Contraste","Concéntrico"]],["RV",["CI","IE-IL","RCM"]],["RF",["IE-IM","Rep-IC","Contraste","Concéntrico"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",9,"REGENERATIVO","1:4","FECHA 11",0,[["R",["CI","Rep-IC"]],["RF",["CI","IE-IM","Contraste","Concéntrico"]],["RV",["CI","Rep-IM","RCM"]],["RF",["CI","Rep-IM","Contraste","Concéntrico"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",9,"CARGA","3:2","FECHA 12",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Contraste","Concéntrico"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","Contraste","Concéntrico"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",9,"CHOQUE","4:1","LIBRE",0,[["R",["CI","Rep-IM"]],["F",["IE-IM","Rep-IC","Contraste","Concéntrico"]],["R",["CI","IE-IL"]],["F",["IE-IM","Rep-IC","Contraste","Concéntrico"]],["",["CI","IE-IL"]]]],["COMPETITIVO 2",9,"CARGA","2:3","FECHA 13",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Contraste","Pliometría"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","Contraste","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",10,"CARGA","2:3","FECHA 14",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Contraste","Pliometría"]],["RV",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Contraste","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["COMPETITIVO 2",10,"CARGA","2:3","FECHA 15",0,[["R",["CI","IE-IL"]],["RF",["II-IC","Rep-IL","Contraste","Pliometría"]],["RV",["CI","IE-IL","RCM"]],["RF",["II-IC","Rep-IL","Contraste","Pliometría"]],["RV",["CI","IE-IL","SEV"]]]],["TRANSITORIO 2",10,"TRANSICION","1:4","FIN DEL TORNEO",0,[["V",["CI","SEV"]],["F",["CI","IE-IM","Rep III","Pirámide"]],["R",["CI"]],["F",["CI","Rep III","Pirámide"]],["R",["CI","IE-IM"]]]]];
+const tpSemanas=()=>T_TP.map(([per,meso,tipo,rel,comp,test,days])=>({per,meso,tipo,rel,comp,test:!!test,days:days.map(([q,met])=>({q,met:[...met]}))}));
+const tempDe=eqId=>(S.temps||[]).filter(t=>t.equipoId===eqId).sort((a,b)=>(b.inicio||'').localeCompare(a.inicio||''))[0]||null;
+const tLun=(t,i)=>{const d=parse(t.inicio);d.setDate(d.getDate()+7*i);return d};
+const MESES_C=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function tSemHoy(t){const k=Math.floor(days(today(),parse(t.inicio))/7);return k>=0&&k<t.semanas.length?k:null}
+const tCompL=c=>!c?'—':/^PRETEMP/i.test(c)?'Pret.':/^FECHA/i.test(c)?'F'+c.replace(/\D/g,''):/^LIBRE/i.test(c)?'Libre':/^RESC|RECESO/i.test(c)?'Receso':/^FIN/i.test(c)?'Fin':c.slice(0,6);
+const tCompLong=c=>!c?'Sin competencia':/^PRETEMP/i.test(c)?'Pretemporada':/^FECHA/i.test(c)?'Fecha '+c.replace(/\D/g,'')+' de liga':/^LIBRE/i.test(c)?'Fecha libre':/^RESC|RECESO/i.test(c)?'Receso de invierno':/^FIN/i.test(c)?'Fin del torneo':c;
+const tCap=s=>s?s.charAt(0)+s.slice(1).toLowerCase():'';
+function lunesProx(){const d=today();const k=(8-d.getDay())%7;d.setDate(d.getDate()+k);return iso(d)}
+
+function temporadaHTML(q){const t=tempDe(q._id);
+  if(!t)return `<div class="card pad tp-empty"><div><b>Temporada</b><p class="hint">Todavía no tiene temporada. Armala desde la planilla del TP, importando la hoja MACRO de un Excel o en blanco.</p></div><button class="btn pri" type="button" data-tpnew="${esc(q._id)}">Crear temporada</button></div>`;
+  const W=t.semanas,hoy=tSemHoy(t);
+  const spans=f=>{const o=[];W.forEach((w,i)=>{const v=f(w,i);if(o.length&&o[o.length-1].v===v)o[o.length-1].n++;else o.push({v,n:1})});return o};
+  let g='<div class="lab">Período</div>'+spans(w=>w.per).map(s=>`<div class="span per" style="grid-column:span ${s.n}" title="${esc(s.v)}">${esc(s.n>2?tCap(s.v):s.v.slice(0,5)+'.')}</div>`).join('');
+  g+='<div class="rowline"></div><div class="lab">Mes</div>'+spans((w,i)=>MESES_C[tLun(t,i).getMonth()]).map(s=>`<div class="span" style="grid-column:span ${s.n}">${esc(s.n>1?s.v:s.v.slice(0,3))}</div>`).join('');
+  g+='<div class="rowline"></div><div class="lab">Mesociclo</div>'+spans(w=>w.meso).map(s=>`<div class="span" style="grid-column:span ${s.n}">${s.n>1?'Meso ':'M'}${esc(s.v)}</div>`).join('');
+  g+='<div class="rowline"></div><div class="lab">Semana</div>'+W.map((w,i)=>`<button type="button" class="wk t-${esc(w.tipo)}${i===hoy?' hoy':''}" data-tpsem="${esc(t._id)}:${i}" aria-label="Semana ${i+1}, ${fmtShort(iso(tLun(t,i)))}: ${T_TIPOS[w.tipo]||w.tipo} ${esc(w.rel)}, ${esc(tCompLong(w.comp))}${w.test?', semana de test':''}${i===hoy?', semana actual':''}">${w.test?'<span class="tst">T</span>':''}<span class="bar" style="height:${(parseInt(w.rel,10)||1)*15}px"></span><span class="n">${i+1}</span></button>`).join('');
+  g+='<div class="rowline"></div><div class="lab">Competencia</div>'+W.map(w=>`<div class="comp ${/^FECHA/i.test(w.comp)?'f':''}" title="${esc(tCompLong(w.comp))}">${esc(tCompL(w.comp))}</div>`).join('');
+  const prox=(f,desde)=>{for(let i=desde;i<W.length;i++)if(f(W[i]))return i;return -1};
+  const d0=hoy??(days(today(),parse(t.inicio))<0?0:W.length),pf=prox(w=>/^FECHA/i.test(w.comp),d0),pt=prox(w=>w.test,d0);
+  const cur=hoy!=null?W[hoy]:null;
+  const fin=iso(tLun(t,W.length-1));
+  return `<div class="card tp-card"><div class="pad tp-h"><div><b>Temporada ${esc(t.nombre||'')}</b><p class="hint">${plural(W.length,'semana','semanas')} · del ${fmtD(t.inicio)} al ${fmtD(fin)} · partido el ${esc((t.partido||'Sábado').toLowerCase())}</p></div>
+    <div class="actions"><button class="btn" type="button" data-tptab="${esc(t._id)}">Editar tabla</button><button class="btn" type="button" data-tpcfg="${esc(t._id)}">Ajustes</button></div></div>
+    <div class="eq-kpis"><div><b>${hoy!=null?'S'+(hoy+1):'—'}</b><span>${cur?`${T_TIPOS[cur.tipo]||cur.tipo} ${esc(cur.rel)} · ${esc(tCap(cur.per))}`:days(today(),parse(t.inicio))<0?'empieza el '+fmtD(t.inicio):'temporada terminada'}</span></div>
+      <div><b>${pf>=0?tCompL(W[pf].comp):'—'}</b><span>${pf>=0?'próxima fecha · semana '+(pf+1)+' ('+fmtShort(iso(tLun(t,pf)))+')':'sin fechas por delante'}</span></div>
+      <div><b>${pt>=0?'S'+(pt+1):'—'}</b><span>${pt>=0?'próximo test · '+fmtShort(iso(tLun(t,pt))):'sin tests por delante'}</span></div>
+      <div><b>${W.filter(w=>/^FECHA/i.test(w.comp)).length}</b><span>fechas de liga · ${W.filter(w=>w.test).length} tests</span></div></div>
+    <div class="tp-legend">${Object.entries(T_TIPOS).map(([k,v])=>`<span><i class="sw t-${k}"></i>${v}</span>`).join('')}<span>Altura = nivel de carga</span><span><b class="tst-l">T</b> test</span><span><i class="sw hoy-l"></i>semana actual</span></div>
+    <div class="tp-scroll" data-keep-scroll><div class="tp-season" style="--n:${W.length}">${g}</div></div></div>`}
+
+/* --- leer la hoja MACRO de un Excel --- */
+function macroDesdeAOA(aoa){
+  const txt=v=>v==null?'':String(v).trim(),low=v=>txt(v).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ');
+  const fila=re=>aoa.findIndex(r=>r&&r.slice(0,5).some(c=>re.test(low(c))));
+  const rN=fila(/^n.? ?microciclo/),rT=fila(/^tipo microciclo/),rP=fila(/^periodo$/),rMe=fila(/^mesociclos?$/),rC=fila(/^competencia/);
+  if(rN<0||rT<0)throw new Error('No encontré las filas «N° Microciclo» y «Tipo Microciclo». ¿Es la hoja MACRO?');
+  const cols=[];(aoa[rN]||[]).forEach((v,c,row)=>{if(c>3&&typeof v==='number'&&v>0&&row[c-1]!==v)cols.push(c)});
+  if(!cols.length)throw new Error('No encontré los números de microciclo.');
+  const ff=(r,c)=>{if(r<0)return '';for(let k=c;k>=4;k--){const v=aoa[r]&&aoa[r][k];if(v!=null&&txt(v)!=='')return txt(v)}return ''};
+  const rRel=rT+1;
+  const qRows={},mRows={};let rTest=-1;
+  aoa.forEach((r,i)=>{if(!r||i<=rT)return;const b=low(r[1]),c=low(r[2]);
+    if(b==='test'||c==='test')rTest=i;
+    if(['resistencia','fuerza','velocidad'].includes(c))qRows[i]=c==='resistencia'?'R':c==='fuerza'?'F':'V';
+    else if(T_XL[c])mRows[i]=T_XL[c]});
+  const tipoN=s=>{const x=low(s).replace(/ó/g,'o');return x.startsWith('intro')?'INTRODUCTORIO':x.startsWith('carga')?'CARGA':x.startsWith('choq')?'CHOQUE':x.startsWith('regen')?'REGENERATIVO':x.startsWith('trans')?'TRANSICION':'CARGA'};
+  const perN=s=>{const x=low(s);return x.startsWith('prep')?'PREPARATORIO':x.startsWith('comp')?(x.includes('2')?'COMPETITIVO 2':'COMPETITIVO 1'):x.startsWith('tr')?(x.includes('2')?'TRANSITORIO 2':'TRANSITORIO 1'):txt(s).toUpperCase()};
+  return cols.map((c0,i)=>{const c1=(cols[i+1]||c0+5)-1;const days=[];
+    for(let c=c0;c<=Math.min(c1,c0+4);c++){const q=Object.entries(qRows).filter(([r])=>txt(aoa[r]&&aoa[r][c])).map(([,v])=>v);
+      const met=[...new Set(Object.entries(mRows).filter(([r])=>txt(aoa[r]&&aoa[r][c])).map(([,v])=>v))];days.push({q:['R','F','V'].filter(x=>q.includes(x)).join(''),met})}
+    while(days.length<5)days.push({q:'',met:[]});
+    let test=false;if(rTest>=0)for(let c=c0;c<=c1;c++)if(txt(aoa[rTest][c]))test=true;
+    const rel=txt(aoa[rRel]&&aoa[rRel][c0]);
+    return {per:perN(ff(rP,c0)),meso:Number(ff(rMe,c0))||1,tipo:tipoN(txt(aoa[rT][c0])),rel:T_RELS.includes(rel)?rel:'2:3',comp:txt(aoa[rC]&&aoa[rC][c0]).toUpperCase(),test,days}})}
+const tResumen=W=>`${plural(W.length,'semana','semanas')} · ${[...new Set(W.map(w=>w.per))].length} períodos · ${[...new Set(W.map(w=>w.meso))].length} mesociclos · ${W.filter(w=>/^FECHA/i.test(w.comp)).length} fechas · ${W.filter(w=>w.test).length} tests`;
+
+/* --- hoja: crear temporada --- */
+function tpNewHTML(a){
+  return `<form id="tpf" class="form pad">
+    <label class="full">Nombre<input id="tp-n" value="${esc(a.n??String(today().getFullYear()))}" placeholder="Ej: 2027"></label>
+    <label>Lunes de la semana 1<input id="tp-ini" type="date" required value="${esc(a.ini||lunesProx())}"></label>
+    <label>Día de partido<select id="tp-par">${['Sábado','Domingo'].map(d=>`<option ${d===(a.par||'Sábado')?'selected':''}>${d}</option>`).join('')}</select></label>
+    <fieldset class="full tf-rm"><legend>Punto de partida</legend>
+      <label class="av-g"><input type="radio" name="tp-src" value="tp" ${a.src!=='xl'&&a.src!=='vac'?'checked':''}> Planilla del TP final (42 semanas de handball, 2 torneos de 15 fechas)</label>
+      <label class="av-g"><input type="radio" name="tp-src" value="xl" ${a.src==='xl'?'checked':''}> Importar la hoja MACRO de un Excel</label>
+      ${a.src==='xl'?`<div class="tp-xl"><label class="btn" style="cursor:pointer">Elegir Excel<input id="tp-file" type="file" accept=".xlsx" hidden></label><span class="hint">${a.prev?`<b>${esc(a.arch)}</b> · ${esc(tResumen(a.prev))}`:a.err?`<span style="color:var(--bad)">${esc(a.err)}</span>`:'Busca la hoja que se llame MACRO (o la primera).'}</span></div>`:''}
+      <label class="av-g"><input type="radio" name="tp-src" value="vac" ${a.src==='vac'?'checked':''}> En blanco con <input id="tp-nsem" type="number" min="4" max="60" value="${esc(a.nsem||42)}" style="width:70px"> semanas</label>
+    </fieldset>
+    <p class="hint full">Las fechas de cada semana salen del lunes de inicio. Después se edita todo: tipo, relación de carga, competencia, tests, cualidades y métodos de cada día.</p>
+    <p class="hint full" id="tp-msg" role="alert"></p>
+    <div class="full actions"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Crear temporada</button></div></form>`}
+function bindTpNew(a){const ov=$('#overlay');
+  const leer=()=>{a.n=$('#tp-n').value;a.ini=$('#tp-ini').value;a.par=$('#tp-par').value;a.nsem=$('#tp-nsem').value;a.src=(ov.querySelector('[name=tp-src]:checked')||{}).value||'tp'};
+  ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};
+  ov.onchange=async ev=>{if(ev.target.name==='tp-src'){leer();renderSheet();return}
+    if(ev.target.id==='tp-file'){leer();const f=ev.target.files[0];if(!f)return;a.arch=f.name;a.prev=null;a.err='';
+      try{const aoa=await leerXLSX(await f.arrayBuffer(),/^macro$/i);a.prev=macroDesdeAOA(aoa)}catch(x){a.err=x.message||'No pude leer el Excel.'}renderSheet()}};
+  $('#tpf').onsubmit=async ev=>{ev.preventDefault();leer();const msg=$('#tp-msg');
+    if(!a.ini){msg.textContent='Elegí el lunes de la semana 1.';return}
+    if(parse(a.ini).getDay()!==1){msg.textContent='La semana 1 tiene que empezar un lunes.';return}
+    let W;if(a.src==='xl'){if(!a.prev){msg.textContent='Elegí el Excel con la hoja MACRO.';return}W=a.prev}
+    else if(a.src==='vac'){const n=Math.min(60,Math.max(4,Number(a.nsem)||42));W=Array.from({length:n},(_,i)=>({per:'PREPARATORIO',meso:Math.floor(i/4)+1,tipo:'CARGA',rel:'2:3',comp:'',test:false,days:T_DIAS.map(()=>({q:'',met:[]}))}))}
+    else W=tpSemanas();
+    const doc={equipoId:a.eq,nombre:(a.n||'').trim(),inicio:a.ini,partido:a.par||'Sábado',semanas:W,origen:a.src==='xl'?'Excel: '+a.arch:a.src==='vac'?'En blanco':'Planilla del TP final',ts:Date.now()};
+    if(await write(()=>S.db.collection('temporadas').add(doc))){toast('Temporada creada');closeSheet()}}}
+
+/* --- hoja: editar una semana --- */
+function tpSemHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const w=a.w;const i=a.i;
+  const metOpts=q=>Object.entries(T_MET).filter(([,m])=>m[1]===q);
+  return `<form id="tsf" class="pad">
+    <div class="tp-sn"><button class="btn" type="button" data-tsstep="-1" ${i===0?'disabled':''} aria-label="Semana anterior">‹</button><b>Semana ${i+1}</b><span class="hint">${fmtD(iso(tLun(t,i)))} al ${fmtD(iso(new Date(tLun(t,i).getTime()+6*864e5)))}</span><button class="btn" type="button" data-tsstep="1" ${i===t.semanas.length-1?'disabled':''} aria-label="Semana siguiente">›</button></div>
+    <div class="form cols3" style="margin-top:12px">
+      <label>Tipo<select id="ts-tipo">${Object.entries(T_TIPOS).map(([k,v])=>`<option value="${k}" ${k===w.tipo?'selected':''}>${v}</option>`).join('')}</select></label>
+      <label>Relación de carga<select id="ts-rel">${T_RELS.map(r=>`<option ${r===w.rel?'selected':''}>${r}</option>`).join('')}</select></label>
+      <label>Competencia<input id="ts-comp" list="ts-comp-l" value="${esc(w.comp)}" placeholder="Ej: FECHA 3, LIBRE"><datalist id="ts-comp-l"><option value="PRETEMPORADA"><option value="LIBRE"><option value="RECESO"><option value="FIN DEL TORNEO">${Array.from({length:15},(_,k)=>`<option value="FECHA ${k+1}">`).join('')}</datalist></label>
+      <label>Período<select id="ts-per">${T_PERS.map(p=>`<option value="${p}" ${p===w.per?'selected':''}>${tCap(p)}</option>`).join('')}</select></label>
+      <label>Mesociclo<input id="ts-meso" type="number" min="1" step="1" value="${esc(w.meso)}"></label>
+      <label class="av-g" style="align-self:end"><input type="checkbox" id="ts-test" ${w.test?'checked':''}> Semana de test</label>
+    </div>
+    <div class="tp-days">${w.days.map((d,k)=>`<div class="tp-day"><div class="tp-day-h"><b>${T_DIAS[k]}</b>${['R','F','V'].map(q=>`<button type="button" class="qt ${q}" data-tsq="${k}:${q}" aria-pressed="${d.q.includes(q)}">${T_Q[q]}</button>`).join('')}</div>
+      <div class="tp-mets">${d.met.map(m=>`<span class="mchip q${(T_MET[m]||[])[1]||''}" title="${esc((T_MET[m]||[m])[0]+' · '+((T_MET[m]||[])[2]||''))}">${esc(m)}<button type="button" data-tsdel="${k}:${esc(m)}" aria-label="Quitar ${esc(m)}">×</button></span>`).join('')||'<span class="hint">Sin métodos</span>'}
+        <select class="mini" data-tsadd="${k}" aria-label="Agregar método el ${T_DIAS[k]}"><option value="">+ método</option>${['R','F','V'].map(q=>`<optgroup label="${T_Q[q]}">${metOpts(q).filter(([m])=>!d.met.includes(m)).map(([m,x])=>`<option value="${esc(m)}">${esc(m)} · ${esc(x[0])}</option>`).join('')}</optgroup>`).join('')}</select></div>
+      ${d.met.some(m=>T_MET[m]&&!d.q.includes(T_MET[m][1]))?'<p class="hint tp-warn">Hay métodos de una cualidad que el día no tiene marcada.</p>':''}</div>`).join('')}</div>
+    <p class="hint" id="ts-msg" role="alert"></p>
+    <div class="actions" style="margin-top:10px"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Guardar semana</button></div></form>`}
+function bindTpSem(a){const ov=$('#overlay');
+  const leer=()=>{const w=a.w;w.tipo=$('#ts-tipo').value;w.rel=$('#ts-rel').value;w.comp=$('#ts-comp').value.trim().toUpperCase();w.per=$('#ts-per').value;w.meso=Number($('#ts-meso').value)||w.meso;w.test=$('#ts-test').checked};
+  ov.onchange=ev=>{const s=ev.target.closest('[data-tsadd]');if(s&&s.value){leer();const d=a.w.days[+s.dataset.tsadd];d.met.push(s.value);const q=T_MET[s.value][1];if(!d.q.includes(q))d.q=['R','F','V'].filter(x=>x===q||d.q.includes(x)).join('');a.dirty=true;renderSheet()}};
+  ov.onclick=async ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
+    const st=ev.target.closest('[data-tsstep]');if(st){leer();if(a.dirty||JSON.stringify(a.w)!==a.orig){if(!await guardarSem(a))return}const t=(S.temps||[]).find(x=>x._id===a.tid);const i=a.i+Number(st.dataset.tsstep);openSheet('__tpsem','ver',semArg(t,i));return}
+    const qb=ev.target.closest('[data-tsq]');if(qb){leer();const[k,q]=qb.dataset.tsq.split(':');const d=a.w.days[+k];d.q=d.q.includes(q)?d.q.replace(q,''):['R','F','V'].filter(x=>x===q||d.q.includes(x)).join('');a.dirty=true;renderSheet();return}
+    const dl=ev.target.closest('[data-tsdel]');if(dl){leer();const[k,m]=dl.dataset.tsdel.split(':');a.w.days[+k].met=a.w.days[+k].met.filter(x=>x!==m);a.dirty=true;renderSheet()}};
+  $('#tsf').onsubmit=async ev=>{ev.preventDefault();leer();if(await guardarSem(a)){toast('Semana '+(a.i+1)+' guardada');closeSheet()}}}
+const semArg=(t,i)=>({tid:t._id,i,w:JSON.parse(JSON.stringify(t.semanas[i])),orig:JSON.stringify(t.semanas[i])});
+async function guardarSem(a){const t=(S.temps||[]).find(x=>x._id===a.tid);if(!t)return false;const W=t.semanas.slice();W[a.i]=a.w;
+  const {_id,...doc}=t;return write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:W}))}
+
+/* --- hoja: tabla de toda la temporada --- */
+function tpTabHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const W=a.W;
+  return `<form id="ttf" class="pad"><p class="hint">Editá varias semanas a la vez. Los métodos de cada día se editan tocando la semana en el tablero.</p>
+    <div class="tbl-wrap" style="margin-top:10px;max-height:62vh"><table class="eq-t tp-tab"><thead><tr><th>Sem.</th><th>Lunes</th><th>Período</th><th>Meso</th><th>Tipo</th><th>Relación</th><th>Competencia</th><th>Test</th></tr></thead><tbody>
+    ${W.map((w,i)=>`<tr class="t-${esc(w.tipo)}"><td><b>${i+1}</b></td><td>${fmtShort(iso(tLun(t,i)))}</td>
+      <td><select data-tt="${i}:per" aria-label="Período semana ${i+1}">${T_PERS.map(p=>`<option value="${p}" ${p===w.per?'selected':''}>${tCap(p)}</option>`).join('')}</select></td>
+      <td><input data-tt="${i}:meso" type="number" min="1" step="1" value="${esc(w.meso)}" aria-label="Mesociclo semana ${i+1}" style="width:58px"></td>
+      <td><span class="dot"></span><select data-tt="${i}:tipo" aria-label="Tipo semana ${i+1}">${Object.entries(T_TIPOS).map(([k,v])=>`<option value="${k}" ${k===w.tipo?'selected':''}>${v}</option>`).join('')}</select></td>
+      <td><select data-tt="${i}:rel" aria-label="Relación semana ${i+1}">${T_RELS.map(r=>`<option ${r===w.rel?'selected':''}>${r}</option>`).join('')}</select></td>
+      <td><input data-tt="${i}:comp" list="ts-comp-l2" value="${esc(w.comp)}" aria-label="Competencia semana ${i+1}" style="width:130px"></td>
+      <td><input data-tt="${i}:test" type="checkbox" ${w.test?'checked':''} aria-label="Test semana ${i+1}"></td></tr>`).join('')}</tbody></table></div>
+    <datalist id="ts-comp-l2"><option value="PRETEMPORADA"><option value="LIBRE"><option value="RECESO"><option value="FIN DEL TORNEO">${Array.from({length:15},(_,k)=>`<option value="FECHA ${k+1}">`).join('')}</datalist>
+    <div class="actions" style="margin-top:10px"><button class="btn" type="button" data-ttadd>+ Agregar semana al final</button>${W.length>4?`<button class="btn" type="button" data-ttrm>Quitar la última</button>`:''}<span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Guardar cambios</button></div></form>`}
+function bindTpTab(a){const ov=$('#overlay');
+  ov.onchange=ev=>{const x=ev.target.closest('[data-tt]');if(!x)return;const[i,k]=x.dataset.tt.split(':');const w=a.W[+i];
+    w[k]=k==='test'?x.checked:k==='meso'?(Number(x.value)||w.meso):k==='comp'?x.value.trim().toUpperCase():x.value;if(k==='tipo')x.closest('tr').className='t-'+x.value};
+  ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
+    if(ev.target.closest('[data-ttadd]')){const l=a.W[a.W.length-1];a.W.push({per:l.per,meso:l.meso,tipo:'CARGA',rel:'2:3',comp:'',test:false,days:T_DIAS.map(()=>({q:'',met:[]}))});renderSheet();return}
+    if(ev.target.closest('[data-ttrm]')){a.W.pop();renderSheet()}};
+  $('#ttf').onsubmit=async ev=>{ev.preventDefault();const t=(S.temps||[]).find(x=>x._id===a.tid);const {_id,...doc}=t;
+    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:a.W}))){toast('Temporada guardada');closeSheet()}}}
+
+/* --- hoja: ajustes de la temporada --- */
+function tpCfgHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);
+  return `<form id="tcf" class="form pad">
+    <label class="full">Nombre<input id="tc-n" value="${esc(t.nombre||'')}"></label>
+    <label>Lunes de la semana 1<input id="tc-ini" type="date" required value="${esc(t.inicio)}"></label>
+    <label>Día de partido<select id="tc-par">${['Sábado','Domingo'].map(d=>`<option ${d===(t.partido||'Sábado')?'selected':''}>${d}</option>`).join('')}</select></label>
+    <p class="hint full">Origen: ${esc(t.origen||'—')}. Si movés el inicio, todas las semanas se corren con él.</p>
+    <p class="hint full" id="tc-msg" role="alert"></p>
+    <div class="full actions"><button class="btn danger" type="button" data-tcdel>${S.tcArm===t._id?'Tocá de nuevo para borrar la temporada':'Borrar temporada'}</button><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`}
+function bindTpCfg(a){const ov=$('#overlay');
+  ov.onclick=async ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){S.tcArm=null;closeSheet();return}
+    if(ev.target.closest('[data-tcdel]')){if(S.tcArm!==a.tid){S.tcArm=a.tid;renderSheet();return}S.tcArm=null;if(await write(()=>S.db.collection('temporadas').doc(a.tid).delete())){toast('Temporada borrada');closeSheet()}}};
+  $('#tcf').onsubmit=async ev=>{ev.preventDefault();const ini=$('#tc-ini').value;if(!ini||parse(ini).getDay()!==1){$('#tc-msg').textContent='La semana 1 tiene que empezar un lunes.';return}
+    const t=(S.temps||[]).find(x=>x._id===a.tid);const {_id,...doc}=t;
+    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,nombre:$('#tc-n').value.trim(),inicio:ini,partido:$('#tc-par').value}))){toast('Temporada actualizada');closeSheet()}}}
+
+document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-tpnew],[data-tpsem],[data-tptab],[data-tpcfg]');if(!b)return;const D=b.dataset;
+  if(D.tpnew!=null){openSheet('__tpnew','ver',{eq:D.tpnew});return}
+  if(D.tpsem!=null){const[tid,i]=D.tpsem.split(':');const t=(S.temps||[]).find(x=>x._id===tid);if(t)openSheet('__tpsem','ver',semArg(t,+i));return}
+  if(D.tptab!=null){const t=(S.temps||[]).find(x=>x._id===D.tptab);if(t)openSheet('__tptab','ver',{tid:t._id,W:JSON.parse(JSON.stringify(t.semanas))});return}
+  if(D.tpcfg!=null){S.tcArm=null;openSheet('__tpcfg','ver',{tid:D.tpcfg});return}});
 (()=>{let y0=scrollY,raf=0;addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const y=scrollY,f=$('#fab');if(!f)return;
   const nearEnd=innerHeight+y>=document.documentElement.scrollHeight-140;f.classList.toggle('min',y>80&&(y>y0||nearEnd));f.classList.toggle('lift',nearEnd);y0=y})},{passive:true})})();
 /* Esc lo maneja el <dialog> nativo */
@@ -2383,6 +2580,7 @@ show(location.hash.slice(1)||'panel');
   db.collection('ejercicios').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.ejs=m;S.ejsV++;got.j=true;done()},onErr);
   db.collection('plantillas').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.plantillas=m;got.t=true;done()},onErr);
   db.collection('equipos').onSnapshot(s=>{S.equipos=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
+  db.collection('temporadas').onSnapshot(s=>{S.temps=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
   db.collection('tests').onSnapshot(s=>{S.tests=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
   db.collection('eventos').onSnapshot(s=>{S.evs=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
   db.collection('liquidaciones').onSnapshot(s=>{S.liqs=s.docs.map(d=>({...d.data(),_id:d.id}));pedirRender()},()=>{});
