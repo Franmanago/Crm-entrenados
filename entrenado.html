@@ -593,7 +593,7 @@ function kg(it){const a=ajusteHoy();if(a&&ajustable(it))return kgBase({...it,pct
 function ytId(u){if(!u)return null;let m=u.match(/shorts\/([\w-]{6,})/)||u.match(/[?&]v=([\w-]{6,})/)||u.match(/youtu\.be\/([\w-]{6,})/)||u.match(/embed\/([\w-]{6,})/);return m?{id:m[1],short:/shorts\//.test(u)}:null}
 const regsFor=uid=>(D.registros||[]).filter(r=>r.item===uid).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.ts||0)-(a.ts||0));
 
-const rutSwitch=()=>D&&D.rutinas&&D.rutinas.length>1?`<div class="rsw" role="group" aria-label="Qué rutina ver">${D.rutinas.map(r=>`<button type="button" data-rsel="${esc(r.id)}" aria-pressed="${r.id===D.rutina.id}">${r.equipo?'Plan del equipo':'Mi rutina personal'}</button>`).join('')}</div>`:'';
+const rutSwitch=()=>D&&D.rutinas&&D.rutinas.length===2&&D.rutinas.some(r=>r.equipo)&&D.rutinas.some(r=>!r.equipo)?`<div class="rsw" role="group" aria-label="Qué rutina ver">${D.rutinas.map(r=>`<button type="button" data-rsel="${esc(r.id)}" aria-pressed="${r.id===D.rutina.id}">${r.equipo?'Plan del equipo':'Mi rutina personal'}</button>`).join('')}</div>`:'';
 const vistaTabs=()=>rutSwitch()+`<div class="vistas" role="tablist"><button class="vista" data-vista="rutina" aria-pressed="${vista==='rutina'}">Mi rutina</button><button class="vista" data-vista="progreso" aria-pressed="${vista==='progreso'}">Mi progreso</button></div>`;
 const isoW=d=>{const x=new Date(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
 const asisRegs=()=>(D.registros||[]).filter(r=>String(r.item||'').startsWith('asis:'));
@@ -1078,7 +1078,8 @@ document.addEventListener('submit',async ev=>{
   if(!data)return fail('Este link no es válido','Pedile a tu entrenador que te lo reenvíe.');
   D=data;D.videos=D.videos||{};
   /* puede haber dos rutinas activas: la propia y el plan del equipo (se elige arriba) */
-  D.rutinas=(Array.isArray(D.rutinas)&&D.rutinas.length?D.rutinas:(D.rutina?[D.rutina]:[]));
+  /* como mucho dos: la rutina propia más reciente y el plan del equipo más reciente; el selector aparece solo si están las dos */
+  {const todas=(Array.isArray(D.rutinas)&&D.rutinas.length?D.rutinas:(D.rutina?[D.rutina]:[]));D.rutinas=[todas.find(r=>!r.equipo),todas.find(r=>r.equipo)].filter(Boolean)}
   {const sel=store.get('rutSel');D.rutina=D.rutinas.find(r=>r.id===sel)||D.rutina||D.rutinas[0]||null}
   initRut();
   render();

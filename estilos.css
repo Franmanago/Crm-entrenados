@@ -807,3 +807,13 @@ select.mini{font:inherit;font-size:12.5px;padding:3px 4px;border:1px dashed var(
 .te-modo{font:inherit;font-size:13px;padding:4px 6px;border:1.5px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);margin:0 0 6px 26px;max-width:calc(100% - 26px)}
 .tp-sum{display:flex;flex-direction:column;gap:2px;background:var(--surface-2);border-radius:var(--r);padding:10px 12px;margin-top:10px;font-size:13.5px}
 .tp-sum span{color:var(--muted)}
+.tp-opt{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;cursor:pointer;text-transform:none!important;letter-spacing:0!important;font-size:14px!important;color:var(--ink)!important;font-weight:500!important}
+.tp-opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.tp-opt input[type=radio]{width:18px!important;height:18px;min-height:0;padding:0;margin:2px 0 0;flex:none;accent-color:var(--accent)}
+.tp-opt span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tp-opt b{font-weight:700}
+.tp-opt small{color:var(--muted);font-size:12.5px}
+.tp-sub{display:flex!important;flex-direction:row!important;flex-wrap:wrap;align-items:center;gap:8px;padding:2px 0 4px 40px;text-transform:none!important;letter-spacing:0!important;font-size:14px!important;color:var(--ink)!important;font-weight:500!important}
+.tp-sub input,.tp-sub select{width:auto!important}
+.tp-sub input[type=number]{width:80px!important}
+.tf-rm .tp-xl{padding-left:40px}

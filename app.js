@@ -2415,7 +2415,7 @@ const tCap=s=>s?s.charAt(0)+s.slice(1).toLowerCase():'';
 function lunesProx(){const d=today();const k=(8-d.getDay())%7;d.setDate(d.getDate()+k);return iso(d)}
 
 function temporadaHTML(q){const t=tempDe(q._id);
-  if(!t)return `<div class="card pad tp-empty"><div><b>Temporada</b><p class="hint">Todavía no tiene temporada. Armala desde la planilla del TP, importando la hoja MACRO de un Excel o en blanco.</p></div><button class="btn pri" type="button" data-tpnew="${esc(q._id)}">Crear temporada</button></div>`;
+  if(!t)return `<div class="card pad tp-empty"><div><b>Temporada</b><p class="hint">Todavía no tiene temporada. Armala desde la plantilla temporada promedio handball, importando un Excel o en blanco.</p></div><button class="btn pri" type="button" data-tpnew="${esc(q._id)}">Crear temporada</button></div>`;
   const W=t.semanas,hoy=tSemHoy(t);
   const spans=f=>{const o=[];W.forEach((w,i)=>{const v=f(w,i);if(o.length&&o[o.length-1].v===v)o[o.length-1].n++;else o.push({v,n:1})});return o};
   let g='<div class="lab">Período</div>'+spans(w=>w.per).map(s=>`<div class="span per" style="grid-column:span ${s.n}" title="${esc(s.v)}">${esc(s.n>2?tCap(s.v):s.v.slice(0,5)+'.')}</div>`).join('');
@@ -2469,17 +2469,18 @@ function tpNewHTML(a){
     <label>Lunes de la semana 1<input id="tp-ini" type="date" required value="${esc(a.ini||lunesProx())}"></label>
     <label>Día de partido<select id="tp-par">${['Sábado','Domingo'].map(d=>`<option ${d===(a.par||'Sábado')?'selected':''}>${d}</option>`).join('')}</select></label>
     <fieldset class="full tf-rm"><legend>Punto de partida</legend>
-      <label class="av-g"><input type="radio" name="tp-src" value="tp" ${a.src!=='xl'&&a.src!=='vac'?'checked':''}> Planilla del TP final (42 semanas de handball, 2 torneos de 15 fechas)</label>
-      <label class="av-g"><input type="radio" name="tp-src" value="xl" ${a.src==='xl'?'checked':''}> Importar la hoja MACRO de un Excel</label>
-      ${a.src==='xl'?`<div class="tp-xl"><label class="btn" style="cursor:pointer">Elegir Excel<input id="tp-file" type="file" accept=".xlsx" hidden></label><span class="hint">${a.xl?`<b>${esc(a.arch)}</b> · ${esc(xlResumen(a.xl))}`:a.err?`<span style="color:var(--bad)">${esc(a.err)}</span>`:'Lee el plan de la hoja MACRO y las dosis de MICROCICLOS y PESAS. Si trae DIAGNÓSTICO, lo podés cargar como test de un jugador.'}</span></div>
-      ${a.xl&&a.xl.diag?(()=>{const q=(S.equipos||[]).find(x=>x._id===a.eq)||{},js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean);return js.length?`<label class="av-g" style="padding-left:26px">Cargar el diagnóstico (VAM ${a.xl.diag.vam?nfx(a.xl.diag.vam,2):'—'}) como test de <select id="tp-dj"><option value="">(no cargar)</option>${js.map(e=>`<option value="${esc(e.id)}" ${a.dj===e.id?'selected':''}>${esc(name(e))}</option>`).join('')}</select></label>`:''})():''}`:''}
-      <label class="av-g"><input type="radio" name="tp-src" value="vac" ${a.src==='vac'?'checked':''}> En blanco con <input id="tp-nsem" type="number" min="4" max="60" value="${esc(a.nsem||42)}" style="width:70px"> semanas</label>
+      <label class="tp-opt"><input type="radio" name="tp-src" value="tp" ${a.src!=='xl'&&a.src!=='vac'?'checked':''}><span><b>Plantilla temporada promedio handball</b><small>42 semanas, 2 torneos de 15 fechas, con la dosis de las primeras 13 semanas</small></span></label>
+      <label class="tp-opt"><input type="radio" name="tp-src" value="xl" ${a.src==='xl'?'checked':''}><span><b>Importar desde un Excel</b><small>Plan de la hoja MACRO y dosis de MICROCICLOS y PESAS</small></span></label>
+      ${a.src==='xl'?`<div class="tp-xl"><label class="btn" style="cursor:pointer">Elegir Excel<input id="tp-file" type="file" accept=".xlsx" hidden></label><span class="hint">${a.xl?`<b>${esc(a.arch)}</b> · ${esc(xlResumen(a.xl))}`:a.err?`<span style="color:var(--bad)">${esc(a.err)}</span>`:'Elegí el archivo. Si trae la hoja DIAGNÓSTICO, la podés cargar como test de un jugador.'}</span></div>
+      ${a.xl&&a.xl.diag?(()=>{const q=(S.equipos||[]).find(x=>x._id===a.eq)||{},js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean);return js.length?`<label class="tp-sub">Cargar el diagnóstico (VAM ${a.xl.diag.vam?nfx(a.xl.diag.vam,2):'—'}) como test de <select id="tp-dj"><option value="">(no cargar)</option>${js.map(e=>`<option value="${esc(e.id)}" ${a.dj===e.id?'selected':''}>${esc(name(e))}</option>`).join('')}</select></label>`:''})():''}`:''}
+      <label class="tp-opt"><input type="radio" name="tp-src" value="vac" ${a.src==='vac'?'checked':''}><span><b>En blanco</b><small>Armás todo desde cero</small></span></label>
+      ${a.src==='vac'?`<label class="tp-sub">Cantidad de semanas <input id="tp-nsem" type="number" min="4" max="60" value="${esc(a.nsem||42)}"></label>`:''}
     </fieldset>
     <p class="hint full">Las fechas de cada semana salen del lunes de inicio. Después se edita todo: tipo, relación de carga, competencia, tests, cualidades y métodos de cada día.</p>
     <p class="hint full" id="tp-msg" role="alert"></p>
     <div class="full actions"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Crear temporada</button></div></form>`}
 function bindTpNew(a){const ov=$('#overlay');
-  const leer=()=>{a.n=$('#tp-n').value;a.ini=$('#tp-ini').value;a.par=$('#tp-par').value;a.nsem=$('#tp-nsem').value;a.src=(ov.querySelector('[name=tp-src]:checked')||{}).value||'tp'};
+  const leer=()=>{a.n=$('#tp-n').value;a.ini=$('#tp-ini').value;a.par=$('#tp-par').value;a.nsem=$('#tp-nsem')?$('#tp-nsem').value:(a.nsem||42);a.src=(ov.querySelector('[name=tp-src]:checked')||{}).value||'tp'};
   ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};
   ov.onchange=async ev=>{if(ev.target.name==='tp-src'){leer();renderSheet();return}
     if(ev.target.id==='tp-file'){leer();const f=ev.target.files[0];if(!f)return;a.arch=f.name;a.prev=null;a.err='';
@@ -2491,7 +2492,7 @@ function bindTpNew(a){const ov=$('#overlay');
     let W;if(a.src==='xl'){if(!a.prev){msg.textContent='Elegí el Excel con la hoja MACRO.';return}W=a.prev}
     else if(a.src==='vac'){const n=Math.min(60,Math.max(4,Number(a.nsem)||42));W=Array.from({length:n},(_,i)=>({per:'PREPARATORIO',meso:Math.floor(i/4)+1,tipo:'CARGA',rel:'2:3',comp:'',test:false,days:T_DIAS.map(()=>({q:'',met:[]}))}))}
     else W=tpSemanas();
-    const doc={equipoId:a.eq,nombre:(a.n||'').trim(),inicio:a.ini,partido:a.par||'Sábado',semanas:W,origen:a.src==='xl'?'Excel: '+a.arch:a.src==='vac'?'En blanco':'Planilla del TP final',ts:Date.now()};
+    const doc={equipoId:a.eq,nombre:(a.n||'').trim(),inicio:a.ini,partido:a.par||'Sábado',semanas:W,origen:a.src==='xl'?'Excel: '+a.arch:a.src==='vac'?'En blanco':'Plantilla temporada promedio handball',ts:Date.now()};
     const dj=a.src==='xl'&&$('#tp-dj')?$('#tp-dj').value:'';
     if(await write(()=>S.db.collection('temporadas').add(doc))){if(dj)await cargarDiag(dj,a.xl.diag);toast('Temporada creada'+(dj?' y diagnóstico cargado':''));closeSheet()}}}
 
