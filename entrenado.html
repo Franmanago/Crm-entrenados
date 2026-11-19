@@ -458,6 +458,15 @@ body.mini-on .tmr-fab{display:none}
 .rsw{display:flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:10px}
 .rsw button{flex:1;border:0;background:none;font:inherit;font-weight:700;font-size:14px;padding:10px 6px;border-radius:10px;color:var(--muted);cursor:pointer;min-height:40px}
 .rsw button[aria-pressed="true"]{background:var(--accent-ink);color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.prog{display:flex;flex-direction:column;gap:4px;margin:8px 0 2px}
+.pg-t{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pg-row{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.pg{flex:none;display:flex;flex-direction:column;gap:1px;min-width:74px;padding:6px 9px;border-radius:10px;background:var(--surface-2,#F0F2ED);font-size:13px;line-height:1.25}
+.pg b{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.pg span{font-weight:700;font-variant-numeric:tabular-nums}
+.pg small{font-size:11.5px;color:var(--muted)}
+.pg.hoy{background:transparent;border:1.5px solid var(--accent-ink,#C8F23A)}
+.pg-d{font-size:12px!important;color:var(--muted)}.pg-d.up{color:var(--ok,#4D7A0C)}.pg-d.dn{color:var(--bad,#B23325)}
 </style>
 </head>
 <body>
@@ -591,6 +600,23 @@ function kgBase(it){
 }
 function kg(it){const a=ajusteHoy();if(a&&ajustable(it))return kgBase({...it,pct:Math.max(0,Number(it.pct)+a.pct)});return kgBase(it)}
 function ytId(u){if(!u)return null;let m=u.match(/shorts\/([\w-]{6,})/)||u.match(/[?&]v=([\w-]{6,})/)||u.match(/youtu\.be\/([\w-]{6,})/)||u.match(/embed\/([\w-]{6,})/);return m?{id:m[1],short:/shorts\//.test(u)}:null}
+/* ---- progresión: el mismo ejercicio en las semanas anteriores (mismo día) y lo que se anotó ---- */
+const normN=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+function mismoEj(a,b){if(a.ej&&b.ej)return a.ej===b.ej;return normN(a.nombre)&&normN(a.nombre)===normN(b.nombre)}
+function buscarEj(dia,it){for(const b of (dia&&dia.bloques)||[]){if(b.modo==='dist')continue;const x=(b.items||[]).find(y=>mismoEj(y,it));if(x)return x}return null}
+const nKg=v=>{const n=Number(String(v||'').replace(',','.'));return isFinite(n)&&n>0?n:null};
+function progresion(it){const R=D.rutina,secs=R.secciones||[],out=[];
+  /* rutina con una semana por sección: se busca el ejercicio en el mismo día de cada semana anterior */
+  for(let k=0;k<secI;k++){const d=((secs[k]||{}).dias||[])[diaI],x=buscarEj(d,it);if(!x)continue;
+    const r=regsFor(x.uid)[0];out.push({lab:'Sem '+(k+1),reps:x.reps||'',kg:kgBase(x),hizo:r&&(r.kg||r.reps)?r:null})}
+  /* si no hay semanas anteriores en la rutina, se muestran los últimos registros de este mismo ejercicio */
+  if(!out.length){const vistos=new Set();for(const r of regsFor(it.uid)){if(r.fecha>=fSel()||vistos.has(r.fecha)||!(r.kg||r.reps))continue;vistos.add(r.fecha);out.unshift({lab:fmt(r.fecha),reps:'',kg:'',hizo:r});if(vistos.size>=3)break}}
+  return out.slice(-4)}
+function progHTML(it,kHoy){if(!D.rutina)return '';const ps=progresion(it);if(!ps.length)return '';const u=uniDe(it);
+  const ult=ps[ps.length-1],ref=nKg(ult.kg)??nKg(ult.hizo&&ult.hizo.kg),h=nKg(kHoy);let dif='';
+  if(ref!=null&&h!=null){const d=+(h-ref).toFixed(2);dif=d>0?`<span class="pg-d up">▲ ${String(d).replace('.',',')} ${u}</span>`:d<0?`<span class="pg-d dn">▼ ${String(-d).replace('.',',')} ${u}</span>`:`<span class="pg-d">= igual</span>`}
+  const t=(reps,k)=>[reps?esc(reps):'',k?esc(String(k).replace('.',','))+' '+u:''].filter(Boolean).join(' × ');
+  return `<div class="prog" aria-label="Progresión de ${esc(it.nombre)}"><span class="pg-t">Antes</span><div class="pg-row">${ps.map(x=>`<span class="pg"><b>${esc(x.lab)}</b>${x.kg||x.reps?`<span>${t(x.reps,x.kg)}</span>`:''}${x.hizo?`<small>${x.kg||x.reps?'hiciste ':''}${t(x.hizo.reps,x.hizo.kg)}</small>`:''}</span>`).join('')}<span class="pg hoy"><b>Hoy</b><span>${t(it.reps,kHoy)||'—'}</span>${dif}</span></div></div>`}
 const regsFor=uid=>(D.registros||[]).filter(r=>r.item===uid).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.ts||0)-(a.ts||0));
 
 const rutSwitch=()=>D&&D.rutinas&&D.rutinas.length===2&&D.rutinas.some(r=>r.equipo)&&D.rutinas.some(r=>!r.equipo)?`<div class="rsw" role="group" aria-label="Qué rutina ver">${D.rutinas.map(r=>`<button type="button" data-rsel="${esc(r.id)}" aria-pressed="${r.id===D.rutina.id}">${r.equipo?'Plan del equipo':'Mi rutina personal'}</button>`).join('')}</div>`:'';
@@ -810,6 +836,7 @@ function render0(){window.splashOff&&window.splashOff();
       h+=`<div class="ej${ok?' hecho':''}" data-uid="${esc(it.uid)}">
         <div class="ej-top"><button class="chk" data-chk="${esc(it.uid)}" aria-pressed="${ok}" aria-label="${ok?'Hecho. Tocá para desmarcar':'Marcar como hecho'}" title="${ok?'Hecho':'Marcar como hecho'}">✓</button><div class="ej-n">${esc(it.nombre)}</div>${v?`<button class="vbtn" data-video="${esc(it.uid)}" aria-expanded="${!!o.video}">${o.video?'Cerrar':'▶ Video'}</button>`:''}</div>
         <div class="campos">${b.modo==='timer'?'':`<label class="campo">Reps<input data-in="reps" data-uid="${esc(it.uid)}" value="${esc(vr)}" style="${anchoIn(vr)}" placeholder="—" class="${mR?'mod':''}" autocomplete="off"></label><span class="x">×</span>`}${k||it.pct||it.rm||vk||kgOpen[it.uid]||last.some(r=>r.kg)?`<label class="campo">${UNI_L[uniDe(it)]||'Kg'}<input data-in="kg" data-uid="${esc(it.uid)}" inputmode="decimal" value="${esc(vk)}" style="${anchoIn(vk)}" placeholder="—" class="${mK?'mod':''}" autocomplete="off"></label>`:`<button type="button" class="mas-kg" data-kgopen="${esc(it.uid)}">+ ${uniDe(it)==='kg'?'kg':esc((UNI_L[uniDe(it)]||'').toLowerCase())}</button>`}${it.pct?`<span class="pc">${(()=>{const a=ajusteHoy();return a&&ajustable(it)?Math.max(0,Number(it.pct)+a.pct):esc(it.pct)})()}% de tu máximo</span>`:''}${mK||(mR&&b.modo!=='timer')?`<span class="tag-mod">Cambiado</span>`:''}</div>
+        ${b.modo==='timer'?'':progHTML(it,k)}
         ${(()=>{const a=ajusteHoy();return a&&ajustable(it)?`<div class="aj-n aj-${a.k}">Planificado <s>${esc(kgBase(it))} kg</s> → hoy <b>${esc(kg(it))} kg</b> (${Math.max(0,Number(it.pct)+a.pct)}% en vez de ${esc(it.pct)}%) · dejá ${a.rir} reps en reserva</div>`:''})()}
         ${it.notas?`<div class="nota">${esc(it.notas)}</div>`:''}
         ${o.video&&v?(yt?`<div class="video ${yt.short?'v916':'v169'}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(yt.id)}?rel=0&playsinline=1" title="Video de ${esc(it.nombre)}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`:'')+`<a class="yt" href="${esc(v)}" target="_blank" rel="noopener">Abrir en YouTube</a>`:''}
