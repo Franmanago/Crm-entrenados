@@ -683,6 +683,7 @@ function renderSheet0(){
   if(openId==='__tpent'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Entregar al plantel',tpEntHTML(a));bindTpEnt(a);return}
   if(openId==='__epform'){const a=sheetArg||{};ov.innerHTML=shell('Fórmulas de Equipo Pro',epFormHTML(a));ov.querySelector('.sheet').classList.add('wide');bindEpForm(a);return}
   if(openId==='__tpsync'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Actualizar desde Excel',tpSyncHTML(a));bindTpSync(a);return}
+  if(openId==='__guia'){const a=sheetArg||{};ov.innerHTML=shell('Guía del entrenador',guiaHTML(a));ov.querySelector('.sheet').classList.add('wide');bindGuia(a);if(a.sec&&a.sec!=='inicio')requestAnimationFrame(()=>{const d=document.getElementById('g-'+a.sec);if(d)d.scrollIntoView({block:'start'})});return}
   if(openId==='__tpcfg'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Ajustes de la temporada',tpCfgHTML(a));bindTpCfg(a);return}
   if(openId==='__bulk'){ov.innerHTML=shell('Envío de mensajes',bulkHTML());bindBulk();return}
   if(openId==='__rut'){const R=S.edit.data;ov.innerHTML=shell(S.edit.col==='plantillas'?(S.edit.id?'Plantilla':'Nueva plantilla'):(R.nombre||'Rutina'),editorHTML());ov.querySelector('.sheet').classList.add('wide');bindEditor();return}
@@ -2319,7 +2320,7 @@ function renderEquipos(){
   const eqs=(S.equipos||[]).slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
   if(!eqs.find(q=>q._id===S.eqSel))S.eqSel=eqs[0]?._id||null;
   const q=eqs.find(x=>x._id===S.eqSel);
-  const top=`<div class="eq-top"><div><h2 class="eq-h">Equipos</h2><p class="hint">Plantel, tests, temporada y dosis de cada equipo. Cada jugador recibe en su link los tiempos y kilos calculados con sus tests.</p></div><div class="actions"><button class="btn" type="button" data-epform>Fórmulas</button><button class="btn pri" type="button" data-eqnew>Nuevo equipo</button></div></div>`;
+  const top=`<div class="eq-top"><div><h2 class="eq-h">Equipos</h2><p class="hint">Plantel, tests, temporada y dosis de cada equipo. Cada jugador recibe en su link los tiempos y kilos calculados con sus tests.</p></div><div class="actions"><button class="btn" type="button" data-guia="inicio">Guía</button><button class="btn" type="button" data-epform>Fórmulas</button><button class="btn pri" type="button" data-eqnew>Nuevo equipo</button></div></div>`;
   if(!eqs.length){el.innerHTML=top+`<div class="card pad eq-empty"><b>Todavía no hay equipos.</b><p class="hint">Creá uno (por ejemplo «AFALP Primera»), sumá a los jugadores que ya son entrenados de la app y cargá sus tests: VAM, saltos, sprint y 1RM.</p><div><button class="btn pri" type="button" data-eqnew>Crear el primer equipo</button></div></div>`;return}
   const mov=(S.cfg.rmDefs||[]).filter(d=>!d.base).slice(0,4).map(d=>d.mov);
   const js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean).sort((a,b)=>(a.posicion||'~').localeCompare(b.posicion||'~')||name(a).localeCompare(name(b)));
@@ -2427,7 +2428,7 @@ function temporadaHTML(q){const t=tempDe(q._id);
   const d0=hoy??(days(today(),parse(t.inicio))<0?0:W.length),pf=prox(w=>/^FECHA/i.test(w.comp),d0),pt=prox(w=>w.test,d0);
   const cur=hoy!=null?W[hoy]:null;
   const fin=iso(tLun(t,W.length-1));
-  return `<div class="card tp-card"><div class="pad tp-h"><div><b>Temporada ${esc(t.nombre||'')}</b><p class="hint">${plural(W.length,'semana','semanas')} · del ${fmtD(t.inicio)} al ${fmtD(fin)} · partido el ${esc((t.partido||'Sábado').toLowerCase())}</p></div>
+  return `<div class="card tp-card"><div class="pad tp-h"><div><b>Temporada ${esc(t.nombre||'')}</b> <button class="g-q" type="button" data-guia="temporada" aria-label="Ayuda sobre la temporada">?</button><p class="hint">${plural(W.length,'semana','semanas')} · del ${fmtD(t.inicio)} al ${fmtD(fin)} · partido el ${esc((t.partido||'Sábado').toLowerCase())}</p></div>
     <div class="actions"><button class="btn pri" type="button" data-tpent="${esc(t._id)}">Entregar al plantel</button><button class="btn" type="button" data-tppdf="${esc(t._id)}">PDF del plantel</button><button class="btn" type="button" data-tptab="${esc(t._id)}">Editar tabla</button><button class="btn" type="button" data-tpcfg="${esc(t._id)}">Ajustes</button></div></div>
     <div class="eq-kpis"><div><b>${hoy!=null?'S'+(hoy+1):'—'}</b><span>${cur?`${T_TIPOS[cur.tipo]||cur.tipo} ${esc(cur.rel)} · ${esc(tCap(cur.per))}`:days(today(),parse(t.inicio))<0?'empieza el '+fmtD(t.inicio):'temporada terminada'}</span></div>
       <div><b>${pf>=0?tCompL(W[pf].comp):'—'}</b><span>${pf>=0?'próxima fecha · semana '+(pf+1)+' ('+fmtShort(iso(tLun(t,pf)))+')':'sin fechas por delante'}</span></div>
@@ -2575,6 +2576,47 @@ document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.clos
   if(D.tpcfg!=null){S.tcArm=null;openSheet('__tpcfg','ver',{tid:D.tpcfg});return}});
 /* ---------- EQUIPO PRO · Etapas 3 y 4: dosis, entrega al plantel, fórmulas y control de carga ---------- */
 /* Biblioteca de métodos: cualidad (q), base de cálculo (b: vam | sprint | rm | none), dosis base (def), rango y para qué sirve */
+/* ---------- REFERENCIAS BIBLIOGRÁFICAS (APA 7) ---------- */
+/* c: cita corta en el texto · a: referencia completa (HTML con cursivas) · ok:false = datos de edición a confirmar con el ejemplar */
+const REFS={
+ bangsbo2008:{c:'Bangsbo et al. (2008)',a:'Bangsbo, J., Iaia, F. M., & Krustrup, P. (2008). The Yo-Yo intermittent recovery test: A useful tool for evaluation of physical performance in intermittent sports. <i>Sports Medicine, 38</i>(1), 37–51. https://doi.org/10.2165/00007256-200838010-00004'},
+ billat2001:{c:'Billat (2001)',a:'Billat, L. V. (2001). Interval training for performance: A scientific and empirical practice. Special recommendations for middle- and long-distance running. Part I: Aerobic interval training. <i>Sports Medicine, 31</i>(1), 13–31. https://doi.org/10.2165/00007256-200131010-00002'},
+ bishop2011:{c:'Bishop et al. (2011)',a:'Bishop, D., Girard, O., & Mendez-Villanueva, A. (2011). Repeated-sprint ability – Part II: Recommendations for training. <i>Sports Medicine, 41</i>(9), 741–756. https://doi.org/10.2165/11590560-000000000-00000'},
+ bompa2009:{c:'Bompa y Haff (2009)',a:'Bompa, T. O., & Haff, G. G. (2009). <i>Periodization: Theory and methodology of training</i> (5th ed.). Human Kinetics.'},
+ bosco1983:{c:'Bosco et al. (1983)',a:'Bosco, C., Luhtanen, P., & Komi, P. V. (1983). A simple method for measurement of mechanical power in jumping. <i>European Journal of Applied Physiology and Occupational Physiology, 50</i>(2), 273–282. https://doi.org/10.1007/BF00422166'},
+ buchheit2013:{c:'Buchheit y Laursen (2013)',a:'Buchheit, M., & Laursen, P. B. (2013). High-intensity interval training, solutions to the programming puzzle: Part I: Cardiopulmonary emphasis. <i>Sports Medicine, 43</i>(5), 313–338. https://doi.org/10.1007/s40279-013-0029-x'},
+ ehlenz1990:{c:'Ehlenz et al. (1990)',a:'Ehlenz, H., Grosser, M., & Zimmermann, E. (1990). <i>Entrenamiento de la fuerza</i>. Martínez Roca.',ok:false},
+ foster2001:{c:'Foster et al. (2001)',a:'Foster, C., Florhaug, J. A., Franklin, J., Gottschall, L., Hrovatin, L. A., Parker, S., Doleshal, P., & Dodge, C. (2001). A new approach to monitoring exercise training. <i>Journal of Strength and Conditioning Research, 15</i>(1), 109–115.'},
+ gabbett2016:{c:'Gabbett (2016)',a:'Gabbett, T. J. (2016). The training—injury prevention paradox: Should athletes be training smarter and harder? <i>British Journal of Sports Medicine, 50</i>(5), 273–280. https://doi.org/10.1136/bjsports-2015-095788'},
+ gb1995:{c:'González Badillo y Gorostiaga (1995)',a:'González Badillo, J. J., & Gorostiaga Ayestarán, E. (1995). <i>Fundamentos del entrenamiento de la fuerza: Aplicación al alto rendimiento deportivo</i>. INDE.'},
+ gb2002:{c:'González Badillo y Ribas (2002)',a:'González Badillo, J. J., & Ribas Serna, J. (2002). <i>Bases de la programación del entrenamiento de fuerza</i>. INDE.'},
+ hulin2014:{c:'Hulin et al. (2014)',a:'Hulin, B. T., Gabbett, T. J., Blanch, P., Chapman, P., Bailey, D., & Orchard, J. W. (2014). Spikes in acute workload are associated with increased injury risk in elite cricket fast bowlers. <i>British Journal of Sports Medicine, 48</i>(8), 708–712. https://doi.org/10.1136/bjsports-2013-092524'},
+ leger1980:{c:'Léger y Boucher (1980)',a:'Léger, L., & Boucher, R. (1980). An indirect continuous running multistage field test: The Université de Montréal track test. <i>Canadian Journal of Applied Sport Sciences, 5</i>(2), 77–84.'},
+ matveev1977:{c:'Matveev (1977)',a:'Matveev, L. P. (1977). <i>La periodización del entrenamiento deportivo</i>. INEF.',ok:false},
+ tillin2009:{c:'Tillin y Bishop (2009)',a:'Tillin, N. A., & Bishop, D. (2009). Factors modulating post-activation potentiation and its effect on performance of subsequent explosive activities. <i>Sports Medicine, 39</i>(2), 147–166. https://doi.org/10.2165/00007256-200939020-00004'},
+ verkho2006:{c:'Verkhoshansky (2006)',a:'Verkhoshansky, Y. (2006). <i>Todo sobre el método pliométrico</i>. Paidotribo.',ok:false},
+ weineck2005:{c:'Weineck (2005)',a:'Weineck, J. (2005). <i>Entrenamiento total</i>. Paidotribo.'},
+ zintl1991:{c:'Zintl (1991)',a:'Zintl, F. (1991). <i>Entrenamiento de la resistencia: Fundamentos, métodos y dirección del entrenamiento</i>. Martínez Roca.',ok:false}
+};
+/* fuentes de cada método de la biblioteca */
+const EP_REF={'CE':['zintl1991','weineck2005'],'CI':['zintl1991','weineck2005'],'CV1':['zintl1991','weineck2005'],'CV2':['zintl1991','weineck2005'],
+ 'IE-IL':['zintl1991','billat2001'],'IE-IM':['zintl1991','billat2001'],'II-IC':['zintl1991','billat2001'],'II-IEC':['billat2001','buchheit2013'],
+ 'Rep-IL':['zintl1991'],'Rep-IM':['zintl1991'],'Rep-IC':['zintl1991'],
+ 'FS':['weineck2005'],'RCM':['weineck2005'],'SEV':['weineck2005'],'RSA':['bishop2011'],
+ 'Rep III':['ehlenz1990','gb1995'],'Rep II':['ehlenz1990','gb1995'],'Rep I':['ehlenz1990','gb1995'],'I Máx':['ehlenz1990','gb1995'],'I Máx II':['ehlenz1990','gb1995'],'Pirámide':['ehlenz1990','gb1995'],
+ 'Contraste':['gb1995','tillin2009'],'Concéntrico':['gb1995'],'Pliometría':['verkho2006']};
+/* fuentes de las fórmulas y de los tests */
+const EP_FREF={tRes:['leger1980','billat2001'],ritmo:['leger1980','billat2001'],tSpr:[],vol:['zintl1991'],kg:['gb1995','gb2002'],imr:['gb1995']};
+const T_REF={vam:['leger1980','billat2001'],cmj:['bosco1983'],abk:['bosco1983'],yoyo:['bangsbo2008'],rm:['gb2002']};
+const citas=ks=>(ks||[]).filter(k=>REFS[k]).map(k=>REFS[k].c).join('; ');
+const refPlano=k=>REFS[k].a.replace(/<[^>]+>/g,'');
+function biblioHTML(){const ks=Object.keys(REFS).sort((a,b)=>refPlano(a).localeCompare(refPlano(b),'es'));
+  return `<p>Referencias en formato APA 7, ordenadas por autor. <button class="btn sm" type="button" data-bibcopy>Copiar todas</button> <span class="hint" id="bib-msg" role="status" style="display:inline"></span></p>
+    <ol class="g-bib">${ks.map(k=>`<li>${REFS[k].a.replace(/(https:\/\/doi\.org\/\S+)/,'<a href="$1" target="_blank" rel="noopener">$1</a>')}${REFS[k].ok===false?' <span class="pill p-warn">edición a confirmar con el ejemplar</span>':''}</li>`).join('')}</ol>
+    <p class="hint">Los cálculos de tiempo por tramo, volumen, kilos e intensidad media son aritmética directa: se cita el concepto en que se basan (prescripción por % de VAM, % de 1RM). El tiempo de sprint como % del test propio no tiene un autor específico: es una adaptación de la app.</p>`}
+document.addEventListener('click',async ev=>{const b=ev.target.closest&&ev.target.closest('[data-bibcopy]');if(!b)return;
+  const t=Object.keys(REFS).sort((a,c)=>refPlano(a).localeCompare(refPlano(c),'es')).map(refPlano).join('\n\n');const m=document.getElementById('bib-msg');
+  try{await navigator.clipboard.writeText(t);if(m)m.textContent='Copiadas al portapapeles.'}catch(_){if(m)m.textContent='No se pudo copiar: seleccioná la lista y copiala a mano.'}});
 const EP_LIB={
  'CE':{n:'Continuo extensivo',q:'R',b:'vam',o:'Eficiencia aeróbica',def:{s:1,r:1,d:4000,p:60,pr:'',ps:''},rg:'20–40 min al 60–70 % VAM'},
  'CI':{n:'Continuo intensivo',q:'R',b:'vam',o:'Capacidad aeróbica',def:{s:1,r:1,d:3000,p:85,pr:'',ps:''},rg:'10–25 min al 80–90 % VAM'},
@@ -2690,7 +2732,7 @@ function epDosisHTML(a,k){const d=a.w.days[k];d.run=d.run||[];d.str=d.str||[];co
   const x=epDia(d),falta=d.met.filter(m=>![...d.run,...d.str].some(y=>y.m===m));
   return `<div class="ep-dose">${run?`<div class="tbl-wrap"><table class="ep-t"><thead><tr><th></th><th>Carrera / velocidad</th><th>Series</th><th>Reps</th><th>Metros</th><th>%</th><th>Pausa</th><th>Entre series</th><th class="num">Tiempo</th><th class="num">Volumen</th><th></th></tr></thead><tbody>${run}</tbody></table></div>`:''}
     ${str?`<div class="tbl-wrap"><table class="ep-t"><thead><tr><th></th><th>Fuerza</th><th>Ejercicio</th><th>Series</th><th>Reps</th><th>% 1RM</th><th>Pausa</th><th class="num">Kilos</th><th class="num">Tonelaje</th><th></th></tr></thead><tbody>${str}</tbody></table></div>`:''}
-    <div class="ep-dose-f"><button class="btn sm" type="button" data-dsadd="${k}:run">+ Carrera / velocidad</button><button class="btn sm" type="button" data-dsadd="${k}:str">+ Fuerza</button>${falta.length?`<button class="btn sm" type="button" data-dsfill="${k}">Completar desde el plan (${falta.length})</button>`:''}<span class="hint" style="margin-left:auto">${x.v?distMil(x.v)+' m · '+nfx(x.im,1)+' % medio':''}${x.v&&x.rp?' · ':''}${x.rp?x.rp+' reps · '+nfx(x.ip,1)+' % 1RM':''}</span></div></div>`}
+    <div class="ep-dose-f"><button class="btn sm" type="button" data-dsadd="${k}:run">+ Carrera / velocidad</button><button class="btn sm" type="button" data-dsadd="${k}:str">+ Fuerza</button>${falta.length?`<button class="btn sm" type="button" data-dsfill="${k}">Completar desde el plan (${falta.length})</button>`:''}<span class="hint" style="margin-left:auto">${x.v?distMil(x.v)+' m · '+nfx(x.im,1)+' % medio':''}${x.v&&x.rp?' · ':''}${x.rp?x.rp+' reps · '+nfx(x.ip,1)+' % 1RM':''}</span></div>${(()=>{const ms=[...new Set([...d.run,...d.str].map(y=>y.m))].filter(m=>citas(EP_REF[m]));return ms.length?`<p class="hint g-ref ep-src">Fuente: ${ms.map(m=>`<b>${esc(m)}</b> ${esc(citas(EP_REF[m]))}`).join(' · ')}</p>`:''})()}</div>`}
 function epSemTopHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid),{js,e}=epJug(a),x=epSem(a.w),av=epAvisos(t,a.i,a.w);
   const src=t.semanas.map((w,i)=>[i,w]).filter(([i,w])=>i!==a.i&&epConDosis(w));const sug=(()=>{for(let i=a.i-1;i>=0;i--)if(epConDosis(t.semanas[i])&&t.semanas[i].tipo===a.w.tipo)return i;return src.length?src[src.length-1][0]:-1})();
   const P=e?epPerfil(e):{};
@@ -2772,7 +2814,7 @@ function epControlHTML(q,t){const js=(q.jugadores||[]).map(id=>S.ents[id]).filte
   const R=Object.fromEntries(js.map(e=>[e.id,real(e)]));const prom=idx.map((_,j)=>{const v=js.map(e=>R[e.id][j]).filter(x=>x>0);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0});
   const hay=prom.some(Boolean);
   const avisos=[];for(let j=1;j<idx.length;j++){const p0=parseInt(t.semanas[idx[j-1]].rel,10),p1=parseInt(t.semanas[idx[j]].rel,10);if(prom[j-1]&&prom[j]){if(p1>p0&&prom[j]<prom[j-1]*0.85)avisos.push(`Semana ${idx[j]+1}: el plan sube (${t.semanas[idx[j]].rel}) pero la carga real del equipo bajó ${Math.round((1-prom[j]/prom[j-1])*100)} %.`);if(p1<p0&&prom[j]>prom[j-1]*1.15)avisos.push(`Semana ${idx[j]+1}: el plan baja (${t.semanas[idx[j]].rel}) pero la carga real subió ${Math.round((prom[j]/prom[j-1]-1)*100)} %.`)}}
-  return `<div class="card tp-card"><div class="pad"><b>Control de carga · planificada contra real</b><p class="hint">Lo real es lo que anota cada jugador al terminar la sesión (minutos × esfuerzo de 1 a 10). La relación aguda/crónica avisa si alguien sube demasiado rápido.</p></div>
+  return `<div class="card tp-card"><div class="pad"><b>Control de carga · planificada contra real</b> <button class="g-q" type="button" data-guia="control" aria-label="Ayuda sobre el control de carga">?</button><p class="hint">Lo real es lo que anota cada jugador al terminar la sesión (minutos × esfuerzo de 1 a 10). La relación aguda/crónica avisa si alguien sube demasiado rápido.</p></div>
     ${hay?'':'<p class="hint pad" style="padding-top:0">Todavía no hay registros. Aparecen cuando los jugadores anotan sus sesiones en el link (se activa al entregar las semanas).</p>'}
     <div class="tbl-wrap"><table class="eq-t ep-ctl"><thead><tr><th>Jugador</th>${idx.map(i=>`<th class="num">S${i+1}<br><small>${fmtShort(iso(tLun(t,i)))}</small></th>`).join('')}<th class="num">Aguda/crónica</th></tr></thead><tbody>
       <tr class="ep-plan"><td><b>Plan</b></td>${idx.map(i=>{const w=t.semanas[i],x=epSem(w);return `<td class="num t-${w.tipo}"><span class="dot" style="background:var(--tc)"></span>${esc(w.rel)}<br><small>${x.v?distMil(x.v)+' m':(T_TIPOS[w.tipo]||'')}</small></td>`}).join('')}<td></td></tr>
@@ -2784,7 +2826,7 @@ function epControlHTML(q,t){const js=(q.jugadores||[]).map(id=>S.ents[id]).filte
 function epFormHTML(a){const fr=(S.cfgRaw||{}).epFormulas||{},hist=((S.cfgRaw||{}).epFormHist||[]).slice().reverse();
   return `<div class="pad ep-form"><p class="hint">Son las cuentas que usan las semanas del equipo para calcular tiempos y metros. Cada cambio pasa dos verificaciones: primero se prueba contra casos con resultado conocido y se mide cuántas filas cambian; después lo confirmás con un motivo. Las semanas ya entregadas no cambian hasta que las vuelvas a entregar. Los kilos se calculan como en el resto de la app (1RM × % redondeado a ${nfx(S.cfg.redondeo,1)} kg, se cambia en Ajustes).</p>
   ${Object.entries(EP_FDEF).map(([k,d])=>{const mod=!!fr[k]&&fr[k]!==d.expr,ed=a.k===k;return `<div class="card ep-fc"><div class="pad ep-fc-h"><b>${esc(d.n)}</b> <span class="pill ${mod?'p-warn':'p-mute'}">${mod?'modificada':'original'}</span><code class="ep-code">${esc(epExpr(k))}</code></div>
-    <div class="pad" style="padding-top:0"><p class="hint">${esc(d.w)} Variables: ${Object.entries(d.vars).map(([v,x])=>`<code>${v}</code> ${esc(x)}`).join(' · ')}.</p>
+    <div class="pad" style="padding-top:0"><p class="hint">${esc(d.w)} Variables: ${Object.entries(d.vars).map(([v,x])=>`<code>${v}</code> ${esc(x)}`).join(' · ')}.</p><p class="hint g-ref">Base teórica: ${esc(citas(EP_FREF[k]))||'adaptación de la app (sin autor específico)'}.</p>
     ${ed?epEditorHTML(a,k):`<div class="actions" style="margin-top:6px"><button class="btn sm" type="button" data-fe="${k}">Editar</button>${mod?`<button class="btn sm" type="button" data-fo="${k}">Volver a la original</button>`:''}</div>`}</div></div>`}).join('')}
   <div class="card pad"><b>Historial</b>${hist.length?`<ul class="timeline" style="margin:6px -16px 0">${hist.map(h=>`<li><span class="d">${esc(h.cuando)}</span><span class="t"><b>${esc((EP_FDEF[h.k]||{}).n||h.k)}</b>: <code>${esc(h.antes)}</code> → <code>${esc(h.despues)}</code><br><span class="hint" style="display:inline">${esc(h.motivo)}${h.fallos?` · aplicada con ${h.fallos} control${h.fallos>1?'es':''} fallido${h.fallos>1?'s':''}`:''}</span></span></li>`).join('')}</ul>`:'<p class="hint">Sin cambios: se usan las fórmulas originales.</p>'}</div></div>`}
 function epEditorHTML(a,k){const d=EP_FDEF[k],r=a.r;
@@ -2897,6 +2939,145 @@ function bindTpSync(a){const ov=$('#overlay');
     const dj=$('#tsy-dj')?.value;
     if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:out,origen:'Excel: '+a.arch,actualizado:iso(today())}))){if(dj)await cargarDiag(dj,a.x.diag);toast('Temporada actualizada desde el Excel');closeSheet()}}}
 document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-tpsync]');if(b){openSheet('__tpsync','ver',{tid:b.dataset.tpsync})}});
+/* ---------- GUÍA DEL ENTRENADOR (dentro de la app) ---------- */
+/* Secciones desplegables con buscador. Las tablas de referencia (métodos, fórmulas, umbrales) se arman con los datos reales de la app. */
+const G_TIPOS=[['INTRODUCTORIO','Introductorio','Arranque o vuelta: carga baja para adaptar.'],['CARGA','Carga','Acumula volumen e intensidad de forma progresiva.'],['CHOQUE','Choque','La semana más exigente del mesociclo. Ideal en fechas libres.'],['REGENERATIVO','Regenerativo','Baja la carga para recuperar y que aparezca la adaptación.'],['TRANSICION','Transición','Receso o fin de torneo: mantener sin cargar.']];
+function guiaSecciones(){
+  const acwrMax=nfx(S.cfg.alertas?.acwr??1.5,1),red=nfx(S.cfg.redondeo||2.5,1);
+  const lib=q=>Object.entries(EP_LIB).filter(([,L])=>L.q===q).map(([k,L])=>`<tr><td><b>${esc(k)}</b></td><td>${esc(L.n)}</td><td>${esc(L.o)}</td><td>${esc(L.rg)}</td><td>${L.b==='vam'?'% VAM':L.b==='sprint'?'% del test de sprint':L.b==='rm'?'% 1RM':'—'}</td><td class="g-ref">${esc(citas(EP_REF[k]))||'—'}</td></tr>`).join('');
+  const libT=(q,t)=>`<h4>${t}</h4><div class="tbl-wrap"><table class="eq-t g-t"><thead><tr><th>Abrev.</th><th>Método</th><th>Objetivo</th><th>Dosis orientativa</th><th>Se calcula con</th><th>Fuente</th></tr></thead><tbody>${lib(q)}</tbody></table></div>`;
+  return [
+  {id:'inicio',t:'Recorrido rápido de Equipo Pro',h:`
+    <p>Equipo Pro planifica la temporada de un equipo y le entrega a cada jugador sus tiempos y kilos calculados con sus propios tests. El orden de uso es este:</p>
+    <ol class="g-pasos">
+      <li><b>Equipo.</b> En Equipos → <b>Nuevo equipo</b>: nombre y jugadores (tienen que existir como entrenados).</li>
+      <li><b>Tests.</b> <b>Cargar tests del plantel</b> (todos juntos) o <b>Test</b> en la fila de un jugador. Sin VAM no hay tiempos de carrera; sin sprint, no hay tiempos de velocidad; sin 1RM, no hay kilos.</li>
+      <li><b>Temporada.</b> <b>Crear temporada</b>: lunes de la semana 1, día de partido y punto de partida (plantilla promedio de handball, tu Excel o en blanco).</li>
+      <li><b>Semanas.</b> Tocás una barra del tablero y ajustás tipo, competencia, métodos y la dosis de cada día.</li>
+      <li><b>Entrega.</b> <b>Entregar al plantel</b>: elegís semanas y jugadores. Cada uno lo ve en su link de siempre.</li>
+      <li><b>Control.</b> Mirás <b>Control de carga</b> para comparar lo planificado con lo que anotó cada jugador.</li>
+    </ol>
+    <p class="hint">Rutina semanal sugerida: el domingo o lunes revisás la semana y sus avisos; si cambió algo, volvés a entregar. En semanas de test cargás los tests y volvés a entregar las semanas que siguen.</p>`},
+  {id:'equipos',t:'Equipos y plantel',h:`
+    <ul><li><b>Crear y editar:</b> nombre, deporte, categoría y jugadores. Un entrenado puede estar en más de un equipo.</li>
+    <li><b>Posición:</b> se carga en la ficha del jugador (Editar → Posición) y aparece sola en el plantel.</li>
+    <li><b>Tabla del plantel:</b> último test, VAM, saltos, sprint y los 1RM principales. La etiqueta <span class="pill p-warn">8 sem</span> avisa que el último test tiene 8 semanas o más.</li>
+    <li><b>Promedios del equipo:</b> VAM, 30 m y CMJ medios, y cuántos jugadores no tienen test o lo tienen vencido.</li>
+    <li><b>Borrar un equipo</b> no borra a los jugadores ni sus tests: solo el agrupamiento.</li></ul>`},
+  {id:'tests',t:'Tests físicos',h:`
+    <div class="tbl-wrap"><table class="eq-t g-t"><thead><tr><th>Test</th><th>Unidad</th><th>Rango aceptado</th><th>Para qué se usa</th><th>Fuente</th></tr></thead><tbody>
+      ${TCAMPOS.map(c=>`<tr><td><b>${c.l}</b></td><td>${c.u}</td><td>${c.min} a ${c.max}</td><td>${{vam:'Ritmos de toda la resistencia (% VAM).',cmj:'Control de fuerza explosiva vertical.',abk:'CMJ con brazos: coordinación y potencia.',t10:'Aceleración y base de los sprints cortos.',t20:'Interpolación de sprints entre 10 y 30 m.',t30:'Velocidad: RSA, salidas y sprints largos.',peso:'Seguimiento del jugador.'}[c.k]||''}</td><td class="g-ref">${esc(citas(T_REF[c.k]))||'—'}</td></tr>`).join('')}
+      <tr><td><b>Yo-Yo IR1</b></td><td>nivel</td><td>texto (ej. 15:1)</td><td>Registro de la capacidad intermitente.</td><td class="g-ref">${esc(citas(T_REF.yoyo))}</td></tr>
+      <tr><td><b>1RM</b></td><td>kg</td><td>por ejercicio</td><td>Kilos de todos los ejercicios con % de 1RM (redondeo ${red} kg).</td><td class="g-ref">${esc(citas(T_REF.rm))}</td></tr></tbody></table></div>
+    <ul><li><b>Lote:</b> «Cargar tests del plantel» guarda un test por jugador con al menos un valor. Lo vacío no se guarda.</li>
+    <li><b>Controles:</b> valores fuera de rango y tiempos que no crecen de 10 a 30 m no se guardan.</li>
+    <li><b>Historial:</b> en la ficha, «Tests físicos» muestra los últimos valores con ▲▼ contra el test anterior (en sprint, bajar el tiempo es mejorar) y cada test se puede editar o borrar.</li>
+    <li><b>1RM en un test:</b> si cargás marcas, se actualizan las de la ficha y todas las rutinas con % recalculan los kilos.</li></ul>`},
+  {id:'temporada',t:'Temporada (macrociclo)',h:`
+    <ul><li><b>Crear:</b> lunes de la semana 1 (tiene que ser lunes), día de partido y punto de partida:
+      <ul><li><b>Plantilla temporada promedio handball:</b> 42 semanas, 2 torneos de 15 fechas, con la dosis de las primeras 13 semanas.</li><li><b>Importar desde un Excel:</b> ver «Planilla Excel».</li><li><b>En blanco:</b> la cantidad de semanas que elijas.</li></ul></li>
+    <li><b>Tablero:</b> período, mes (sale de las fechas), mesociclo, una barra por semana y la competencia. El color es el tipo de semana y la altura, el nivel de carga. La semana actual se resalta.</li>
+    <li><b>Editar tabla:</b> todas las semanas juntas; agregar o quitar semanas al final.</li>
+    <li><b>Ajustes:</b> nombre, inicio (todas las semanas se corren con él), día de partido, actualizar desde Excel y borrar.</li></ul>
+    <h4>Tipos de semana</h4><div class="g-tipos">${G_TIPOS.map(([k,n,d])=>`<div class="t-${k}"><i class="sw"></i><b>${n}</b><span>${d}</span></div>`).join('')}</div>
+    <h4>Relación de carga</h4><p>Reparte las 5 sesiones entre carga alta y baja: <b>1:4</b> (muy suave), <b>2:3</b>, <b>3:2</b>, <b>4:1</b> (muy exigente). Es la altura de la barra. Siempre suma 5.</p>
+    <h4>Competencia</h4><p>Escribí <b>FECHA 3</b>, <b>LIBRE</b>, <b>PRETEMPORADA</b>, <b>RECESO</b> o <b>FIN DEL TORNEO</b>. Las fechas cuentan para «próxima fecha» y los totales.</p>
+    <p class="g-ref">Base teórica: períodos, mesociclos y microciclos según ${citas(['matveev1977','bompa2009'])}.</p>`},
+  {id:'excel',t:'Planilla Excel (importar y actualizar)',h:`
+    <p>La app lee el mismo formato de la planilla del TP. Busca las hojas por nombre:</p>
+    <div class="tbl-wrap"><table class="eq-t g-t"><thead><tr><th>Hoja</th><th>Qué lee</th><th>Cómo la reconoce</th></tr></thead><tbody>
+      <tr><td><b>MACRO</b></td><td>Período, mes, mesociclo, tipo, relación, competencia, test, cualidades y métodos de cada día</td><td>Filas «N° Microciclo», «Tipo Microciclo», «Competencia», «Periodo», «Mesociclos»; una «x» por día en cada método</td></tr>
+      <tr><td><b>MICROCICLOS</b></td><td>Carrera y velocidad: método, series, reps, distancia, %, pausas</td><td>Bloques «MICROCICLO: n» con encabezado «METODO» y fila «V. total»; 5 días por bloque</td></tr>
+      <tr><td><b>PESAS</b></td><td>Fuerza: método, ejercicio, series, reps, %, pausas</td><td>Bloques «MICROCICLO: n» con «Metodo» y «Total»; el día sale del rótulo «DIA:»</td></tr>
+      <tr><td><b>DIAGNÓSTICO</b></td><td>VAM, Yo-Yo, CMJ, Abalakov, peso, sprint 10/20/30 m y 1RM</td><td>Rótulos de la columna B; los 1RM debajo de «MOVIMIENTO»</td></tr></tbody></table></div>
+    <ul><li><b>Celdas combinadas</b> (por ejemplo «PRETEMPORADA» en 6 semanas) se copian a todas las semanas del rango.</li>
+    <li><b>Ejercicios:</b> se asocian a tus marcas por nombre (Press banco plano → Banco plano, Cargada → Clean, etc.). Si no hay coincidencia, el kilo queda «sin 1RM».</li>
+    <li><b>Actualizar desde Excel</b> (Ajustes de la temporada): muestra cuántas semanas cambian en plan y dosis antes de aplicar. No toca el inicio, el partido ni el plantel. Con la casilla marcada, conserva las dosis armadas en la app para las semanas que en el Excel están vacías.</li>
+    <li><b>Diagnóstico:</b> al importar podés cargarlo como test de un jugador del equipo.</li></ul>`},
+  {id:'semana',t:'Semanas y dosis',h:`
+    <ul><li><b>Calcular para:</b> elegís un jugador del plantel y la tabla muestra sus tiempos y kilos. Si le falta un test, lo marca.</li>
+    <li><b>Cualidades del día:</b> Resistencia, Fuerza y Velocidad. Si un método no coincide con las cualidades marcadas, avisa.</li>
+    <li><b>Métodos planificados:</b> las etiquetas del día (de la hoja MACRO). <b>Completar desde el plan</b> trae la dosis base de cada método sin dosis.</li>
+    <li><b>Dosis de carrera y velocidad:</b> series × reps × metros al %, pausa entre reps y entre series. Tiempo por tramo (o total y ritmo por km en los continuos) y volumen.</li>
+    <li><b>Dosis de fuerza:</b> ejercicio (tus marcas RM), series × reps al % de 1RM, pausa. Kilos y tonelaje.</li>
+    <li><b>Generador:</b> copia la dosis de otra semana con ± puntos de intensidad y ± % de volumen (en continuos cambia los metros; en el resto, las repeticiones).</li>
+    <li><b>Flechas ‹ ›:</b> pasan de semana y guardan lo que cambiaste.</li></ul>
+    <h4>Avisos</h4><ul>
+      <li><span class="pill p-warn">Volumen</span> los metros suben más de 25 % contra la semana anterior con dosis.</li>
+      <li><span class="pill p-warn">Choque flojo</span> semana de choque con intensidad media menor que la anterior.</li>
+      <li><span class="pill p-warn">Regenerativa</span> con más metros que la semana anterior.</li>
+      <li><span class="pill p-bad">Porcentaje</span> más de 120 % de VAM, más de 100 % del sprint o más de 100 % de 1RM.</li>
+      <li><span class="pill p-warn">Plan y dosis</span> método planificado sin dosis, o dosis de un método que no estaba planificado.</li></ul>
+    <h4>Gráficos de la temporada</h4><p>Debajo del tablero: metros por semana con la intensidad media (% VAM), y repeticiones de fuerza con el % medio de 1RM. No dependen del jugador.</p>`},
+  {id:'entrega',t:'Entregar al plantel y lo que ve el jugador',h:`
+    <ul><li><b>Semanas:</b> por defecto, el mesociclo actual. Podés elegir cualquier rango.</li>
+    <li><b>Jugadores:</b> todos tildados. Los que no tienen VAM se marcan: sus tiempos llegan vacíos con una nota.</li>
+    <li><b>Si ya tiene su rutina:</b> <b>Sumar</b> (ve las dos y elige arriba «Mi rutina personal» o «Plan del equipo») o <b>Reemplazar</b> (su rutina pasa a finalizada y queda en el historial).</li>
+    <li><b>Re-entregar:</b> el plan anterior del mismo equipo se cierra solo. Volvé a entregar si cambiaste un test de VAM o sprint, una fórmula o una dosis: <b>los tiempos quedan fijos al entregar</b>. Los kilos se recalculan solos con el 1RM.</li>
+    <li><b>Opciones:</b> pedir minutos y esfuerzo al terminar cada sesión (control de carga) y el bienestar antes de entrenar.</li></ul>
+    <h4>En el link del jugador</h4><ul>
+      <li>Ve la semana que corresponde por fecha y se le abre el día de hoy.</li>
+      <li>Carrera y sprint: tramos con su tiempo objetivo, ritmo por km, pausas y temporizador. Fuerza: reps × kilos calculados con su marca.</li>
+      <li>Fila <b>«Antes»</b>: lo planificado y lo que anotó en las semanas anteriores para ese mismo ejercicio y día, con ▲▼ contra hoy.</li>
+      <li>Tilda lo hecho, anota kilos reales y, al terminar, minutos y esfuerzo.</li></ul>
+    <p><b>PDF del plantel</b> descarga en un .zip el PDF de cada jugador con su plan.</p>`},
+  {id:'control',t:'Control de carga',h:`
+    <ul><li><b>Carga real</b> = minutos de la sesión × esfuerzo de 1 a 10 (RPE) que anota el jugador. Se suma por semana.</li>
+    <li><b>Fila Plan:</b> tipo, relación y metros planificados de cada una de las últimas 6 semanas.</li>
+    <li><b>Colores por jugador:</b> <span class="ep-real hi">rojo</span> más de 30 % sobre su promedio; <span class="ep-real lo">naranja</span> más de 30 % por debajo.</li>
+    <li><b>Aguda/crónica</b> (últimos 7 días contra el promedio semanal de los últimos 28; necesita 3 semanas de registros): <span class="pill p-ok">0,8 a 1,3</span> bien · <span class="pill p-warn">fuera de ese rango</span> atención · <span class="pill p-bad">más de ${acwrMax}</span> riesgo (se cambia en Ajustes → alertas).</li>
+    <li><b>Avisos del equipo:</b> si el plan sube y la carga real del equipo baja más de 15 %, o al revés.</li></ul>
+    <p class="g-ref">Base teórica: carga real por RPE de la sesión, ${citas(['foster2001'])}; relación aguda/crónica, ${citas(['hulin2014','gabbett2016'])}. Los umbrales de 0,8 a 1,3 son orientativos y la propia literatura los discute: usalos como alerta, no como regla.</p>`},
+  {id:'formulas',t:'Fórmulas y doble verificación',h:`
+    <div class="tbl-wrap"><table class="eq-t g-t"><thead><tr><th>Cálculo</th><th>Fórmula en uso</th><th>Para qué</th><th>Base teórica</th></tr></thead><tbody>
+      ${Object.entries(EP_FDEF).map(([k,d])=>`<tr><td><b>${esc(d.n)}</b></td><td><code class="ep-code">${esc(epExpr(k))}</code>${epExpr(k)!==d.expr?' <span class="pill p-warn">modificada</span>':''}</td><td>${esc(d.w)}</td><td class="g-ref">${esc(citas(EP_FREF[k]))||'Adaptación de la app'}</td></tr>`).join('')}
+      <tr><td><b>Kilos</b></td><td><code class="ep-code">1RM × % ÷ 100, redondeado a ${red} kg</code></td><td>Igual en toda la app. El redondeo se cambia en Ajustes.</td><td class="g-ref">${esc(citas(EP_FREF.kg))}</td></tr>
+      <tr><td><b>Intensidad media</b></td><td><code class="ep-code">Σ(metros × %) ÷ Σ metros</code></td><td>Pesa más lo que más metros tiene.</td><td class="g-ref">${esc(citas(EP_FREF.vol))}</td></tr>
+      <tr><td><b>IMR (fuerza)</b></td><td><code class="ep-code">Σ(tonelaje × %) ÷ Σ tonelaje</code></td><td>Intensidad media relativa de la semana de fuerza.</td><td class="g-ref">${esc(citas(EP_FREF.imr))}</td></tr></tbody></table></div>
+    <ul><li><b>Sprint:</b> entre 0 y 30 m se interpola con los tiempos de 10, 20 y 30 m; más allá de 30 m se extiende en proporción.</li>
+    <li><b>Editar</b> (botón Fórmulas, arriba en Equipos): 1) escribís la fórmula; 2) la app la prueba contra casos con resultado conocido y cuenta cuántas filas cambian; 3) confirmás con un motivo. Si falló un control, además tenés que aceptarlo.</li>
+    <li><b>Historial:</b> cada cambio queda con fecha, antes, después y motivo. Siempre se puede volver a la original.</li>
+    <li><b>Seguridad:</b> solo números, variables, + − × ÷ ^ y round, min, max, abs, floor, ceil, sqrt. No se puede escribir código.</li></ul>`},
+  {id:'referencias',t:'Referencias y glosario',h:`
+    <dl class="g-dl">
+      <dt>VAM</dt><dd>Velocidad aeróbica máxima (m/s). El % de VAM individualiza el ritmo: misma consigna, distinto tiempo. <span class="g-ref">(${citas(['leger1980', 'billat2001'])})</span></dd>
+      <dt>1RM</dt><dd>Máximo peso para una repetición. El % de 1RM da los kilos de cada jugador. <span class="g-ref">(${citas(['gb2002'])})</span></dd>
+      <dt>Intensidad media</dt><dd>Promedio del % ponderado por metros (carrera) o repeticiones (fuerza).</dd>
+      <dt>IMR</dt><dd>Intensidad media relativa de la fuerza, ponderada por tonelaje. <span class="g-ref">(${citas(['gb1995'])})</span></dd>
+      <dt>Tonelaje</dt><dd>Series × reps × kilos.</dd>
+      <dt>Mesociclo</dt><dd>Bloque de 3 a 6 semanas, casi siempre en ola regenerativo → carga → carga → choque. <span class="g-ref">(${citas(['matveev1977', 'bompa2009'])})</span></dd>
+      <dt>Microciclo</dt><dd>Una semana: 5 sesiones de lunes a viernes.</dd>
+      <dt>RPE</dt><dd>Esfuerzo percibido de 1 a 10 al terminar la sesión. <span class="g-ref">(${citas(['foster2001'])})</span></dd>
+      <dt>Aguda/crónica</dt><dd>Carga de los últimos 7 días contra el promedio semanal de los últimos 28 días. <span class="g-ref">(${citas(['hulin2014', 'gabbett2016'])})</span></dd></dl>
+    ${libT('R','Métodos de resistencia')}${libT('V','Métodos de velocidad')}${libT('F','Métodos de fuerza')}
+    <p class="hint">La clasificación de métodos sigue a los autores de la columna Fuente; cada cátedra puede usar otra nomenclatura. La lista completa está en <b>Bibliografía</b>.</p>`},
+  {id:'bibliografia',t:'Bibliografía (APA 7)',h:biblioHTML()},
+  {id:'app',t:'El resto de la app (resumen)',h:`
+    <ul><li><b>Panel:</b> pestañas Hoy (lo que hay que atender) y Finanzas (cobros y reparto).</li>
+    <li><b>Entrenados:</b> lista con filtros; la ficha tiene datos, rutinas, tests, marcas, carga, bienestar e historial.</li>
+    <li><b>Calendario:</b> entrenamientos, entregas y vencimientos de rutinas, pagos y eventos.</li>
+    <li><b>Rutinas:</b> plantillas, entregas y listado; armado de rutinas individuales.</li>
+    <li><b>Equipos:</b> todo lo de esta guía.</li>
+    <li><b>Ajustes:</b> URL de la app, posiciones, bloques, redondeo de kilos, marcas RM y umbrales de alertas.</li></ul>`},
+  {id:'faq',t:'Preguntas frecuentes',h:`
+    <dl class="g-dl">
+      <dt>El jugador ve tiempos vacíos.</dt><dd>No tenía VAM o test de sprint al entregar. Cargá el test y volvé a entregar esas semanas.</dd>
+      <dt>Cambié la VAM y el link sigue igual.</dt><dd>Los tiempos se fijan al entregar: volvé a entregar. Los kilos sí se actualizan solos.</dd>
+      <dt>Un ejercicio dice «sin 1RM».</dt><dd>El ejercicio no coincide con una marca del jugador. Cargá el 1RM en su ficha o elegí otro ejercicio en la dosis.</dd>
+      <dt>¿Se borra la rutina del jugador al entregar?</dt><dd>Solo si elegís «Reemplazar». Con «Sumar» ve las dos.</dd>
+      <dt>Actualicé el Excel, ¿pierdo lo que hice en la app?</dt><dd>Lo que cambió en el Excel se aplica. Con la casilla marcada, las dosis de semanas vacías en el Excel se conservan. Antes de aplicar ves el resumen de cambios.</dd>
+      <dt>¿Cómo arranco una temporada nueva?</dt><dd>Creá otra temporada para el equipo (por ejemplo «2027»): la app muestra siempre la más reciente.</dd></dl>`}
+  ]}
+function guiaHTML(a){const q=(a.q||'').trim().toLowerCase(),secs=guiaSecciones();const txt=h=>h.replace(/<[^>]+>/g,' ').toLowerCase();
+  const vis=secs.filter(s=>!q||s.t.toLowerCase().includes(q)||txt(s.h).includes(q));
+  return `<div class="pad guia"><div class="g-top"><input id="g-q" type="search" placeholder="Buscar en la guía (ej: VAM, Excel, reemplazar)" value="${esc(a.q||'')}" autocomplete="off" aria-label="Buscar en la guía"></div>
+    <nav class="g-toc" aria-label="Secciones">${secs.map(s=>`<button type="button" data-gsec="${s.id}" class="${vis.includes(s)?'':'off'}">${esc(s.t)}</button>`).join('')}</nav>
+    ${vis.length?vis.map(s=>`<details class="card g-sec" id="g-${s.id}" ${q||a.sec===s.id||(!a.sec&&s.id==='inicio')?'open':''}><summary>${esc(s.t)}</summary><div class="g-b">${s.h}</div></details>`).join(''):'<p class="hint">No hay nada con esa palabra. Probá con otra.</p>'}</div>`}
+function bindGuia(a){const ov=$('#overlay');
+  ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
+    const b=ev.target.closest('[data-gsec]');if(b){a.sec=b.dataset.gsec;a.q='';renderSheet();requestAnimationFrame(()=>{const d=document.getElementById('g-'+a.sec);if(d){d.open=true;d.scrollIntoView({block:'start'})}})}};
+  ov.oninput=ev=>{if(ev.target.id==='g-q'){a.q=ev.target.value;a.sec=null;renderSheet()}}}
+document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-guia]');if(!b)return;const um=document.getElementById('umenu');if(um&&um.hidePopover)try{um.hidePopover()}catch(_){}openSheet('__guia','ver',{sec:b.dataset.guia||'inicio'})});
 (()=>{let y0=scrollY,raf=0;addEventListener('scroll',()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const y=scrollY,f=$('#fab');if(!f)return;
   const nearEnd=innerHeight+y>=document.documentElement.scrollHeight-140;f.classList.toggle('min',y>80&&(y>y0||nearEnd));f.classList.toggle('lift',nearEnd);y0=y})},{passive:true})})();
 /* Esc lo maneja el <dialog> nativo */
