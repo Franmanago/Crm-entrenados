@@ -921,6 +921,14 @@ function bindSheet(e,isNew){
     const dp=ev.target.closest('[data-delp]');if(dp)return delPago(dp.dataset.delp,dp);
     const aw=ev.target.closest('[data-asw]');if(aw){S.asW=Math.min(0,(S.asW||0)+Number(aw.dataset.asw));S.asSec=null;renderSheet();return}
     const at=ev.target.closest('[data-astog]');if(at)return asisToggle(e,at);
+    const rv=ev.target.closest('[data-regver]');if(rv){const k=rv.dataset.regver;S.regVer=S.regVer||{};if(S.regVer[k])delete S.regVer[k];else S.regVer[k]=1;S.regEd=null;renderSheet();return}
+    const rt=ev.target.closest('[data-regtodo]');if(rt){const k=rt.dataset.regtodo;S.regVer[k]=S.regVer[k]==='todo'?1:'todo';renderSheet();return}
+    const re=ev.target.closest('[data-reged]');if(re){S.regEd=re.dataset.reged;renderSheet();return}
+    if(ev.target.closest('[data-regcancel]')){S.regEd=null;renderSheet();return}
+    const rs=ev.target.closest('[data-regsave]');if(rs)return regGuardar(e,rs);
+    const rd=ev.target.closest('[data-regdel]');if(rd)return regBorrar(rd);
+    const lv=ev.target.closest('[data-limpver]');if(lv){S.limpVer=lv.dataset.limpver||null;renderSheet();return}
+    const lp=ev.target.closest('[data-limpiar]');if(lp)return limpiarRut(e,lp);
   };
   ov.onchange=ev=>{const f=ev.target.closest('[data-asf]');if(f)return asisFecha(e,f);const sc=ev.target.closest('[data-assec]');if(sc){S.asSec=Number(sc.value);renderSheet()}};
   const ef=$('#ef');
@@ -1424,6 +1432,7 @@ function fichaRutinasHTML(e){
     ${asisEdHTML(e)}
     ${cargaFichaHTML(e,a)}
     ${cambiosHTML(e)}
+    ${limpiarHTML(e)}
   </div>
   ${gcalFichaHTML(e)}
   ${(()=>{const ms=mesesDe(e);const def=ms.includes(mesShift(curMes(),-1))?mesShift(curMes(),-1):ms[0];const vs=ms.find(k=>k<def)||ms.find(k=>k!==def)||'';
@@ -1446,17 +1455,92 @@ function cargaFichaHTML(e,a){
     const cd=cargaDias(e.id);const ws=semanasDe(new Date(today().getTime()-35*864e5),today()).slice(-6).map(([x,y])=>{let v=0;for(const k in cd)if(k>=iso(x)&&k<=iso(y))v+=cd[k];return {ini:x,v:Math.round(v)}});
     const mx=Math.max(1,...ws.map(w=>w.v));const ac=acwr(e.id);
     h+=`<div class="pad" style="border-top:1px solid var(--line)"><div class="kpi" style="padding:0;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div class="lbl">Carga semanal (minutos × esfuerzo)</div><span class="pill ${acwrPill(ac.ratio)}">Aguda/crónica: ${ac.ratio==null?'—':ac.ratio.toFixed(2)} · ${acwrTxt(ac.ratio)}</span></div>
-      ${hayC?`<div class="asis-row">${ws.map(w=>`<div class="asis-w"><div class="asis-bar"><i style="height:${w.v/mx*100}%;background:var(--accent)"></i></div><b>${w.v}</b><span>${fmtShort(iso(w.ini))}</span></div>`).join('')}</div>`:'<p class="hint">Todavía no anotó ninguna sesión.</p>'}</div>`;
+      ${hayC?`<div class="asis-row">${ws.map(w=>`<div class="asis-w"><div class="asis-bar"><i style="height:${w.v/mx*100}%;background:var(--accent)"></i></div><b>${w.v}</b><span>${fmtShort(iso(w.ini))}</span></div>`).join('')}</div>${regListaHTML(e,'carga')}`:'<p class="hint">Todavía no anotó ninguna sesión.</p>'}</div>`;
   }
   if(hayB||a?.bienestar){
     const bl=regs.filter(r=>r.tipo==='bien').sort((x,y)=>y.fecha.localeCompare(x.fecha)).slice(0,5);
     h+=`<div class="pad" style="border-top:1px solid var(--line)"><div class="kpi" style="padding:0"><div class="lbl">Bienestar antes de entrenar</div></div>
-      ${bl.length?`<ul class="alist" style="margin:4px -16px 0">${bl.map(r=>{const st=estadoBien(e.id,r.fecha);return `<li><span class="nm">${fmtShort(r.fecha)}</span><span class="meta">${bienTxt(r.datos)}</span>${st?`<span class="pill ${EST[st.k][1]}">${EST[st.k][0]}</span>`:''}</li>`}).join('')}</ul>`:'<p class="hint">Todavía no respondió el cuestionario.</p>'}
+      ${bl.length?(S.regVer?.[e.id+'|bien']?regListaHTML(e,'bien'):`<ul class="alist" style="margin:4px -16px 0">${bl.map(r=>{const st=estadoBien(e.id,r.fecha);return `<li><span class="nm">${fmtShort(r.fecha)}</span><span class="meta">${bienTxt(r.datos)}</span>${st?`<span class="pill ${EST[st.k][1]}">${EST[st.k][0]}</span>`:''}</li>`}).join('')}</ul>${regListaHTML(e,'bien')}`):'<p class="hint">Todavía no respondió el cuestionario.</p>'}
       ${a?.ajusteWellness?(()=>{const fal=[];(a.secciones||[]).forEach(s2=>s2.dias.forEach(d=>d.bloques.forEach(b=>b.items.forEach(i=>{if(i.pct&&i.rm&&kgItem(i,e).falta&&!fal.includes(i.rm))fal.push(i.rm)}))));const sinPct=[];(a.secciones||[]).forEach(s2=>s2.dias.forEach(d=>d.bloques.forEach(b=>{if(b.modo!=='timer')b.items.forEach(i=>{if(String(i.nombre||'').trim()&&!i.pct&&i.kg&&!sinPct.includes(i.nombre))sinPct.push(i.nombre)})})));
         return `<div class="aj-info"><b>Ajuste de cargas por wellness: activado</b><span>Moderado −5% · Bajo −10% y una serie menos. Se ajustan los ejercicios con %RM; los circuitos por tiempo suman descanso o restan una vuelta.</span>${fal.length?`<span class="aj-falta">Faltan marcas para ajustar: <b>${fal.map(esc).join(', ')}</b>. Cargalas en "Marcas RM".</span>`:''}${sinPct.length?`<span class="hint">Con kg fijo (no se ajustan): ${sinPct.slice(0,6).map(esc).join(', ')}${sinPct.length>6?'…':''}</span>`:''}</div>`})():''}</div>`;
   }
   return h;
 }
+/* ----- corregir o borrar registros de carga y bienestar (y limpiar pruebas) ----- */
+document.head.insertAdjacentHTML('beforeend',`<style id="rg-css">/* ---- corregir registros de carga y bienestar / borrar pruebas ---- */
+.rg-tg{font-size:13px;margin-top:8px;display:inline-block}
+.rg-l{list-style:none;margin:6px 0 0;padding:0}
+.rg-r{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.rg-r:first-child{border-top:0}
+.rg-d{min-width:46px;font-weight:700;font-size:14px;display:flex;flex-direction:column;line-height:1.2}
+.rg-d small{font-weight:500;font-size:11px;color:var(--muted)}
+.rg-t{flex:1;min-width:140px;font-size:13.5px;color:var(--muted)}
+.rg-t b{color:var(--ink)}
+.rg-a{display:flex;gap:6px;margin-left:auto}
+.rg-r.ed{background:var(--surface-2);border-radius:8px;padding:10px;border-top:0;margin:4px 0}
+.rg-f{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;width:100%}
+.rg-f label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.rg-f input,.rg-f select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);text-transform:none}
+.rg-f input[type=number]{width:84px}
+.rg-f input[type=date]{width:140px}
+.rg-pie{display:flex;justify-content:space-between;gap:10px;margin-top:6px;font-size:13px}
+.rg-pie .lnk:last-child{margin-left:auto}</style>`);
+function regArm(btn,txt){if(btn.dataset.armed==='1')return true;btn.dataset.armed='1';btn.dataset.txt=btn.textContent;btn.textContent=txt||'¿Seguro?';btn.classList.add('armed');
+  setTimeout(()=>{if(btn.isConnected&&btn.dataset.armed==='1'&&!btn.disabled){btn.dataset.armed='';btn.textContent=btn.dataset.txt;btn.classList.remove('armed')}},4000);return false}
+function regListaHTML(e,tipo){const k=e.id+'|'+tipo,ver=!!S.regVer?.[k];
+  const lbl=tipo==='carga'?'sesiones':'respuestas';
+  if(!ver)return `<button type="button" class="lnk rg-tg" data-regver="${esc(k)}">Corregir o borrar ${lbl}</button>`;
+  const l=S.regs.filter(r=>r.entrenadoId===e.id&&r.tipo===tipo).sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||'')||(y.ts||0)-(x.ts||0));
+  const todo=S.regVer[k]==='todo',L=todo?l:l.slice(0,12);
+  return `<ul class="rg-l">${L.map(r=>regRowHTML(e,r)).join('')}</ul>
+    <div class="rg-pie">${l.length>12?`<button type="button" class="lnk" data-regtodo="${esc(k)}">${todo?'Ver menos':'Ver las '+l.length}</button>`:''}<button type="button" class="lnk" data-regver="${esc(k)}">Listo</button></div>`}
+function regRowHTML(e,r){const d=r.datos||{};
+  if(S.regEd!==r._id){const txt=r.tipo==='carga'?`${esc(d.min??'—')} min · esfuerzo ${esc(d.rpe??'—')}/10 · <b>${Math.round((Number(d.min)||0)*(Number(d.rpe)||0))}</b>`:esc(bienTxt(d))||'—';
+    return `<li class="rg-r"><span class="rg-d">${fmtShort(r.fecha)}${r.editAdmin?'<small>corregido</small>':''}</span><span class="rg-t">${txt}</span><span class="rg-a"><button type="button" class="btn sm" data-reged="${esc(r._id)}">Editar</button><button type="button" class="btn sm danger" data-regdel="${esc(r._id)}">Borrar</button></span></li>`}
+  const v=bienVals(d);
+  const campos=r.tipo==='carga'
+    ?`<label>Minutos<input type="number" inputmode="numeric" min="1" max="600" name="min" value="${esc(d.min??'')}"></label><label>Esfuerzo 1-10<input type="number" inputmode="numeric" min="1" max="10" name="rpe" value="${esc(d.rpe??'')}"></label>`
+    :BK.map(([k,l])=>`<label>${l}<select name="${k}"><option value="">—</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${v[k]===n?'selected':''}>${n}</option>`).join('')}</select></label>`).join('');
+  return `<li class="rg-r ed"><div class="rg-f" data-regbox="${esc(r._id)}"><label>Fecha<input type="date" name="fecha" value="${esc(r.fecha)}" max="${iso(today())}"></label>${campos}
+    <span class="rg-a"><button type="button" class="btn sm pri" data-regsave="${esc(r._id)}">Guardar</button><button type="button" class="btn sm" data-regcancel="1">Cancelar</button></span></div></li>`}
+async function regGuardar(e,btn){const box=btn.closest('[data-regbox]'),id=box.dataset.regbox,r=S.regs.find(x=>x._id===id);if(!r)return;
+  const g=n=>box.querySelector(`[name="${n}"]`)?.value??'';const f=g('fecha');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(f))return toast('Elegí la fecha');if(f>iso(today()))return toast('La fecha no puede ser futura');
+  let datos={...(r.datos||{})};
+  if(r.tipo==='carga'){const min=Math.round(Number(g('min'))),rpe=Math.round(Number(g('rpe')));
+    if(!(min>=1&&min<=600))return toast('Minutos: entre 1 y 600');if(!(rpe>=1&&rpe<=10))return toast('Esfuerzo: de 1 a 10');datos={...datos,min,rpe}}
+  else{delete datos.cuerpo;['estado','prom','base'].forEach(k=>delete datos[k]);let n=0;
+    BK.forEach(([k])=>{const x=Number(g(k));if(x>=1&&x<=5){datos[k]=x;n++}else delete datos[k]});if(!n)return toast('Completá al menos una respuesta');
+    const d0=new Date(parse(f));d0.setDate(d0.getDate()-28);const ini=iso(d0);
+    const st=bienEstado(datos,S.regs.filter(x=>x._id!==id&&x.entrenadoId===e.id&&x.tipo==='bien'&&x.fecha<f&&x.fecha>=ini).map(x=>x.datos));
+    if(st){datos.estado=st.k;datos.prom=st.m;datos.base=st.base}}
+  const nid=f===r.fecha?id:asisRid(e.id,r.item,f);
+  if(nid!==id&&S.regs.some(x=>x._id===nid))return toast('Ya hay un registro así ese día: borrá uno de los dos');
+  const {_id,...base}=r,d={...base,fecha:f,datos,ts:Date.now(),editAdmin:true};btn.disabled=true;
+  if(!await write(()=>S.db.collection('registros').doc(nid).set(d))){btn.disabled=false;return}
+  S.regs=S.regs.filter(x=>x._id!==nid).concat({...d,_id:nid});
+  if(nid!==id&&await write(()=>S.db.collection('registros').doc(id).delete()))S.regs=S.regs.filter(x=>x._id!==id);
+  S.regEd=null;toast('Registro corregido');renderSheet()}
+async function regBorrar(btn){if(!regArm(btn,'¿Borrar?'))return;const id=btn.dataset.regdel;btn.disabled=true;
+  if(await write(()=>S.db.collection('registros').doc(id).delete())){S.regs=S.regs.filter(x=>x._id!==id);if(S.regEd===id)S.regEd=null;toast('Registro borrado');renderSheet()}else btn.disabled=false}
+function limpiarHTML(e){const regs=S.regs.filter(r=>r.entrenadoId===e.id);if(!regs.length)return '';
+  const ver=S.limpVer===e.id;
+  if(!ver)return `<div class="pad" style="border-top:1px solid var(--line)"><button type="button" class="lnk rg-tg" data-limpver="${esc(e.id)}">Borrar registros de prueba o de una rutina</button></div>`;
+  const ids=[...new Set(regs.map(r=>r.rutinaId||''))];
+  const G=ids.map(rid=>{const r=rid&&S.rutinas.find(x=>x._id===rid),l=regs.filter(x=>(x.rutinaId||'')===rid),fs=l.map(x=>x.fecha).filter(Boolean).sort();
+    const n=t=>l.filter(x=>t==='asis'?String(x.item||'').startsWith('asis:'):t==='ej'?!especial(x):x.tipo===t).length;
+    return {rid,r,l,desde:fs[0],hasta:fs[fs.length-1],c:[['asis','asistencia'],['carga','carga'],['bien','bienestar'],['ej','ejercicios']].map(([t,lb])=>[n(t),lb]).filter(([x])=>x)}})
+    .sort((a,b)=>(b.hasta||'').localeCompare(a.hasta||''));
+  const est=r=>!r?'<span class="pill p-mute">Rutina borrada</span>':r.estado==='activa'?'<span class="pill p-ok">Activa</span>':r.estado==='finalizada'?'<span class="pill p-mute">Finalizada</span>':`<span class="pill p-mute">${esc(r.estado||'')}</span>`;
+  return `<div class="pad" style="border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:14px">Borrar registros de prueba</b><button type="button" class="lnk" data-limpver="">Cerrar</button></div>
+    <p class="hint" style="margin:2px 0 8px">Borra todo lo que anotó (o marcaste vos) con esa rutina: asistencia, kg, carga y bienestar. Desaparece de los gráficos, la carga aguda/crónica y los PDF. No se puede deshacer.</p>
+    <ul class="rg-l">${G.map(g=>`<li class="rg-r"><span class="rg-t" style="white-space:normal">${est(g.r)} <b>${esc(g.r?.nombre||'Sin rutina')}</b><br><small class="hint">${g.desde?fmtShort(g.desde)+(g.hasta!==g.desde?' al '+fmtShort(g.hasta):''):''} · ${g.c.map(([x,lb])=>x+' '+lb).join(' · ')}</small></span>
+      <span class="rg-a"><button type="button" class="btn sm danger" data-limpiar="${esc(g.rid)}" data-n="${g.l.length}">Borrar ${g.l.length}</button></span></li>`).join('')}</ul></div>`}
+async function limpiarRut(e,btn){const n=btn.dataset.n;if(!regArm(btn,`Tocá otra vez: borrar ${n}`))return;
+  const rid=btn.dataset.limpiar,l=S.regs.filter(r=>r.entrenadoId===e.id&&(r.rutinaId||'')===rid);btn.disabled=true;btn.textContent='Borrando…';const ok=new Set();
+  for(let i=0;i<l.length;i+=10)await Promise.all(l.slice(i,i+10).map(r=>S.db.collection('registros').doc(r._id).delete().then(()=>ok.add(r._id),()=>{})));
+  S.regs=S.regs.filter(x=>!ok.has(x._id));S.regEd=null;
+  toast(ok.size===l.length?`Listo: ${ok.size} registros borrados`:`Se borraron ${ok.size} de ${l.length}. Probá de nuevo.`);renderSheet()}
 function bindFichaRutinas(e){
   const rg=$('#rep-go');if(rg){const tp=$('#rep-tipo');tp.addEventListener('change',()=>{$('#rep-vsw').hidden=tp.value!=='comp'});
     rg.addEventListener('click',()=>descargarReportes([e.id],$('#rep-mes').value,tp.value==='comp'?$('#rep-vs').value:null))}

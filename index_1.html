@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>entrená.</title>
+<meta name="theme-color" content="#F3F4F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C0F0E" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest?v=2">
+<link rel="icon" href="icono.svg?v=2" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icono2-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="estilos.css?v=20261123b">
+</head>
+<body>
+<div id="splash" aria-hidden="true"><div class="sp-in"><img src="icono.svg" alt="" width="132" height="132"><span class="sp-w">entrená<i>.</i></span></div></div>
+<script>window.splashOff=function(){var s=document.getElementById('splash');if(!s||s.dataset.off)return;s.dataset.off=1;var mn=(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)?0:700;var t=Math.max(0,mn-(Date.now()-window.__sp0));setTimeout(function(){s.classList.add('off');setTimeout(function(){s.remove()},450)},t)};window.__sp0=Date.now();setTimeout(window.splashOff,7000);</script>
+<div id="login" class="login" hidden>
+  <form id="login-form" class="card">
+    <h1><img src="icono.svg" alt=""><span>entrená<i>.</i></span></h1>
+    <p class="hint">Entrá con el mail y la contraseña de tu usuario de Supabase.</p>
+    <input id="login-email" type="email" autocomplete="username" placeholder="Mail" required>
+    <input id="login-pass" type="password" autocomplete="current-password" placeholder="Contraseña" required>
+    <div id="login-msg" class="banner" hidden></div>
+    <button class="btn pri" type="submit">Entrar</button>
+  </form>
+</div>
+<div id="app" hidden>
+
+
+<header class="top"><div class="wrap">
+  <div class="brand"><img src="icono.svg" alt=""><span>entrená<i>.</i></span></div>
+  <nav class="tabs" aria-label="Secciones">
+    <button data-view="panel" aria-current="page">Panel</button>
+    <button data-view="lista">Entrenados</button>
+    <button data-view="calendario">Calendario</button>
+    <button data-view="rutinas">Rutinas</button>
+    <button data-view="equipos">Equipos</button>
+    <button data-view="ajustes">Ajustes</button>
+  </nav>
+  <div class="date" id="today"></div>
+  <div class="user"><button type="button" class="av" popovertarget="umenu" aria-label="Cuenta"><span id="user-ini">·</span></button><div id="umenu" class="pmenu um-p" popover="auto" aria-label="Cuenta"><span id="user-mail"></span><button type="button" data-guia="inicio">Guía de uso</button><button id="logout" type="button">Salir</button></div></div>
+</div></header>
+
+<main class="wrap">
+  <div id="banner" class="banner" hidden></div>
+  <section id="v-panel"></section>
+  <section id="v-lista" hidden></section>
+  <section id="v-calendario" hidden></section>
+  <section id="v-rutinas" hidden></section>
+  <section id="v-equipos" hidden></section>
+  <section id="v-ajustes" hidden></section>
+</main>
+<button class="fab" id="fab" aria-label="Nuevo entrenado"><span class="fab-i" aria-hidden="true">+</span><span class="fab-t">Nuevo entrenado</span></button>
+<dialog id="overlay" class="overlay" aria-label="Detalle"></dialog>
+<div role="region" aria-label="Avisos"><div id="toast" class="toast" popover="manual" hidden></div></div>
+
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="db.js?v=20261123b"></script>
+<script src="pdffonts.js?v=20261123b"></script>
+<script src="rutinapdf.js?v=20261123b"></script>
+<script src="app.js?v=20261125a"></script>
+</body>
+</html>
