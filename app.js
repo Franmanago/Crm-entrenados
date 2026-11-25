@@ -218,10 +218,13 @@ function renderPanel(){
   <div class="seg" role="tablist"><button type="button" data-pv="ganado" aria-pressed="${S.pv!=='caja'}">Ganado</button><button type="button" data-pv="caja" aria-pressed="${S.pv==='caja'}">Caja</button></div>
   ${S.pv==='caja'?cajaHTML(M):`<div class="kpis">
     <div class="card kpi hl"><div class="lbl">Tu ganancia cobrada</div><div class="val">${money(D.T.fc)}</div><div class="sub">${D.T.ff?Math.round(D.T.fc/D.T.ff*100):0}% de ${money(D.T.ff)} esperados</div><div class="prog" style="margin-top:8px"><i style="width:${D.T.ff?Math.min(100,D.T.fc/D.T.ff*100):0}%"></i></div></div>
-    <div class="card kpi"><div class="lbl">Falta cobrar</div><div class="val" style="color:var(--bad)">${money(D.T.p)}</div><div class="sub">${plural(D.pend.length,'entrenado','entrenados')}</div></div>
+    <button type="button" class="card kpi kpi-btn${S.faltaVer?' on':''}" data-falta="1" aria-expanded="${!!S.faltaVer}" aria-controls="falta-l"><div class="lbl">Falta cobrar</div><div class="val" style="color:var(--bad)">${money(D.T.p)}</div><div class="sub">${plural(D.pend.length,'entrenado','entrenados')} · <u>${S.faltaVer?'ocultar':'ver quiénes'}</u> <span class="kpi-car" aria-hidden="true">▾</span></div></button>
     <div class="card kpi"><div class="lbl">Plantel del mes</div><div class="val">${D.T.n}</div><div class="sub">${GYMS.map(g=>D.G[g].n+' '+GYM_LBL[g]).join(' · ')}</div></div>
     ${isCur?`<div class="card kpi"><div class="lbl">Rutinas a revisar</div><div class="val" style="color:var(--warn)">${rut.length}</div><div class="sub">+30 días o a cambiar</div></div>`:''}
   </div>
+  ${S.faltaVer?`<div class="card falta-l" id="falta-l">${head(`Faltan cobrar en ${mesLbl(M)} · ${money(D.T.p)}`,'deuda',urg.length)}
+    ${pendInfo.length?`<ul class="alist">${pendInfo.map(x=>x.e?`<li><button class="nm" data-open="${esc(x.e.id)}">${esc(name(x.e))}<br><span class="hint">${esc(GYM_LBL[gymOf(x.e)]||'')}${x.e.telefono?'':' · sin teléfono'}</span></button><span class="meta"><span class="pill ${x.cls}">${esc(x.tag)}</span> <b>${money(x.r.monto)}</b></span><span class="fl-acc">${isCur&&isAct(x.e)?`<button type="button" class="btn sm pri" data-cobrar="${esc(x.e.id)}">Cobrar</button>`:''}${msgBtn(x.e,x.kind,'Avisar')}</span></li>`:`<li><span class="nm">${esc(titleCase(x.r.nombre))}<br><span class="hint">sin ficha</span></span><span class="meta"><b>${money(x.r.monto)}</b></span></li>`).join('')}</ul>
+      <p class="hint pad" style="padding-top:6px">${isCur?'“Cobrar” abre el registro de pago de esa persona; al guardarlo sale de esta lista. Tocá el nombre para ver la ficha.':'Mes anterior: tocá el nombre para abrir la ficha y registrar el pago.'}</p>`:'<div class="empty">Todos pagaron este mes.</div>'}</div>`:''}
 
   <h2 class="sec">Reparto de ${mesLbl(M)}</h2>
   <div class="grid2 g-rep">
@@ -1484,7 +1487,16 @@ document.head.insertAdjacentHTML('beforeend',`<style id="rg-css">/* ---- corregi
 .rg-f input[type=number]{width:84px}
 .rg-f input[type=date]{width:140px}
 .rg-pie{display:flex;justify-content:space-between;gap:10px;margin-top:6px;font-size:13px}
-.rg-pie .lnk:last-child{margin-left:auto}</style>`);
+.rg-pie .lnk:last-child{margin-left:auto}
+.kpi-btn{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;transition:border-color .15s}
+.kpi-btn:hover{border-color:var(--bad)}
+.kpi-btn.on{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.kpi-btn u{text-decoration-color:var(--line);text-underline-offset:3px}
+.kpi-car{display:inline-block;transition:transform .15s}.kpi-btn.on .kpi-car{transform:rotate(180deg)}
+.falta-l{margin-top:12px;border-color:var(--bad)}
+.falta-l .alist li{flex-wrap:wrap}
+.falta-l .nm{white-space:normal}
+.fl-acc{display:flex;gap:6px;align-items:center}</style>`);
 function regArm(btn,txt){if(btn.dataset.armed==='1')return true;btn.dataset.armed='1';btn.dataset.txt=btn.textContent;btn.textContent=txt||'¿Seguro?';btn.classList.add('armed');
   setTimeout(()=>{if(btn.isConnected&&btn.dataset.armed==='1'&&!btn.disabled){btn.dataset.armed='';btn.textContent=btn.dataset.txt;btn.classList.remove('armed')}},4000);return false}
 function regListaHTML(e,tipo){const k=e.id+'|'+tipo,ver=!!S.regVer?.[k];
@@ -1529,12 +1541,12 @@ function limpiarHTML(e){const regs=S.regs.filter(r=>r.entrenadoId===e.id);if(!re
   const ids=[...new Set(regs.map(r=>r.rutinaId||''))];
   const G=ids.map(rid=>{const r=rid&&S.rutinas.find(x=>x._id===rid),l=regs.filter(x=>(x.rutinaId||'')===rid),fs=l.map(x=>x.fecha).filter(Boolean).sort();
     const n=t=>l.filter(x=>t==='asis'?String(x.item||'').startsWith('asis:'):t==='ej'?!especial(x):x.tipo===t).length;
-    return {rid,r,l,desde:fs[0],hasta:fs[fs.length-1],c:[['asis','asistencia'],['carga','carga'],['bien','bienestar'],['ej','ejercicios']].map(([t,lb])=>[n(t),lb]).filter(([x])=>x)}})
+    return {rid,r,l,desde:fs[0],hasta:fs[fs.length-1],c:[['asis','día de asistencia','días de asistencia'],['carga','sesión de carga','sesiones de carga'],['bien','respuesta de bienestar','respuestas de bienestar'],['ej','registro de kg','registros de kg']].map(([t,a,b])=>[n(t),a,b]).filter(([x])=>x)}})
     .sort((a,b)=>(b.hasta||'').localeCompare(a.hasta||''));
   const est=r=>!r?'<span class="pill p-mute">Rutina borrada</span>':r.estado==='activa'?'<span class="pill p-ok">Activa</span>':r.estado==='finalizada'?'<span class="pill p-mute">Finalizada</span>':`<span class="pill p-mute">${esc(r.estado||'')}</span>`;
   return `<div class="pad" style="border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:14px">Borrar registros de prueba</b><button type="button" class="lnk" data-limpver="">Cerrar</button></div>
     <p class="hint" style="margin:2px 0 8px">Borra todo lo que anotó (o marcaste vos) con esa rutina: asistencia, kg, carga y bienestar. Desaparece de los gráficos, la carga aguda/crónica y los PDF. No se puede deshacer.</p>
-    <ul class="rg-l">${G.map(g=>`<li class="rg-r"><span class="rg-t" style="white-space:normal">${est(g.r)} <b>${esc(g.r?.nombre||'Sin rutina')}</b><br><small class="hint">${g.desde?fmtShort(g.desde)+(g.hasta!==g.desde?' al '+fmtShort(g.hasta):''):''} · ${g.c.map(([x,lb])=>x+' '+lb).join(' · ')}</small></span>
+    <ul class="rg-l">${G.map(g=>`<li class="rg-r"><span class="rg-t" style="white-space:normal">${est(g.r)} <b>${esc(g.r?.nombre||'Sin rutina')}</b><br><small class="hint">${g.desde?fmtShort(g.desde)+(g.hasta!==g.desde?' al '+fmtShort(g.hasta):''):''} · ${g.c.map(([x,a,b])=>plural(x,a,b)).join(' · ')}</small></span>
       <span class="rg-a"><button type="button" class="btn sm danger" data-limpiar="${esc(g.rid)}" data-n="${g.l.length}">Borrar ${g.l.length}</button></span></li>`).join('')}</ul></div>`}
 async function limpiarRut(e,btn){const n=btn.dataset.n;if(!regArm(btn,`Tocá otra vez: borrar ${n}`))return;
   const rid=btn.dataset.limpiar,l=S.regs.filter(r=>r.entrenadoId===e.id&&(r.rutinaId||'')===rid);btn.disabled=true;btn.textContent='Borrando…';const ok=new Set();
@@ -2306,6 +2318,8 @@ document.addEventListener('click',e=>{
   const fz=e.target.closest('[data-formas]');if(fz){openSheet('__formas','ver',{mes:S.mes,f:fz.dataset.formas});return}
   const mc=e.target.closest('[data-mes]');if(mc){S.mes=mc.dataset.mes;renderPanel();window.scrollTo(0,0);return}
   const pv=e.target.closest('[data-pv]');if(pv){S.pv=pv.dataset.pv;render();return}
+  const fv=e.target.closest('[data-falta]');if(fv){S.faltaVer=!S.faltaVer;render();if(S.faltaVer)setTimeout(()=>document.getElementById('falta-l')?.scrollIntoView({behavior:'smooth',block:'nearest'}),60);return}
+  const cb=e.target.closest('[data-cobrar]');if(cb){openSheet(cb.dataset.cobrar,'pago');return}
   const pt=e.target.closest('[data-ptab]');if(pt){S.ptab=pt.dataset.ptab;try{localStorage.setItem('entrena.ptab',S.ptab)}catch(_){}conTransicion(()=>{render();scrollTo({top:0})});return}
   const lq=e.target.closest('[data-liq]');if(lq){const l=S.liqs.find(x=>x._id===lq.dataset.liq);if(l){S.lq={id:l._id,mes:l.mes,fecha:l.fecha,monto:l.monto,forma:l.forma||'efectivo',filas:(l.filas||[]).map(f=>({...f})),archivo:l.archivo||'',msg:''};openSheet('__liq','ver')}return}
   const ln=e.target.closest('[data-liqnew]');if(ln){S.lq=liqNueva();if(/^\d{4}-\d{2}$/.test(ln.dataset.liqnew))S.lq.mes=ln.dataset.liqnew;openSheet('__liq','ver');return}
