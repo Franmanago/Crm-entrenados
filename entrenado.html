@@ -467,6 +467,23 @@ body.mini-on .tmr-fab{display:none}
 .pg small{font-size:11.5px;color:var(--muted)}
 .pg.hoy{background:transparent;border:1.5px solid var(--accent-ink,#C8F23A)}
 .pg-d{font-size:12px!important;color:var(--muted)}.pg-d.up{color:var(--ok,#4D7A0C)}.pg-d.dn{color:var(--bad,#B23325)}
+
+.bl-test{border:1.5px solid var(--warn)}
+.tst-h{padding:12px 14px;background:var(--warn-soft);display:flex;flex-direction:column;gap:2px;border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.tst-k{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
+.tst-h b{font-size:16px}.tst-h p{margin:4px 0 0;font-size:14px;color:var(--ink)}
+.tst-h .b-ed{align-self:flex-start;margin-top:4px}
+.tst-t{all:unset;cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.tst-t:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:6px}
+.tst-m{font-size:13px;color:var(--muted)}
+.tst-p{align-self:flex-start;font-size:12.5px;font-weight:600;color:var(--ok);background:var(--ok-soft);border-radius:6px;padding:2px 8px;margin-top:2px}
+.ej.hecho .tst-p{background:var(--surface)}
+.tst-p.nv{color:var(--muted);background:var(--surface-2,var(--line))}
+.tst-c{font-size:13px;font-weight:700;color:var(--ink);text-decoration:underline;text-underline-offset:3px;margin-top:2px}
+.tst-b{padding:0 0 2px 40px;font-size:14.5px;line-height:1.55}
+.tst-b ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.tst-mat,.tst-nota{margin:0 0 6px;font-size:13.5px;color:var(--muted)}.tst-nota{margin:8px 0 0}
+.tst-inv{margin:8px 0 0;font-size:13.5px;color:var(--bad)}
 </style>
 </head>
 <body>
@@ -815,6 +832,14 @@ function render0(){window.splashOff&&window.splashOff();
     if(!(b.items||[]).length)continue;
     if(blHecho(b)&&!blOpen[b.uid]){const n=itemsReales(b).length;h+=`<section class="card bl-ok" id="bl-${esc(b.uid)}"><div class="bl-h"><span class="ok-ic" aria-hidden="true">✓</span><span class="bl-n">${esc(b.nombre)}</span><span class="bl-r"><span class="hint">${n} ${n===1?'ejercicio':'ejercicios'}</span><button class="b-ed" data-blopen="${esc(b.uid)}">Editar</button></span></div></section>`;continue}
     const blTop=blHecho(b)?`<button class="b-ed" data-blclose="${esc(b.uid)}">Minimizar</button>`:'';
+    if(b.modo==='test'){const its=itemsReales(b),nh=its.filter(i=>regHoy(i.uid)).length;
+      h+=`<section class="card bl-test" id="bl-${esc(b.uid)}"><div class="tst-h"><span class="tst-k">Día de test</span><b>${its.length} ${its.length===1?'prueba':'pruebas'} · ${nh} de ${its.length} ${nh===1&&its.length===1?'hecha':'hechas'}</b>${b.nota?`<p>${esc(b.nota)}</p>`:''}${blTop}</div>`;
+      its.forEach((it,j)=>{const T=it.test||{},ok=!!regHoy(it.uid),o=open[it.uid]||{},op=o.prot??(!ok&&its.slice(0,j).every(x=>regHoy(x.uid)));
+        const x=T.int||'',meta=[!x?'':/intento/i.test(x)?x:/^\d+$/.test(x)?x+(x==='1'?' intento':' intentos'):/^\d+\s*(a|-|o)\s*\d+$/.test(x)?x+' intentos':'intentos: '+x,T.pau?'pausa '+T.pau:''].filter(Boolean).join(' · ');
+        h+=`<div class="ej ej-tst${ok?' hecho':''}" data-uid="${esc(it.uid)}"><div class="ej-top"><button class="chk" data-chk="${esc(it.uid)}" aria-pressed="${ok}" aria-label="${ok?'Hecho. Tocá para desmarcar':'Marcar como hecho'}" title="${ok?'Hecho':'Marcar como hecho'}">✓</button>
+          <button class="tst-t" data-tprot="${esc(it.uid)}" aria-expanded="${!!op}"><span class="ej-n">${j+1}. ${esc(it.nombre)}</span>${meta?`<span class="tst-m">${esc(meta)}</span>`:''}${it.prev?`<span class="tst-p${it.prev==='Primera vez'?' nv':''}">${it.prev==='Primera vez'?'Primera vez: sin marca anterior':'Marca anterior: '+esc(it.prev)}</span>`:''}<span class="tst-c">${op?'Ocultar cómo se hace':'Ver cómo se hace'}</span></button></div>
+          ${op?`<div class="tst-b">${T.mat?`<p class="tst-mat">Material: ${esc(T.mat)}</p>`:''}${(T.pasos||[]).length?`<ol>${T.pasos.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:''}${(T.inv||[]).length?`<p class="tst-inv"><b>No vale si:</b> ${T.inv.map(esc).join(' ')}</p>`:''}${T.nota?`<p class="tst-nota">${esc(T.nota)}</p>`:''}</div>`:''}</div>`});
+      h+='</section>';continue}
     if(b.modo==='dist'){const ser=parseInt(b.series)||0,tot=distTot(b);
       h+=`<section class="card bl-ds" id="bl-${esc(b.uid)}"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span><span class="bl-r">${blTop}${ser>1?`<span class="series"><b>${ser}</b> series${String(b.pausaSeries||'').trim()?' · entre series '+esc(distT(b.pausaSeries)):''}</span>`:''}${tot?`<span class="ds-tot">${distMil(tot)} m</span>`:''}</span></div>`;
       for(const it of b.items){if(!String(it.nombre||it.metros||'').trim())continue;
@@ -902,6 +927,7 @@ document.addEventListener('click',ev=>{
   if(b=t.closest('[data-hcancel]')){movOpen=false;render();return}
   if(b=t.closest('[data-hdel]')){asisMover(b.dataset.hdel,b.dataset.f,null,b);return}
   if(b=t.closest('[data-hsave]')){const v=document.getElementById('h-mov')?.value;if(!v)return;if(v===b.dataset.f){movOpen=false;render();return}if(asisRegs().some(r=>r.item==='asis:'+b.dataset.hsave&&r.fecha===v)){alertMsg('Ese día ya está marcado');return}asisMover(b.dataset.hsave,b.dataset.f,v,b);return}
+  if(b=t.closest('[data-tprot]')){const u=b.dataset.tprot;const cur=b.getAttribute('aria-expanded')==='true';open[u]={...open[u],prot:!cur};render();return}
   if(b=t.closest('[data-video]')){const u=b.dataset.video;open[u]={...open[u],video:!open[u]?.video};render();return}
   if(b=t.closest('[data-log]')){const u=b.dataset.log;open[u]={...open[u],log:!open[u]?.log};render();return}
   if(b=t.closest('[data-rpe]')){const f=b.closest('form');const cur=f.cansancio.value;const v=cur===b.dataset.rpe?'':b.dataset.rpe;f.cansancio.value=v;f.querySelectorAll('[data-rpe]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.rpe===v));return}

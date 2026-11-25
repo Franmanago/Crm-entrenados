@@ -684,6 +684,7 @@ function renderSheet0(){
   if(openId==='__tpsem'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Semana '+(a.i+1),tpSemHTML(a));ov.querySelector('.sheet').classList.add('wide');bindTpSem(a);return}
   if(openId==='__tptab'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Tabla de la temporada',tpTabHTML(a));ov.querySelector('.sheet').classList.add('wide');bindTpTab(a);return}
   if(openId==='__tpent'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Entregar al plantel',tpEntHTML(a));bindTpEnt(a);return}
+  if(openId==='__prot'){const a=sheetArg||{};ov.innerHTML=shell('Protocolos de test',protFormHTML(a));ov.querySelector('.sheet').classList.add('wide');bindProt(a);return}
   if(openId==='__epform'){const a=sheetArg||{};ov.innerHTML=shell('Fórmulas de Equipo Pro',epFormHTML(a));ov.querySelector('.sheet').classList.add('wide');bindEpForm(a);return}
   if(openId==='__tpsync'){const a=sheetArg||{};if(!(S.temps||[]).find(x=>x._id===a.tid)){closeSheet();return}ov.innerHTML=shell('Actualizar desde Excel',tpSyncHTML(a));bindTpSync(a);return}
   if(openId==='__guia'){const a=sheetArg||{};ov.innerHTML=shell('Guía del entrenador',guiaHTML(a));ov.querySelector('.sheet').classList.add('wide');bindGuia(a);if(a.sec&&a.sec!=='inicio')requestAnimationFrame(()=>{const d=document.getElementById('g-'+a.sec);if(d)d.scrollIntoView({block:'start'})});return}
@@ -1196,7 +1197,7 @@ function faltantes(r){
   (r.secciones||[]).forEach((s,si)=>(s.dias||[]).forEach((d,di)=>{
     let sinReps=0,sinEj=0;const vac=[];let tot=0;
     (d.bloques||[]).forEach(b=>{const v=(b.items||[]).filter(i=>!itemVacio(i));tot+=v.length;if(!v.length)vac.push(b.nombre||'bloque');
-      v.forEach(i=>{if(!String(i.nombre||'').trim())sinEj++;else if(b.modo==='dist'?!String(i.metros||'').trim():(b.modo!=='timer'&&!String(i.reps||'').trim()))sinReps++})});
+      v.forEach(i=>{if(!String(i.nombre||'').trim())sinEj++;else if(b.modo==='dist'?!String(i.metros||'').trim():(b.modo!=='timer'&&b.modo!=='test'&&!String(i.reps||'').trim()))sinReps++})});
     const p=[];
     if(!tot)p.push('sin ejercicios');
     else{if(sinEj)p.push(plural(sinEj,'fila sin ejercicio','filas sin ejercicio'));if(sinReps)p.push(plural(sinReps,'ejercicio sin reps','ejercicios sin reps'));if(vac.length)p.push((vac.length===1?'bloque vacío: ':'bloques vacíos: ')+vac.map(x=>titleCase(x)).join(', '))}
@@ -1771,6 +1772,7 @@ function rutLimpia(R){
       const o={nombre:b.nombre||'',series:String(b.series??'')};
       if(b.modo==='timer'){o.modo='timer';o.trabajo=num(b.trabajo)??40;o.descanso=num(b.descanso)??20;o.vueltas=num(b.vueltas)??3;o.pausa=num(b.pausa)??0}
       if(b.modo==='dist'){o.modo='dist';if(String(b.pausaSeries||'').trim())o.pausaSeries=String(b.pausaSeries)}
+      if(b.modo==='test')o.modo='test';
       o.items=(b.items||[]).filter(i=>!itemVacio(i)).map(i=>{const x={nombre:i.nombre||''};(b.modo==='dist'?['metros','reps','tiempo','pausa','notas']:['reps','kg','pct','rm','notas','unidad']).forEach(k=>{if(String(i[k]??'').trim())x[k]=String(i[k])});return x});
       return o})}))}))}
 }
@@ -1857,6 +1859,7 @@ function editorHTML(){
   const items=(d,b,bl)=>bl.items.map((it,i)=>{const path=`${P},${d},${b},${i}`;const k=isRut?kgItem(it,e):null;const has=it.ej&&S.ejs[it.ej];
     const tm=bl.modo==='timer',ds=bl.modo==='dist';const vac=itemVacio(it),fEj=!vac&&!String(it.nombre||'').trim(),fRe=!tm&&!vac&&!fEj&&!String((ds?it.metros:it.reps)||'').trim();
     const acts=ro?'':`<span class="it-a"><button type="button" data-act="up" data-p="${path}" aria-label="Subir">↑</button><button type="button" data-act="down" data-p="${path}" aria-label="Bajar">↓</button><button type="button" data-act="delItem" data-p="${path}" aria-label="Quitar">✕</button></span>`;
+    if(bl.modo==='test')return `<div class="it it-tst"><div class="it-ej"><b>${esc(it.nombre)}</b></div><span class="hint">${esc(it.notas||'')}</span>${acts}</div>`;
     if(ds){const pv=distTxt(it);return `<div class="it it-ds${fEj||fRe?' it-falta':''}">
       <div class="it-ej ac-wrap"><input data-ac="1" autocomplete="off" class="${fEj?'falta':''}" data-p="${path}" data-f="nombre" value="${esc(it.nombre)}" placeholder="${fEj?'Falta el ejercicio':'Ej: Pique lanzado'}" ${ro?'readonly':''}>${it.nombre&&has&&S.ejs[it.ej].video?`<a class="vid" target="_blank" rel="noopener" href="${esc(S.ejs[it.ej].video)}" title="Ver video">▶</a>`:''}</div>
       <label class="${fRe?'falta-l':''}">Metros${inp(path,'metros',it.metros,fRe?'Falta':'30')}</label>
@@ -1908,7 +1911,7 @@ function editorHTML(){
   </div>
   ${s.dias.map((dia,d)=>`<div class="card dia${falDia(P,d)?' dia-falta':''}"><div class="dia-h"><input class="dia-n" data-p="${P},${d}" data-f="nombre" value="${esc(dia.nombre)}" ${ro?'readonly':''}>${falDia(P,d)?`<span class="pill p-bad">${esc(falDia(P,d).txt)}</span>`:'<span class="pill p-ok">Completo</span>'}${dia.bloques.length>1?(()=>{const all=dia.bloques.every((bl,b)=>E.pleg&&E.pleg[bl.uid||`${P},${d},${b}`]);return `<button type="button" class="btn" data-act="${all?'despDia':'plegDia'}" data-p="${P},${d}">${all?'Expandir bloques':'Minimizar bloques'}</button>`})():''}${ro?'':`<button type="button" class="btn" data-act="addBloque" data-p="${P},${d}">+ Bloque</button><button type="button" class="btn" data-act="clearDia" data-p="${P},${d}">Vaciar día</button><button type="button" class="btn danger" data-act="delDia" data-p="${P},${d}">Quitar día</button>`}</div>
     ${dia.bloques.map((bl,b)=>{const bk=bl.uid||`${P},${d},${b}`,pl=!!(E.pleg&&E.pleg[bk]);const noms=bl.items.filter(i=>String(i.nombre||'').trim()).map(i=>i.nombre);const nb=dia.bloques.length;return `<div class="bl${bl.items.every(itemVacio)?' bl-vacio':''}${pl?' plegado':''}${bl.modo==='dist'?' bl-ds':''}" data-bi="${b}"><div class="bl-h">${ro||nb<2?'':`<span class="bl-grip" data-grip="${P},${d},${b}" title="Arrastrar para mover" aria-hidden="true"><svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor"><circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/><circle cx="3" cy="9" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="3" cy="15" r="1.6"/><circle cx="9" cy="15" r="1.6"/></svg></span>`}<button type="button" class="bl-tg" data-act="pleg" data-k="${esc(bk)}" aria-expanded="${!pl}" title="${pl?'Expandir bloque':'Minimizar bloque'}">${pl?'▸':'▾'}</button><input list="dl-bl" class="bl-n" data-p="${P},${d},${b}" data-f="nombre" value="${esc(bl.nombre)}" ${ro?'readonly':''}><label>Modalidad<select data-p="${P},${d},${b}" data-f="modo" ${ro?'disabled':''}><option value="">Por series</option><option value="timer" ${bl.modo==='timer'?'selected':''}>Circuito por tiempo ⏱</option><option value="dist" ${bl.modo==='dist'?'selected':''}>Distancias (metros)</option></select></label>${bl.modo==='dist'?`<label>Series<input data-p="${P},${d},${b}" data-f="series" value="${esc(bl.series??'')}" placeholder="1" style="width:56px" ${ro?'readonly':''}></label><label>Pausa series<input data-p="${P},${d},${b}" data-f="pausaSeries" value="${esc(bl.pausaSeries??'')}" placeholder="3'" style="width:70px" ${ro?'readonly':''}></label>`:bl.modo==='timer'?`<label>Trabajo (seg)<input data-p="${P},${d},${b}" data-f="trabajo" value="${esc(bl.trabajo??'40')}" inputmode="numeric" style="width:64px" ${ro?'readonly':''}></label><label>Descanso (seg)<input data-p="${P},${d},${b}" data-f="descanso" value="${esc(bl.descanso??'20')}" inputmode="numeric" style="width:64px" ${ro?'readonly':''}></label><label>Vueltas<input data-p="${P},${d},${b}" data-f="vueltas" value="${esc(bl.vueltas??'3')}" inputmode="numeric" style="width:56px" ${ro?'readonly':''}></label><label>Pausa entre vueltas<input data-p="${P},${d},${b}" data-f="pausa" value="${esc(bl.pausa??'60')}" inputmode="numeric" style="width:64px" ${ro?'readonly':''}></label>`:`<label>Series<input data-p="${P},${d},${b}" data-f="series" value="${esc(bl.series)}" style="width:56px" ${ro?'readonly':''}></label>`}${pl?`<span class="bl-res">${noms.length?plural(noms.length,'ejercicio','ejercicios')+': '+esc(noms.join(', ')):'Sin ejercicios'}${bl.modo==='dist'&&distTot(bl)?' · '+distMil(distTot(bl))+' m':''}</span>`:''}${ro||nb<2?'':`<span class="bl-mv"><button type="button" data-act="blUp" data-p="${P},${d},${b}" aria-label="Subir bloque" title="Subir bloque" ${b===0?'disabled':''}>↑</button><button type="button" data-act="blDown" data-p="${P},${d},${b}" aria-label="Bajar bloque" title="Bajar bloque" ${b===nb-1?'disabled':''}>↓</button></span>`}${ro?'':`<button type="button" class="x-sm" data-act="delBloque" data-p="${P},${d},${b}" aria-label="Quitar bloque">Quitar</button>`}</div>
-      ${pl?'':items(d,b,bl)}${ro||pl?'':`<button type="button" class="add-it" data-act="addItem" data-p="${P},${d},${b}">+ Ejercicio</button>`}</div>`}).join('')}
+      ${pl?'':items(d,b,bl)}${pl||bl.modo!=='test'?'':'<p class="hint">Bloque de test: el protocolo se edita en Equipos → Protocolos de test y se vuelve a entregar.</p>'}${ro||pl||bl.modo==='test'?'':`<button type="button" class="add-it" data-act="addItem" data-p="${P},${d},${b}">+ Ejercicio</button>`}</div>`}).join('')}
   </div>`).join('')}
   <div class="actions sticky-save">${ro?'':`<button class="btn pri" type="button" data-act="save">Guardar</button>`}
     ${isRut&&R.estado==='cola'&&E.id?`<button class="wa" type="button" data-entregar="${esc(E.id)}">Entregar ahora</button>`:''}
@@ -2418,7 +2421,7 @@ function renderEquipos(){
   const eqs=(S.equipos||[]).slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
   if(!eqs.find(q=>q._id===S.eqSel))S.eqSel=eqs[0]?._id||null;
   const q=eqs.find(x=>x._id===S.eqSel);
-  const top=`<div class="eq-top"><div><h2 class="eq-h">Equipos</h2><p class="hint">Plantel, tests, temporada y dosis de cada equipo. Cada jugador recibe en su link los tiempos y kilos calculados con sus tests.</p></div><div class="actions"><button class="btn" type="button" data-guia="inicio">Guía</button><button class="btn" type="button" data-epform>Fórmulas</button><button class="btn pri" type="button" data-eqnew>Nuevo equipo</button></div></div>`;
+  const top=`<div class="eq-top"><div><h2 class="eq-h">Equipos</h2><p class="hint">Plantel, tests, temporada y dosis de cada equipo. Cada jugador recibe en su link los tiempos y kilos calculados con sus tests.</p></div><div class="actions"><button class="btn" type="button" data-guia="inicio">Guía</button><button class="btn" type="button" data-protos>Protocolos de test</button><button class="btn" type="button" data-epform>Fórmulas</button><button class="btn pri" type="button" data-eqnew>Nuevo equipo</button></div></div>`;
   if(!eqs.length){el.innerHTML=top+`<div class="card pad eq-empty"><b>Todavía no hay equipos.</b><p class="hint">Creá uno (por ejemplo «AFALP Primera»), sumá a los jugadores que ya son entrenados de la app y cargá sus tests: VAM, saltos, sprint y 1RM.</p><div><button class="btn pri" type="button" data-eqnew>Crear el primer equipo</button></div></div>`;return}
   const mov=(S.cfg.rmDefs||[]).filter(d=>!d.base).slice(0,4).map(d=>d.mov);
   const js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean).sort((a,b)=>(a.posicion||'~').localeCompare(b.posicion||'~')||name(a).localeCompare(name(b)));
@@ -2607,21 +2610,32 @@ function tpSemHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const w=a.w;c
       <label>Período<select id="ts-per">${T_PERS.map(p=>`<option value="${p}" ${p===w.per?'selected':''}>${tCap(p)}</option>`).join('')}</select></label>
       <label>Mesociclo<input id="ts-meso" type="number" min="1" step="1" value="${esc(w.meso)}"></label>
       <label class="av-g" style="align-self:end"><input type="checkbox" id="ts-test" ${w.test?'checked':''}> Semana de test</label>
-    </div>${epSemTopHTML(a)}
-    <div class="tp-days">${w.days.map((d,k)=>`<div class="tp-day"><div class="tp-day-h"><b>${T_DIAS[k]}</b>${['R','F','V'].map(q=>`<button type="button" class="qt ${q}" data-tsq="${k}:${q}" aria-pressed="${d.q.includes(q)}">${T_Q[q]}</button>`).join('')}</div>
+    </div>${w.test?`<div class="ts-tbar"><span class="hint">Semana de test: elegí qué días son de test y qué protocolos van. El jugador los ve paso a paso, antes de la dosis del día.</span><span class="actions"><button class="btn sm" type="button" data-tssug>Usar el orden sugerido</button><button class="btn sm" type="button" data-protsem>Editar protocolos</button></span></div>`:''}${epSemTopHTML(a)}
+    <div class="tp-days">${w.days.map((d,k)=>`<div class="tp-day"><div class="tp-day-h"><b>${T_DIAS[k]}</b>${['R','F','V'].map(q=>`<button type="button" class="qt ${q}" data-tsq="${k}:${q}" aria-pressed="${d.q.includes(q)}">${T_Q[q]}</button>`).join('')}${w.test&&!d.test?`<button type="button" class="qt T" data-tston="${k}">+ Test</button>`:''}</div>${w.test&&d.test?tsTestHTML(d,k):''}
       <div class="tp-mets">${d.met.map(m=>`<span class="mchip q${(T_MET[m]||[])[1]||''}" title="${esc((T_MET[m]||[m])[0]+' · '+((T_MET[m]||[])[2]||''))}">${esc(m)}<button type="button" data-tsdel="${k}:${esc(m)}" aria-label="Quitar ${esc(m)}">×</button></span>`).join('')||'<span class="hint">Sin métodos</span>'}
         <select class="mini" data-tsadd="${k}" aria-label="Agregar método el ${T_DIAS[k]}"><option value="">+ método</option>${['R','F','V'].map(q=>`<optgroup label="${T_Q[q]}">${metOpts(q).filter(([m])=>!d.met.includes(m)).map(([m,x])=>`<option value="${esc(m)}">${esc(m)} · ${esc(x[0])}</option>`).join('')}</optgroup>`).join('')}</select></div>
       ${d.met.some(m=>T_MET[m]&&!d.q.includes(T_MET[m][1]))?'<p class="hint tp-warn">Hay métodos de una cualidad que el día no tiene marcada.</p>':''}${epDosisHTML(a,k)}</div>`).join('')}</div>
     <p class="hint" id="ts-msg" role="alert"></p>
     <div class="actions" style="margin-top:10px"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Guardar semana</button></div></form>`}
 function bindTpSem(a){const ov=$('#overlay');
-  const leer=()=>{const w=a.w;w.tipo=$('#ts-tipo').value;w.rel=$('#ts-rel').value;w.comp=$('#ts-comp').value.trim().toUpperCase();w.per=$('#ts-per').value;w.meso=Number($('#ts-meso').value)||w.meso;w.test=$('#ts-test').checked};
-  ov.onchange=ev=>{if(ev.target.dataset.ds){leer();epDsCambio(a,ev.target);a.dirty=true;renderSheet();return}if(ev.target.dataset.dspj!=null){leer();a.pj=ev.target.value;renderSheet();return}
+  const leer=()=>{const w=a.w;w.tipo=$('#ts-tipo').value;w.rel=$('#ts-rel').value;w.comp=$('#ts-comp').value.trim().toUpperCase();w.per=$('#ts-per').value;w.meso=Number($('#ts-meso').value)||w.meso;w.test=$('#ts-test').checked;ov.querySelectorAll('[data-tsnota]').forEach(x=>{const d=w.days[+x.dataset.tsnota];if(d&&d.test)d.test.nota=x.value.trim()})};
+  ov.onchange=ev=>{if(ev.target.dataset.ds){leer();epDsCambio(a,ev.target);a.dirty=true;renderSheet();return}
+    if(ev.target.id==='ts-test'){leer();a.dirty=true;renderSheet();return}
+    if(ev.target.dataset.tspadd!=null&&ev.target.value){leer();const d=a.w.days[+ev.target.dataset.tspadd];d.test.p=[...(d.test.p||[]),ev.target.value];a.dirty=true;renderSheet();return}
+    if(ev.target.dataset.tsnota!=null){leer();a.dirty=true;return}
+    if(ev.target.dataset.tssolo!=null){leer();const d=a.w.days[+ev.target.dataset.tssolo];if(ev.target.checked)delete d.test.solo;else d.test.solo=false;a.dirty=true;return}if(ev.target.dataset.dspj!=null){leer();a.pj=ev.target.value;renderSheet();return}
     const s=ev.target.closest('[data-tsadd]');if(s&&s.value){leer();const d=a.w.days[+s.dataset.tsadd];d.met.push(s.value);const q=T_MET[s.value][1];if(!d.q.includes(q))d.q=['R','F','V'].filter(x=>x===q||d.q.includes(x)).join('');a.dirty=true;renderSheet()}};
   ov.onclick=async ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
     if(ev.target.closest('[data-dsadd],[data-dsfill],[data-dsdel],[data-dsgen]')){leer();if(epDsClick(a,ev)){a.dirty=true;renderSheet()}return}
     const st=ev.target.closest('[data-tsstep]');if(st){leer();if(a.dirty||JSON.stringify(a.w)!==a.orig){if(!await guardarSem(a))return}const t=(S.temps||[]).find(x=>x._id===a.tid);const i=a.i+Number(st.dataset.tsstep);openSheet('__tpsem','ver',semArg(t,i,a.pj));return}
     const qb=ev.target.closest('[data-tsq]');if(qb){leer();const[k,q]=qb.dataset.tsq.split(':');const d=a.w.days[+k];d.q=d.q.includes(q)?d.q.replace(q,''):['R','F','V'].filter(x=>x===q||d.q.includes(x)).join('');a.dirty=true;renderSheet();return}
+    let tb;
+    if(tb=ev.target.closest('[data-tston]')){leer();a.w.days[+tb.dataset.tston].test={p:[],nota:''};a.dirty=true;renderSheet();return}
+    if(tb=ev.target.closest('[data-tstoff]')){leer();delete a.w.days[+tb.dataset.tstoff].test;a.dirty=true;renderSheet();return}
+    if(tb=ev.target.closest('[data-tsmv]')){leer();const[k,j,d]=tb.dataset.tsmv.split(':').map(Number);const P=a.w.days[k].test.p;[P[j],P[j+d]]=[P[j+d],P[j]];a.dirty=true;renderSheet();return}
+    if(tb=ev.target.closest('[data-tsprm]')){leer();const[k,j]=tb.dataset.tsprm.split(':').map(Number);a.w.days[k].test.p.splice(j,1);a.dirty=true;renderSheet();return}
+    if(ev.target.closest('[data-tssug]')){leer();Object.entries(PROT_SUG).forEach(([k,ids])=>{const d=a.w.days[+k];if(!d)return;d.test={p:ids.filter(protDe),nota:(d.test&&d.test.nota)||''}});a.dirty=true;renderSheet();return}
+    if(ev.target.closest('[data-protsem]')){leer();if(a.dirty||JSON.stringify(a.w)!==a.orig){if(!await guardarSem(a))return}openSheet('__prot','ver',{back:{tid:a.tid,i:a.i,pj:a.pj}});return}
     const dl=ev.target.closest('[data-tsdel]');if(dl){leer();const[k,m]=dl.dataset.tsdel.split(':');a.w.days[+k].met=a.w.days[+k].met.filter(x=>x!==m);a.dirty=true;renderSheet()}};
   $('#tsf').onsubmit=async ev=>{ev.preventDefault();leer();if(await guardarSem(a)){toast('Semana '+(a.i+1)+' guardada');closeSheet()}}}
 const semArg=(t,i,pj)=>({tid:t._id,pj,i,w:JSON.parse(JSON.stringify(t.semanas[i])),orig:JSON.stringify(t.semanas[i])});
@@ -2865,8 +2879,8 @@ function epRutina(t,q,e,a,b,opc){const P=epPerfil(e);const secs=[],dist=[];
           items:[{uid:ruid(),nombre:L.n||it.m,metros:String(it.d),reps:String(it.r),...(c.falta?{}:{tiempo:epTRut(c.t)}),...(it.pr?{pausa:String(it.pr)}:{}),...(c.falta?{notas:`Al ${it.p} % de tu ${c.falta==='VAM'?'VAM':'test de sprint'}: falta tu test para calcular el tiempo.`}:c.cont&&isFinite(c.rit)?{notas:'Ritmo '+epT(c.rit)+' por km'}:{})}]})});
       let cur=null;(d.str||[]).forEach(it=>{const L=EP_LIB[it.m]||{n:it.m};if(!cur||cur._m!==it.m||cur.series!==String(it.s)){cur={uid:ruid(),nombre:(L.n||it.m).toUpperCase(),series:String(it.s),items:[],_m:it.m};bl.push(cur)}
         cur.items.push({uid:ruid(),nombre:titleCase(it.e),reps:String(it.r),...(L.b==='none'?{}:{pct:String(it.p),rm:it.e}),...(it.pr?{notas:'Pausa '+it.pr+(it.ps?' · entre ejercicios '+it.ps:'')}:{})})});
-      bl.forEach(x=>delete x._m);
-      if(bl.length)dias.push({uid:ruid(),nombre:`Día ${dias.length+1} · ${T_DIAS[k]}`,bloques:bl})});
+      bl.forEach(x=>delete x._m);const tb=w.test&&d.test?protBloque(d,e):null;if(tb){if(d.test.solo!==false)bl.length=0;bl.unshift(tb)}
+      if(bl.length)dias.push({uid:ruid(),nombre:`Día ${dias.length+1} · ${T_DIAS[k]}${tb?' · Test':''}`,bloques:bl})});
     secs.push({uid:ruid(),titulo:`Semana ${i+1} · ${T_TIPOS[w.tipo]||w.tipo} ${w.rel}${w.comp?' · '+tCompLong(w.comp):''}`,posicion:e.posicion||'',dias});dist.push(dias.map((_,j)=>j))}
   return {entrenadoId:e.id,nombre:`${q.nombre} · ${a===b?'Semana '+(a+1):'Semanas '+(a+1)+' a '+(b+1)}`,estado:'activa',fechaEntrega:iso(tLun(t,a)),duracionSemanas:b-a+1,secciones:secs,distribucion:dist,
     controlCarga:!!opc.carga,bienestar:!!opc.bien,equipo:{eq:q._id,tid:t._id,desde:a,hasta:b,ts:Date.now()},
@@ -2874,7 +2888,7 @@ function epRutina(t,q,e,a,b,opc){const P=epPerfil(e);const secs=[],dist=[];
 function tpEntHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid),q=(S.equipos||[]).find(x=>x._id===t.equipoId)||{};const js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean).sort((x,y)=>name(x).localeCompare(name(y)));
   const W=t.semanas;const sel=a.sel||js.map(e=>e.id);
   const opt=v=>W.map((w,i)=>`<option value="${i}" ${i===v?'selected':''}>Semana ${i+1} · ${fmtShort(iso(tLun(t,i)))} · ${T_TIPOS[w.tipo]||w.tipo}${epConDosis(w)?'':' (sin dosis)'}</option>`).join('');
-  const sinD=[];for(let i=a.a;i<=a.b;i++)if(!epConDosis(W[i]))sinD.push(i+1);
+  const conTest=w=>w.test&&w.days.some(d=>d.test&&(d.test.p||[]).length);const sinD=[];for(let i=a.a;i<=a.b;i++)if(!epConDosis(W[i])&&!conTest(W[i]))sinD.push(i+1);
   const ej=js.find(e=>sel.includes(e.id));let prev='';if(ej){const P=epPerfil(ej);for(let i=a.a;i<=a.b&&!prev;i++)for(const d of W[i].days){const it=(d.run||[])[0];if(it){const c=epRun(it,P);prev=`${name(ej)} · semana ${i+1}: ${it.s>1?it.s+' × ':''}${it.r} × ${distMil(it.d)} m ${c.falta?'(sin '+c.falta+')':'en '+epT(c.t)+(c.cont?' total':' cada tramo')}`;break}}}
   return `<form id="tef" class="pad"><p class="hint">Se arma una rutina para cada jugador con las semanas elegidas: los tiempos de carrera y sprint salen de sus tests y los kilos de sus marcas. La ven en su link de siempre, una semana por vez, con tildes, temporizador y registro. A quien ya tiene su propia rutina le podés <b>sumar</b> el plan (en su link elige entre «Mi rutina» y «Plan del equipo») o <b>reemplazarla</b> (queda en su historial).</p>
     <div class="form" style="margin-top:12px"><label>Desde<select id="te-a">${opt(a.a)}</select></label><label>Hasta<select id="te-b">${opt(a.b)}</select></label></div>
@@ -2955,10 +2969,94 @@ function bindEpForm(a){const ov=$('#overlay');
       if(a.r.fails&&!(ack&&ack.checked)){toast('Confirmá que querés aplicarla aunque no coincida');return}
       if(await guardar(a.k,a.x,why,a.r.fails)){toast('Fórmula actualizada');a.k=null;a.r=null;renderSheet()}return}
     const o=ev.target.closest('[data-fo]');if(o){if(await guardar(o.dataset.fo,EP_FDEF[o.dataset.fo].expr,'Vuelta a la fórmula original',0)){toast('Fórmula original restaurada');renderSheet()}}}}
-document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-tpent],[data-tppdf],[data-epform]');if(!b)return;const D=b.dataset;
+document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-tpent],[data-tppdf],[data-epform],[data-protos]');if(!b)return;const D=b.dataset;
+  if(D.protos!=null){openSheet('__prot','ver',{});return}
   if(D.tpent!=null){const t=(S.temps||[]).find(x=>x._id===D.tpent);if(!t)return;const h=tSemHoy(t);let a0=h??0;if(days(today(),parse(t.inicio))<0)a0=0;const m=t.semanas[a0].meso;let b0=a0;while(b0+1<t.semanas.length&&t.semanas[b0+1].meso===m)b0++;openSheet('__tpent','ver',{tid:t._id,a:a0,b:b0});return}
   if(D.tppdf!=null){epPDFs(D.tppdf);return}
   if(D.epform!=null){openSheet('__epform','ver',{})}});
+/* ---------- EQUIPO PRO · protocolos de test (editables) ---------- */
+/* {id, n nombre, c qué registra (campo de TCAMPOS, 'spr', 'yoyo' o ''), u unidad si c='', int intentos, pau pausa, mat material, pasos[], inv[] no vale si, nota} */
+const PROT_C=[['','Nada (solo instrucciones)'],['peso','Peso (kg)'],['cmj','CMJ (cm)'],['abk','Abalakov (cm)'],['spr','Sprint 10/20/30 m (s)'],['t10','Sprint 10 m (s)'],['t20','Sprint 20 m (s)'],['t30','Sprint 30 m (s)'],['vam','VAM (m/s)'],['yoyo','Yo-Yo IR1 (nivel)'],['otro','Otro valor (lo anotás en la nota del test)']];
+const PROT_DEF=[
+ {id:'calor',n:'Entrada en calor',c:'',int:'',pau:'',mat:'Conos',pasos:['5 min de trote suave.','Movilidad de cadera, tobillo y hombro.','Skipping, talones y desplazamientos laterales: 2 × 15 m de cada uno.','3 aceleraciones de 20 m al 60, 80 y 90 %.','3 saltos al 70 %.'],inv:[],nota:'Siempre la misma, así los tests se pueden comparar.'},
+ {id:'peso',n:'Peso corporal',c:'peso',int:'1',pau:'',mat:'Balanza',pasos:['Sin zapatillas y con ropa liviana.','Antes de tomar agua o comer.'],inv:[],nota:''},
+ {id:'cmj',n:'CMJ',c:'cmj',int:'3',pau:'1 min',mat:'Plataforma o app de salto',pasos:['Manos en la cintura todo el salto.','Bajá rápido hasta donde te salga natural y saltá lo más alto posible.','Piernas estiradas en el aire. Caé en el mismo lugar.'],inv:['Sacaste las manos de la cintura.','Flexionaste las rodillas en el aire.'],nota:'Se anota el mejor intento.'},
+ {id:'abk',n:'Abalakov',c:'abk',int:'3',pau:'1 min',mat:'Plataforma o app de salto',pasos:['Igual que el CMJ, pero con impulso libre de brazos.','Llevá los brazos arriba con fuerza al despegar.'],inv:['Flexionaste las rodillas en el aire.'],nota:'Se anota el mejor intento.'},
+ {id:'unil',n:'CMJ unilaterales (vertical, horizontal y lateral)',c:'otro',int:'3 por pierna',pau:'45 s',mat:'Plataforma o app de salto, cinta métrica',pasos:['Vertical: apoyo en una pierna, manos en la cintura, saltá lo más alto posible.','Horizontal: desde una pierna, saltá lo más lejos posible hacia adelante. Se mide de la punta del pie al talón más cercano.','Lateral: desde una pierna, saltá hacia el costado de esa pierna.','Alterná derecha e izquierda.'],inv:['Perdiste el equilibrio al caer.'],nota:'Se anota el mejor de cada pierna. Ajustá estas consignas al protocolo que uses.'},
+ {id:'spr',n:'Sprint 10/20/30 m',c:'spr',int:'3',pau:'3 min caminando',mat:'Fotocélulas o cronómetro, conos',pasos:['Parado, un pie adelante, la punta 50 cm detrás de la línea.','Arrancá cuando quieras, sin balanceo previo.','A fondo hasta pasar los 30 m. No frenes antes.'],inv:['Te balanceaste antes de salir.'],nota:'Se anota el mejor tiempo de cada parcial.'},
+ {id:'tt',n:'Prueba T',c:'otro',int:'3',pau:'3 min',mat:'4 conos, cronómetro',pasos:['De A a B de frente (9,14 m). Tocá el cono.','Lateral a C (4,57 m). Tocá.','Lateral a D (9,14 m). Tocá.','Lateral a B. Tocá.','De espaldas hasta A.'],inv:['Cruzaste los pies.','No tocaste un cono.'],nota:'Se anota el mejor intento.'},
+ {id:'rm',n:'1RM',c:'',int:'3 a 5',pau:'3 a 5 min',mat:'Barra, discos, ayudante',pasos:['8 a 10 repeticiones livianas (50 % de tu marca anterior). Pausa 1 min.','3 a 5 repeticiones al 70 %. Pausa 2 min.','1 a 2 repeticiones al 85–90 %. Pausa 3 min.','Intentos de 1 repetición: subí 5 a 10 % en tren superior y 10 a 20 % en tren inferior.'],inv:['Se rompió la técnica.','Necesitaste ayuda para terminar.'],nota:'Siempre con ayudante. Las marcas nuevas las carga tu entrenador.'},
+ {id:'vam',n:'VAM · prueba de Montreal (UM-TT)',c:'vam',int:'1',pau:'',mat:'Pista de 400 m, conos cada 50 m, audio',pasos:['Corré siguiendo la señal sonora: arranca a 8 km/h y sube 1 km/h cada 2 min.','Tenés que pasar cada cono con la señal.','Seguí hasta que no puedas sostener el ritmo.'],inv:['No llegaste al cono 2 veces seguidas: ahí termina.'],nota:'Se anota la velocidad de la última etapa completa.'},
+ {id:'yoyo',n:'Yo-Yo IR1',c:'yoyo',int:'1',pau:'',mat:'Conos a 20 m y a 5 m, audio',pasos:['Corré ida y vuelta 2 × 20 m al ritmo del audio.','10 s de recuperación caminando 2 × 5 m.','Seguí mientras llegues a la línea con la señal.'],inv:['No llegaste a la línea 2 veces: ahí termina.'],nota:'Se anota el último nivel completo (ej: 15:1).'}];
+/* orden sugerido para la semana de test: lo que menos cansa primero; 1RM y resistencia en días separados */
+const PROT_SUG={0:['calor','peso','cmj','abk','spr','tt'],2:['calor','rm'],4:['calor','vam']};
+const protos=()=>Array.isArray((S.cfgRaw||{}).protocolos)?S.cfgRaw.protocolos:PROT_DEF;
+const protDe=id=>protos().find(p=>p.id===id);
+const intTxt=x=>!x?'':/intento/i.test(x)?x:/^\d+$/.test(x)?x+(x==='1'?' intento':' intentos'):/^\d+\s*(a|-|o)\s*\d+$/.test(x)?x+' intentos':'intentos: '+x;
+const protMeta=p=>[intTxt(p.int),p.pau?'pausa '+p.pau:''].filter(Boolean).join(' · ');
+function protPrev(p,e){if(!e)return '';const u=ultimoTest(e.id),f=x=>x&&x.f?' ('+fmtShort(x.f)+')':'';
+  if(p.c==='spr'){if(!u.t10&&!u.t20&&!u.t30)return '';return ['t10','t20','t30'].map(k=>u[k]?nfx(u[k].v,2):'—').join(' / ')+' s'+f(u.t30||u.t20||u.t10)}
+  if(p.c==='yoyo')return u.yoyo?u.yoyo.v+f(u.yoyo):'';
+  const c=TCAMPOS.find(x=>x.k===p.c);return c&&u[c.k]?nfx(u[c.k].v,c.d)+' '+c.u+f(u[c.k]):''}
+const protEj=c=>({spr:'1,90 / 3,22 / 4,40 s',vam:'3,40 m/s',peso:'92,0 kg',yoyo:'15:1',abk:'47,5 cm',t10:'1,90 s',t20:'3,22 s',t30:'4,40 s'})[c]||'41,2 cm';
+const protUsos=id=>(S.temps||[]).reduce((n,t)=>n+t.semanas.reduce((m,w)=>m+(w.test?w.days.filter(d=>d.test&&(d.test.p||[]).includes(id)).length:0),0),0);
+async function guardarProtos(L){const raw=S.cfgRaw||{};if(await write(()=>S.db.doc('config/general').set({...raw,protocolos:L}))){S.cfgRaw={...raw,protocolos:L};return true}return false}
+/* vista previa: igual a como lo ve el jugador */
+function protVistaHTML(p,prev){return `<div class="pr-v"><div class="pr-vh"><b>${esc(p.n||'Sin nombre')}</b>${protMeta(p)?`<span>${esc(protMeta(p))}</span>`:''}</div>
+  ${p.c&&p.c!=='otro'?`<span class="pr-prev">${prev?'Marca anterior: '+esc(prev):'Primera vez: sin marca anterior'}</span>`:''}
+  ${p.mat?`<p class="pr-mat">Material: ${esc(p.mat)}</p>`:''}
+  ${(p.pasos||[]).length?`<ol>${p.pasos.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:''}
+  ${(p.inv||[]).length?`<p class="pr-inv"><b>No vale si:</b> ${p.inv.map(esc).join(' ')}</p>`:''}
+  ${p.nota?`<p class="pr-nota">${esc(p.nota)}</p>`:''}</div>`}
+function protFormHTML(a){const L=protos();
+  if(a.ed!=null){const p=a.p;const lines=x=>(x||[]).join('\n');
+    return `<form id="prf" class="pad pr-ed"><div class="form">
+      <label class="full">Nombre del test<input id="pr-n" required maxlength="80" value="${esc(p.n)}" placeholder="CMJ"></label>
+      <label>Qué se registra<select id="pr-c">${PROT_C.map(([k,l])=>`<option value="${k}" ${k===(p.c||'')?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+      <label>Intentos<input id="pr-int" maxlength="30" value="${esc(p.int)}" placeholder="3"></label>
+      <label>Pausa entre intentos<input id="pr-pau" maxlength="40" value="${esc(p.pau)}" placeholder="1 min"></label>
+      <label>Material<input id="pr-mat" maxlength="120" value="${esc(p.mat)}" placeholder="Conos, cronómetro"></label>
+      <label class="full">Pasos (uno por renglón)<textarea id="pr-pasos" rows="6" required placeholder="Manos en la cintura todo el salto.">${esc(lines(p.pasos))}</textarea></label>
+      <label class="full">No vale si… (uno por renglón, opcional)<textarea id="pr-inv" rows="3" placeholder="Sacaste las manos de la cintura.">${esc(lines(p.inv))}</textarea></label>
+      <label class="full">Nota para el jugador (opcional)<textarea id="pr-nota" rows="2" placeholder="Se anota el mejor intento.">${esc(p.nota)}</textarea></label></div>
+      <p class="hint" style="margin-top:12px"><b>Así lo ve el jugador</b>${p.c&&p.c!=='otro'?' (con una marca de ejemplo)':''}:</p><div id="pr-prev">${protVistaHTML(p,protEj(p.c))}</div>
+      <p class="hint" id="pr-msg" role="alert"></p>
+      <div class="actions sticky-save"><button class="btn" type="button" data-prback>Volver a la lista</button><span style="flex:1"></span><button class="btn pri" type="submit">Guardar protocolo</button></div></form>`}
+  return `<div class="pad pr-list"><p class="hint">Armá cada test como quieras: nombre, intentos, pausas, pasos y cuándo no vale el intento. En la semana de test de la temporada elegís qué protocolos van cada día, y el jugador los ve paso a paso en su link al entregar el plan.</p>
+    ${a.back?`<button class="btn" type="button" data-prsem style="margin-top:10px">‹ Volver a la semana ${a.back.i+1}</button>`:''}
+    <ul class="pr-ul">${L.map((p,i)=>{const n=protUsos(p.id);return `<li><div class="pr-li"><b>${esc(p.n)}</b><span class="hint">${esc([protMeta(p),(PROT_C.find(c=>c[0]===(p.c||''))||[])[1],n?'en '+plural(n,'día de test','días de test'):''].filter(Boolean).join(' · '))}</span></div>
+      <span class="pr-ac"><button class="x-sm" type="button" data-prmv="${i}:-1" ${i?'':'disabled'} aria-label="Subir ${esc(p.n)}">↑</button><button class="x-sm" type="button" data-prmv="${i}:1" ${i<L.length-1?'':'disabled'} aria-label="Bajar ${esc(p.n)}">↓</button><button class="btn sm" type="button" data-pred="${i}">Editar</button><button class="btn sm" type="button" data-prdup="${i}">Duplicar</button><button class="btn sm danger" type="button" data-prdel="${i}" aria-label="Borrar ${esc(p.n)}">Borrar</button></span></li>`}).join('')||'<li class="hint">No hay protocolos.</li>'}</ul>
+    <p class="hint" id="pr-msg" role="alert"></p>
+    <div class="actions" style="margin-top:12px"><button class="btn pri" type="button" data-prnew>+ Nuevo protocolo</button>${PROT_DEF.some(d=>!L.find(p=>p.id===d.id))?'<button class="btn" type="button" data-prfill>Agregar los ejemplos que falten</button>':''}<span style="flex:1"></span><button class="btn" type="button" data-close>Cerrar</button></div></div>`}
+function bindProt(a){const ov=$('#overlay');
+  const leerP=()=>{const ls=id=>$(id).value.split('\n').map(x=>x.trim()).filter(Boolean);const p=a.p;p.n=$('#pr-n').value.trim();p.c=$('#pr-c').value;p.int=$('#pr-int').value.trim();p.pau=$('#pr-pau').value.trim();p.mat=$('#pr-mat').value.trim();p.pasos=ls('#pr-pasos');p.inv=ls('#pr-inv');p.nota=$('#pr-nota').value.trim()};
+  if(a.ed!=null){$('#prf').oninput=()=>{leerP();$('#pr-prev').innerHTML=protVistaHTML(a.p,protEj(a.p.c))};$('#prf').onchange=ev=>{if(ev.target.id==='pr-c'){leerP();$('#pr-prev').innerHTML=protVistaHTML(a.p,protEj(a.p.c))}};
+    $('#prf').onsubmit=async ev=>{ev.preventDefault();leerP();const msg=$('#pr-msg');if(!a.p.n){msg.textContent='Falta el nombre del test.';$('#pr-n').focus();return}if(!a.p.pasos.length){msg.textContent='Escribí al menos un paso.';$('#pr-pasos').focus();return}
+      const L=protos().slice();if(a.ed<0)L.push(a.p);else L[a.ed]=a.p;if(await guardarProtos(L)){toast('Protocolo guardado');a.ed=null;a.p=null;renderSheet()}}}
+  ov.onclick=async ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
+    const t=ev.target;let b;
+    if(t.closest('[data-prback]')){a.ed=null;a.p=null;renderSheet();return}
+    if(t.closest('[data-prsem]')){const tp=(S.temps||[]).find(x=>x._id===a.back.tid);if(tp)openSheet('__tpsem','ver',semArg(tp,a.back.i,a.back.pj));else closeSheet();return}
+    if(t.closest('[data-prnew]')){a.ed=-1;a.p={id:'p'+Date.now().toString(36),n:'',c:'',int:'3',pau:'',mat:'',pasos:[],inv:[],nota:''};renderSheet();return}
+    if(b=t.closest('[data-pred]')){a.ed=+b.dataset.pred;a.p=JSON.parse(JSON.stringify(protos()[a.ed]));renderSheet();return}
+    if(b=t.closest('[data-prdup]')){const L=protos().slice(),i=+b.dataset.prdup,c={...JSON.parse(JSON.stringify(L[i])),id:'p'+Date.now().toString(36),n:L[i].n+' (copia)'};L.splice(i+1,0,c);if(await guardarProtos(L)){a.ed=i+1;a.p=JSON.parse(JSON.stringify(c));renderSheet()}return}
+    if(b=t.closest('[data-prmv]')){const[i,d]=b.dataset.prmv.split(':').map(Number);const L=protos().slice();[L[i],L[i+d]]=[L[i+d],L[i]];if(await guardarProtos(L))renderSheet();return}
+    if(b=t.closest('[data-prdel]')){const i=+b.dataset.prdel,L=protos().slice(),n=protUsos(L[i].id);
+      if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent=n?`Se usa en ${n} ${n===1?'día':'días'}: ¿borrar?`:'¿Seguro?';return}
+      L.splice(i,1);if(await guardarProtos(L)){toast('Protocolo borrado');renderSheet()}return}
+    if(t.closest('[data-prfill]')){const L=protos().slice();PROT_DEF.forEach(d=>{if(!L.find(p=>p.id===d.id))L.push(JSON.parse(JSON.stringify(d)))});if(await guardarProtos(L)){toast('Ejemplos agregados');renderSheet()}}}}
+/* bloque de test que recibe el jugador (el protocolo viaja copiado: cambiarlo después no toca planes ya entregados) */
+function protBloque(d,e){const its=(d.test.p||[]).map(protDe).filter(Boolean).map(p=>{const prev=p.c&&p.c!=='otro'?protPrev(p,e):'';
+    return {uid:ruid(),nombre:p.n,test:{c:p.c||'',int:p.int||'',pau:p.pau||'',mat:p.mat||'',pasos:p.pasos||[],inv:p.inv||[],nota:p.nota||''},...(p.c&&p.c!=='otro'?{prev:prev||'Primera vez'}:{}),
+      notas:[protMeta(p),p.c&&p.c!=='otro'?(prev?'marca anterior: '+prev:'primera vez'):''].filter(Boolean).join(' · ')}});
+  return its.length?{uid:ruid(),nombre:'TEST',modo:'test',series:'',...(d.test.nota?{nota:d.test.nota}:{}),items:its}:null}
+/* panel del día de test dentro de la hoja de la semana */
+function tsTestHTML(d,k){const L=protos(),p=(d.test&&d.test.p)||[];
+  return `<div class="ts-test"><div class="ts-th"><b>Día de test</b><button class="btn sm" type="button" data-tstoff="${k}">Quitar el test de este día</button></div>
+    <ol class="ts-tl">${p.map((id,j)=>{const x=protDe(id);return `<li><span>${x?esc(x.n):'<i>Protocolo borrado</i>'}${x&&protMeta(x)?` <small>${esc(protMeta(x))}</small>`:''}</span><span class="pr-ac"><button class="x-sm" type="button" data-tsmv="${k}:${j}:-1" ${j?'':'disabled'} aria-label="Subir">↑</button><button class="x-sm" type="button" data-tsmv="${k}:${j}:1" ${j<p.length-1?'':'disabled'} aria-label="Bajar">↓</button><button class="x-sm" type="button" data-tsprm="${k}:${j}" aria-label="Quitar">✕</button></span></li>`}).join('')||'<li class="hint">Todavía no elegiste protocolos.</li>'}</ol>
+    <div class="ts-tf"><select class="mini" data-tspadd="${k}" aria-label="Agregar protocolo el ${T_DIAS[k]}"><option value="">+ protocolo</option>${L.filter(x=>!p.includes(x.id)).map(x=>`<option value="${esc(x.id)}">${esc(x.n)}</option>`).join('')}</select>
+      <label class="ts-solo"><input type="checkbox" data-tssolo="${k}" ${d.test&&d.test.solo===false?'':'checked'}> Ese día solo test (no se entrega la dosis)</label>
+      <input class="ts-nota" data-tsnota="${k}" maxlength="160" value="${esc((d.test&&d.test.nota)||'')}" placeholder="Nota del día (ej: sin pesas desde el sábado)" aria-label="Nota del día de test"></div></div>`}
 /* ---------- EQUIPO PRO · importar la planilla completa (MACRO + MICROCICLOS + PESAS + DIAGNÓSTICO) ---------- */
 const XL_RUN={'continuo extensivo':'CE','continuo intensivo':'CI','continuo variable i':'CV1','continuo variable ii':'CV2','interv ext c/ i largo':'IE-IL','interv ext c/ i medios':'IE-IM','interv intensivos c/ i cortos':'II-IC','interv intensivos c/ ie cortos':'II-IEC','repeticiones c/ i largos':'Rep-IL','repeticiones c/ i medios':'Rep-IM','repeticiones c/ i cortos':'Rep-IC','repeticiones cortas maximas':'RCM','rsa':'RSA','salidas a estimulos variables':'SEV','velocidad maxima':'FS','velocidad maxima (fs)':'FS'};
 const XL_STR={'rep iii':'Rep III','rep ii':'Rep II','rep i':'Rep I','i max':'I Máx','i max 2':'I Máx II','i max ii':'I Máx II','piramide':'Pirámide','contraste':'Contraste','contrastes':'Contraste','concentrico':'Concéntrico','concentrico puro':'Concéntrico','pliometria':'Pliometría','pliometrico':'Pliometría'};
@@ -3014,6 +3112,7 @@ const xlResumen=x=>{const W=x.W,dos=W.filter(epConDosis).length,ej=W.reduce((a,w
 function xlDiff(t,W,mantener){const res={plan:0,dosis:0,nuevas:Math.max(0,W.length-t.semanas.length),quitadas:Math.max(0,t.semanas.length-W.length),mant:0};
   const out=W.map((w,i)=>{const o=t.semanas[i];if(!o)return w;const pl=o.per!==w.per||o.meso!==w.meso||o.tipo!==w.tipo||o.rel!==w.rel||o.comp!==w.comp||!!o.test!==!!w.test||JSON.stringify(o.days.map(d=>[d.q,d.met]))!==JSON.stringify(w.days.map(d=>[d.q,d.met]));
     let nw=w;if(mantener&&!epConDosis(w)&&epConDosis(o)){nw={...w,days:w.days.map((d,k)=>({...d,run:o.days[k].run||[],str:o.days[k].str||[]}))};res.mant++}
+    if(o.days.some(d=>d.test))nw={...nw,days:nw.days.map((d,k)=>o.days[k]&&o.days[k].test?{...d,test:o.days[k].test}:d)};
     const ds=JSON.stringify(o.days.map(d=>[d.run||[],d.str||[]]))!==JSON.stringify(nw.days.map(d=>[d.run||[],d.str||[]]));if(pl)res.plan++;if(ds)res.dosis++;return nw});
   return {out,res}}
 function tpSyncHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const q=(S.equipos||[]).find(x=>x._id===t.equipoId)||{};const js=(q.jugadores||[]).map(id=>S.ents[id]).filter(Boolean);
@@ -3071,6 +3170,20 @@ function guiaSecciones(){
     <li><b>Controles:</b> valores fuera de rango y tiempos que no crecen de 10 a 30 m no se guardan.</li>
     <li><b>Historial:</b> en la ficha, «Tests físicos» muestra los últimos valores con ▲▼ contra el test anterior (en sprint, bajar el tiempo es mejorar) y cada test se puede editar o borrar.</li>
     <li><b>1RM en un test:</b> si cargás marcas, se actualizan las de la ficha y todas las rutinas con % recalculan los kilos.</li></ul>`},
+  {id:'protocolos',t:'Protocolos de test y día de test',h:`
+    <p>Cada test tiene un protocolo que armás vos: el jugador lo ve paso a paso en su link el día de test, con su marca anterior al lado.</p>
+    <ol class="g-pasos">
+      <li><b>Armar los protocolos.</b> Equipos → <b>Protocolos de test</b>. Cada uno tiene nombre, qué se registra, intentos, pausa, material, pasos (uno por renglón), cuándo no vale el intento y una nota. Abajo ves cómo lo va a ver el jugador mientras escribís. Vienen ${PROT_DEF.length} ejemplos para editar, duplicar o borrar.</li>
+      <li><b>Marcar la semana de test.</b> En la hoja de la semana tildás <b>Semana de test</b>.</li>
+      <li><b>Elegir los días.</b> En cada día tocás <b>+ Test</b> y sumás protocolos en el orden en que se hacen (con ↑ ↓). <b>Usar el orden sugerido</b> arma lunes, miércoles y viernes de una vez. La nota del día le llega al jugador arriba de todo.</li>
+      <li><b>Entregar.</b> Al entregar el plan, ese día abre con el bloque TEST. Con <b>Ese día solo test</b> tildado (viene así) no se entrega la dosis de ese día; si lo destildás, la dosis va después del test.</li>
+      <li><b>Cargar los resultados.</b> Los cargás vos con <b>Cargar tests del plantel</b>. En la entrega siguiente la marca anterior ya es la nueva.</li>
+    </ol>
+    <h4>Orden sugerido de la semana</h4>
+    <ul><li><b>Lunes:</b> entrada en calor, peso, CMJ, Abalakov, sprint y Prueba T. Lo explosivo se mide descansado, de lo que menos cansa a lo que más.</li>
+    <li><b>Miércoles:</b> entrada en calor y 1RM, lejos del sprint.</li>
+    <li><b>Viernes:</b> entrada en calor y VAM o Yo-Yo, que es lo que más agota.</li></ul>
+    <p class="hint">Para que dos tests se puedan comparar: misma hora, misma superficie, mismo calzado, misma entrada en calor y sin entrenamiento pesado las 48 horas previas. El protocolo se copia en el plan al entregarlo: si después lo cambiás, volvé a entregar esa semana para que el jugador vea la versión nueva.</p>`},
   {id:'temporada',t:'Temporada (macrociclo)',h:`
     <ul><li><b>Crear:</b> lunes de la semana 1 (tiene que ser lunes), día de partido y punto de partida:
       <ul><li><b>Plantilla temporada promedio handball:</b> 42 semanas, 2 torneos de 15 fechas, con la dosis de las primeras 13 semanas.</li><li><b>Importar desde un Excel:</b> ver «Planilla Excel».</li><li><b>En blanco:</b> la cantidad de semanas que elijas.</li></ul></li>
