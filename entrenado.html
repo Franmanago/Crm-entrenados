@@ -484,6 +484,8 @@ body.mini-on .tmr-fab{display:none}
 .tst-b ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
 .tst-mat,.tst-nota{margin:0 0 6px;font-size:13.5px;color:var(--muted)}.tst-nota{margin:8px 0 0}
 .tst-inv{margin:8px 0 0;font-size:13.5px;color:var(--bad)}
+.tst-sh{margin:10px 0 4px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
+.tst-b .tst-sh:first-child{margin-top:0}
 </style>
 </head>
 <body>
@@ -838,7 +840,7 @@ function render0(){window.splashOff&&window.splashOff();
         const x=T.int||'',meta=[!x?'':/intento/i.test(x)?x:/^\d+$/.test(x)?x+(x==='1'?' intento':' intentos'):/^\d+\s*(a|-|o)\s*\d+$/.test(x)?x+' intentos':'intentos: '+x,T.pau?'pausa '+T.pau:''].filter(Boolean).join(' · ');
         h+=`<div class="ej ej-tst${ok?' hecho':''}" data-uid="${esc(it.uid)}"><div class="ej-top"><button class="chk" data-chk="${esc(it.uid)}" aria-pressed="${ok}" aria-label="${ok?'Hecho. Tocá para desmarcar':'Marcar como hecho'}" title="${ok?'Hecho':'Marcar como hecho'}">✓</button>
           <button class="tst-t" data-tprot="${esc(it.uid)}" aria-expanded="${!!op}"><span class="ej-n">${j+1}. ${esc(it.nombre)}</span>${meta?`<span class="tst-m">${esc(meta)}</span>`:''}${it.prev?`<span class="tst-p${it.prev==='Primera vez'?' nv':''}">${it.prev==='Primera vez'?'Primera vez: sin marca anterior':'Marca anterior: '+esc(it.prev)}</span>`:''}<span class="tst-c">${op?'Ocultar cómo se hace':'Ver cómo se hace'}</span></button></div>
-          ${op?`<div class="tst-b">${T.mat?`<p class="tst-mat">Material: ${esc(T.mat)}</p>`:''}${(T.pasos||[]).length?`<ol>${T.pasos.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:''}${(T.inv||[]).length?`<p class="tst-inv"><b>No vale si:</b> ${T.inv.map(esc).join(' ')}</p>`:''}${T.nota?`<p class="tst-nota">${esc(T.nota)}</p>`:''}</div>`:''}</div>`});
+          ${op?`<div class="tst-b">${T.mat?`<p class="tst-mat">Material: ${esc(T.mat)}</p>`:''}${(T.calor||[]).length?`<p class="tst-sh">Entrada en calor</p>${j>0?'<p class="tst-mat">Si venís de la prueba anterior, ya estás en calor: hacé solo lo específico de esta prueba.</p>':''}<ol>${T.calor.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:''}${(T.pasos||[]).length?`${(T.calor||[]).length?'<p class="tst-sh">Evaluación</p>':''}<ol>${T.pasos.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:''}${(T.inv||[]).length?`<p class="tst-inv"><b>No vale si:</b> ${T.inv.map(esc).join(' ')}</p>`:''}${T.nota?`<p class="tst-nota">${esc(T.nota)}</p>`:''}</div>`:''}</div>`});
       h+='</section>';continue}
     if(b.modo==='dist'){const ser=parseInt(b.series)||0,tot=distTot(b);
       h+=`<section class="card bl-ds" id="bl-${esc(b.uid)}"><div class="bl-h"><span class="bl-n">${esc(b.nombre)}</span><span class="bl-r">${blTop}${ser>1?`<span class="series"><b>${ser}</b> series${String(b.pausaSeries||'').trim()?' · entre series '+esc(distT(b.pausaSeries)):''}</span>`:''}${tot?`<span class="ds-tot">${distMil(tot)} m</span>`:''}</span></div>`;
