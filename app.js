@@ -115,7 +115,11 @@ const curMes=()=>mesKey(today());
 const mesLbl=k=>{const [y,m]=k.split('-').map(Number);return MESES_N[m-1]+' '+y};
 const mesCorto=k=>{const [y,m]=k.split('-').map(Number);return MESES_N[m-1].slice(0,3)+' '+String(y).slice(2)};
 const mesShift=(k,n)=>{const [y,m]=k.split('-').map(Number);return mesKey(new Date(y,m-1+n,1))};
-const liveRoster=()=>Object.values(S.ents).filter(e=>isAct(e)&&!sinCuota(e)).map(e=>({id:e.id,nombre:e.nombre,gym:gymOf(e),monto:monto(e),pct:pctFran(gymOf(e))}));
+/* primer cobro: el pago más antiguo registrado o, si todavía no pagó nunca, la fecha de primer pago cargada en la ficha.
+   Quien arranca a pagar en un mes posterior no figura como deuda en los meses anteriores. */
+const primerCobro=e=>{const fs=S.pagos.filter(p=>p.entrenadoId===e.id&&p.fecha).map(p=>p.fecha);if(e.ultPago)fs.push(e.ultPago);return fs.sort()[0]||e.inicio||''};
+const cobraEn=(e,M)=>{if(!M)return true;const f=primerCobro(e);return !f||f.slice(0,7)<=M};
+const liveRoster=M=>Object.values(S.ents).filter(e=>isAct(e)&&!sinCuota(e)&&cobraEn(e,M)).map(e=>({id:e.id,nombre:e.nombre,gym:gymOf(e),monto:monto(e),pct:pctFran(gymOf(e))}));
 function mesesList(){
   const s=new Set([curMes()]);
   Object.keys(S.meses).forEach(k=>s.add(k));
@@ -124,7 +128,7 @@ function mesesList(){
 }
 function monthData(M){
   const doc=S.meses[M];
-  const roster=doc&&doc.plantel?doc.plantel:liveRoster();
+  const roster=doc&&doc.plantel?doc.plantel:liveRoster(M);
   const pagos=S.pagos.filter(p=>p.mes===M);
   const paid=new Set(pagos.map(p=>p.entrenadoId));
   const G={};GYMS.forEach(g=>G[g]={n:0,f:0,c:0,p:0,ff:0,fc:0,fp:0});
