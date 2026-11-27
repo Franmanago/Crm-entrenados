@@ -739,6 +739,14 @@ nav.tabs{view-transition-name:pestanas}
 .tp-season .tst{position:absolute;top:4px;font-size:10px;font-weight:700;background:var(--ink);color:var(--surface);border-radius:4px;padding:0 4px}
 .tp-season .comp{border-left:1px solid var(--line);text-align:center;font-size:10.5px;padding:4px 0;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden}
 .tp-season .comp.f{color:var(--ink)}
+.tp-season .comp .x2{font-style:normal;font-size:9px;display:block;color:var(--accent-ink,var(--ink))}
+.tp-season .riv{border-left:1px solid var(--line);height:120px;display:flex;flex-direction:row-reverse;justify-content:center;align-items:flex-end;gap:1px;padding:4px 0;overflow:hidden}
+.tp-season .riv span{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10.5px;line-height:1.1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:112px}
+.tp-season .riv .loc{color:var(--ink);font-weight:700}
+.tp-season .riv .vis{color:var(--muted)}
+.tp-rivs{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:13px}
+.tp-rivs .loc{font-weight:700}
+.tp-rivs .vis{color:var(--muted);font-weight:600}
 .tp-xl{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:4px 0 4px 26px}
 .tp-sn{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .tp-sn b{font-family:var(--display);font-weight:400;font-size:28px;line-height:1}

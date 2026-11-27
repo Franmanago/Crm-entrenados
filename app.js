@@ -2519,9 +2519,17 @@ const tempDe=eqId=>(S.temps||[]).filter(t=>t.equipoId===eqId).sort((a,b)=>(b.ini
 const tLun=(t,i)=>{const d=parse(t.inicio);d.setDate(d.getDate()+7*i);return d};
 const MESES_C=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function tSemHoy(t){const k=Math.floor(days(today(),parse(t.inicio))/7);return k>=0&&k<t.semanas.length?k:null}
-const tCompL=c=>!c?'—':/^PRETEMP/i.test(c)?'Pret.':/^FECHA/i.test(c)?'F'+c.replace(/\D/g,''):/^LIBRE/i.test(c)?'Libre':/^RESC|RECESO/i.test(c)?'Receso':/^FIN/i.test(c)?'Fin':c.slice(0,6);
-const tCompLong=c=>!c?'Sin competencia':/^PRETEMP/i.test(c)?'Pretemporada':/^FECHA/i.test(c)?'Fecha '+c.replace(/\D/g,'')+' de liga':/^LIBRE/i.test(c)?'Fecha libre':/^RESC|RECESO/i.test(c)?'Receso de invierno':/^FIN/i.test(c)?'Fin del torneo':c;
+const tNum=c=>(String(c).match(/\d+/)||[''])[0];
+const tCompL=c=>!c?'—':/^PRETEMP/i.test(c)?'Pret.':/^FECHA/i.test(c)?'F'+tNum(c):/^LIBRE/i.test(c)?'Libre':/^RESC|RECESO/i.test(c)?'Receso':/^FIN/i.test(c)?'Fin':c.slice(0,6);
+const tCompLong=c=>!c?'Sin competencia':/^PRETEMP/i.test(c)?'Pretemporada':/^FECHA/i.test(c)?'Fecha '+tNum(c)+' de liga':/^LIBRE/i.test(c)?'Fecha libre':/^RESC|RECESO/i.test(c)?'Receso de invierno':/^FIN/i.test(c)?'Fin del torneo':c;
 const tCap=s=>s?s.charAt(0)+s.slice(1).toLowerCase():'';
+/* rivales de la semana: w.partidos [{fecha,dia,hora,condicion,rival,cancha}] o, si no hay, lo que sigue a «·» en la competencia («@ X» visitante, «VS X» local) */
+const T_DS=['dom','lun','mar','mié','jue','vie','sáb'];
+function tRivs(w){if(Array.isArray(w.partidos)&&w.partidos.length)return w.partidos.map(p=>({...p,vis:/^vis/i.test(p.condicion||'')}));
+  if(!/^FECHA/i.test(w.comp||'')||!/·/.test(w.comp))return [];
+  return w.comp.split('·').slice(1).join('·').replace(/·?\s*DOBLE FECHA/i,'').split('+').map(x=>x.trim()).filter(Boolean).map(x=>{const vis=/^@/.test(x);const r=x.replace(/^(@|VS\.?)\s*/i,'').replace(/\s*\((LUN|MAR|MI[ÉE]|JUE|VIE|S[ÁA]B|DOM)\)\s*$/i,'');return {rival:r.toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase()),vis}})}
+const tRivTxt=p=>(p.vis?'@ ':'vs ')+p.rival;
+const tRivLong=p=>`${p.fecha?'Fecha '+p.fecha+' · ':''}${p.vis?'Visitante en cancha de':'Local contra'} ${p.rival}${p.dia?' · '+T_DS[parse(p.dia).getDay()]+' '+fmtShort(p.dia):''}${p.hora?' '+p.hora:''}${p.cancha?' · '+p.cancha:''}`;
 function lunesProx(){const d=today();const k=(8-d.getDay())%7;d.setDate(d.getDate()+k);return iso(d)}
 
 function temporadaHTML(q){const t=tempDe(q._id);
@@ -2532,7 +2540,8 @@ function temporadaHTML(q){const t=tempDe(q._id);
   g+='<div class="rowline"></div><div class="lab">Mes</div>'+spans((w,i)=>MESES_C[tLun(t,i).getMonth()]).map(s=>`<div class="span" style="grid-column:span ${s.n}">${esc(s.n>1?s.v:s.v.slice(0,3))}</div>`).join('');
   g+='<div class="rowline"></div><div class="lab">Mesociclo</div>'+spans(w=>w.meso).map(s=>`<div class="span" style="grid-column:span ${s.n}">${s.n>1?'Meso ':'M'}${esc(s.v)}</div>`).join('');
   g+='<div class="rowline"></div><div class="lab">Semana</div>'+W.map((w,i)=>`<button type="button" class="wk t-${esc(w.tipo)}${i===hoy?' hoy':''}" data-tpsem="${esc(t._id)}:${i}" aria-label="Semana ${i+1}, ${fmtShort(iso(tLun(t,i)))}: ${T_TIPOS[w.tipo]||w.tipo} ${esc(w.rel)}, ${esc(tCompLong(w.comp))}${w.test?', semana de test':''}${i===hoy?', semana actual':''}">${w.test?'<span class="tst">T</span>':''}<span class="bar" style="height:${(parseInt(w.rel,10)||1)*15}px"></span><span class="n">${i+1}</span></button>`).join('');
-  g+='<div class="rowline"></div><div class="lab">Competencia</div>'+W.map(w=>`<div class="comp ${/^FECHA/i.test(w.comp)?'f':''}" title="${esc(tCompLong(w.comp))}">${esc(tCompL(w.comp))}</div>`).join('');
+  g+='<div class="rowline"></div><div class="lab">Competencia</div>'+W.map(w=>`<div class="comp ${/^FECHA/i.test(w.comp)?'f':''}" title="${esc(tCompLong(w.comp))}">${esc(tCompL(w.comp))}${tRivs(w).length>1?'<i class="x2">×2</i>':''}</div>`).join('');
+  if(W.some(w=>tRivs(w).length))g+='<div class="rowline"></div><div class="lab">Rival</div>'+W.map(w=>{const R=tRivs(w);return `<div class="riv" title="${esc(R.map(tRivLong).join('\n'))}">${R.map(p=>`<span class="${p.vis?'vis':'loc'}">${esc(tRivTxt(p))}</span>`).join('')}</div>`}).join('');
   const prox=(f,desde)=>{for(let i=desde;i<W.length;i++)if(f(W[i]))return i;return -1};
   const d0=hoy??(days(today(),parse(t.inicio))<0?0:W.length),pf=prox(w=>/^FECHA/i.test(w.comp),d0),pt=prox(w=>w.test,d0);
   const cur=hoy!=null?W[hoy]:null;
@@ -2540,9 +2549,9 @@ function temporadaHTML(q){const t=tempDe(q._id);
   return `<div class="card tp-card"><div class="pad tp-h"><div><b>Temporada ${esc(t.nombre||'')}</b> <button class="g-q" type="button" data-guia="temporada" aria-label="Ayuda sobre la temporada">?</button><p class="hint">${plural(W.length,'semana','semanas')} · del ${fmtD(t.inicio)} al ${fmtD(fin)} · partido el ${esc((t.partido||'Sábado').toLowerCase())}</p></div>
     <div class="actions"><button class="btn pri" type="button" data-tpent="${esc(t._id)}">Entregar al plantel</button><button class="btn" type="button" data-tppdf="${esc(t._id)}">PDF del plantel</button><button class="btn" type="button" data-tptab="${esc(t._id)}">Editar tabla</button><button class="btn" type="button" data-tpcfg="${esc(t._id)}">Ajustes</button></div></div>
     <div class="eq-kpis"><div><b>${hoy!=null?'S'+(hoy+1):'—'}</b><span>${cur?`${T_TIPOS[cur.tipo]||cur.tipo} ${esc(cur.rel)} · ${esc(tCap(cur.per))}`:days(today(),parse(t.inicio))<0?'empieza el '+fmtD(t.inicio):'temporada terminada'}</span></div>
-      <div><b>${pf>=0?tCompL(W[pf].comp):'—'}</b><span>${pf>=0?'próxima fecha · semana '+(pf+1)+' ('+fmtShort(iso(tLun(t,pf)))+')':'sin fechas por delante'}</span></div>
+      <div><b>${pf>=0?tCompL(W[pf].comp):'—'}</b><span>${pf>=0?(tRivs(W[pf]).length?esc(tRivs(W[pf]).map(p=>tRivTxt(p)+(p.dia?' ('+T_DS[parse(p.dia).getDay()]+' '+fmtShort(p.dia)+(p.hora?' '+p.hora:'')+')':'')).join(' y '))+' · semana '+(pf+1):'próxima fecha · semana '+(pf+1)+' ('+fmtShort(iso(tLun(t,pf)))+')'):'sin fechas por delante'}</span></div>
       <div><b>${pt>=0?'S'+(pt+1):'—'}</b><span>${pt>=0?'próximo test · '+fmtShort(iso(tLun(t,pt))):'sin tests por delante'}</span></div>
-      <div><b>${W.filter(w=>/^FECHA/i.test(w.comp)).length}</b><span>fechas de liga · ${W.filter(w=>w.test).length} tests</span></div></div>
+      <div><b>${W.reduce((n,w)=>n+(/^FECHA/i.test(w.comp)?Math.max(1,tRivs(w).length):0),0)}</b><span>fechas de liga · ${W.filter(w=>w.test).length} tests</span></div></div>
     <div class="tp-legend">${Object.entries(T_TIPOS).map(([k,v])=>`<span><i class="sw t-${k}"></i>${v}</span>`).join('')}<span>Altura = nivel de carga</span><span><b class="tst-l">T</b> test</span><span><i class="sw hoy-l"></i>semana actual</span></div>
     <div class="tp-scroll" data-keep-scroll><div class="tp-season" style="--n:${W.length}">${g}</div></div>${epChartsHTML(t)}</div>`}
 
@@ -2610,7 +2619,7 @@ function bindTpNew(a){const ov=$('#overlay');
 function tpSemHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const w=a.w;const i=a.i;
   const metOpts=q=>Object.entries(T_MET).filter(([,m])=>m[1]===q);
   return `<form id="tsf" class="pad">
-    <div class="tp-sn"><button class="btn" type="button" data-tsstep="-1" ${i===0?'disabled':''} aria-label="Semana anterior">‹</button><b>Semana ${i+1}</b><span class="hint">${fmtD(iso(tLun(t,i)))} al ${fmtD(iso(new Date(tLun(t,i).getTime()+6*864e5)))}</span><button class="btn" type="button" data-tsstep="1" ${i===t.semanas.length-1?'disabled':''} aria-label="Semana siguiente">›</button></div>
+    <div class="tp-sn"><button class="btn" type="button" data-tsstep="-1" ${i===0?'disabled':''} aria-label="Semana anterior">‹</button><b>Semana ${i+1}</b><span class="hint">${fmtD(iso(tLun(t,i)))} al ${fmtD(iso(new Date(tLun(t,i).getTime()+6*864e5)))}</span><button class="btn" type="button" data-tsstep="1" ${i===t.semanas.length-1?'disabled':''} aria-label="Semana siguiente">›</button></div>${tRivs(w).length?`<div class="tp-rivs">${tRivs(w).map(p=>`<span class="${p.vis?'vis':'loc'}">${esc(tRivLong(p))}</span>`).join('')}</div>`:''}
     <div class="form cols3" style="margin-top:12px">
       <label>Tipo<select id="ts-tipo">${Object.entries(T_TIPOS).map(([k,v])=>`<option value="${k}" ${k===w.tipo?'selected':''}>${v}</option>`).join('')}</select></label>
       <label>Relación de carga<select id="ts-rel">${T_RELS.map(r=>`<option ${r===w.rel?'selected':''}>${r}</option>`).join('')}</select></label>
