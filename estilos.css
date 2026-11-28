@@ -741,12 +741,12 @@ nav.tabs{view-transition-name:pestanas}
 .tp-season .comp.f{color:var(--ink)}
 .tp-season .comp .x2{font-style:normal;font-size:9px;display:block;color:var(--accent-ink,var(--ink))}
 .tp-season .riv{border-left:1px solid var(--line);height:120px;display:flex;flex-direction:row-reverse;justify-content:center;align-items:flex-end;gap:1px;padding:4px 0;overflow:hidden}
-.tp-season .riv span{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10.5px;line-height:1.1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:112px}
-.tp-season .riv .loc{color:var(--ink);font-weight:700}
-.tp-season .riv .vis{color:var(--muted)}
-.tp-rivs{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:13px}
-.tp-rivs .loc{font-weight:700}
-.tp-rivs .vis{color:var(--muted);font-weight:600}
+.tp-season .riv span{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10.5px;line-height:1.1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:112px;padding:5px 1px;border-radius:5px}
+.tp-season .riv .loc,.tp-rivs .loc{background:var(--ok-soft);color:var(--ok)}
+.tp-season .riv .vis,.tp-rivs .vis{background:var(--bad-soft);color:var(--bad)}
+.tp-legend .sw.loc-l{background:var(--ok)}.tp-legend .sw.vis-l{background:var(--bad)}
+.tp-rivs{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:8px;font-size:13px}
+.tp-rivs span{font-weight:700;padding:3px 8px;border-radius:6px}
 .tp-xl{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:4px 0 4px 26px}
 .tp-sn{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .tp-sn b{font-family:var(--display);font-weight:400;font-size:28px;line-height:1}

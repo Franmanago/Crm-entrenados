@@ -2552,7 +2552,7 @@ function temporadaHTML(q){const t=tempDe(q._id);
       <div><b>${pf>=0?tCompL(W[pf].comp):'—'}</b><span>${pf>=0?(tRivs(W[pf]).length?esc(tRivs(W[pf]).map(p=>tRivTxt(p)+(p.dia?' ('+T_DS[parse(p.dia).getDay()]+' '+fmtShort(p.dia)+(p.hora?' '+p.hora:'')+')':'')).join(' y '))+' · semana '+(pf+1):'próxima fecha · semana '+(pf+1)+' ('+fmtShort(iso(tLun(t,pf)))+')'):'sin fechas por delante'}</span></div>
       <div><b>${pt>=0?'S'+(pt+1):'—'}</b><span>${pt>=0?'próximo test · '+fmtShort(iso(tLun(t,pt))):'sin tests por delante'}</span></div>
       <div><b>${W.reduce((n,w)=>n+(/^FECHA/i.test(w.comp)?Math.max(1,tRivs(w).length):0),0)}</b><span>fechas de liga · ${W.filter(w=>w.test).length} tests</span></div></div>
-    <div class="tp-legend">${Object.entries(T_TIPOS).map(([k,v])=>`<span><i class="sw t-${k}"></i>${v}</span>`).join('')}<span>Altura = nivel de carga</span><span><b class="tst-l">T</b> test</span><span><i class="sw hoy-l"></i>semana actual</span></div>
+    <div class="tp-legend">${Object.entries(T_TIPOS).map(([k,v])=>`<span><i class="sw t-${k}"></i>${v}</span>`).join('')}<span>Altura = nivel de carga</span><span><b class="tst-l">T</b> test</span><span><i class="sw hoy-l"></i>semana actual</span>${W.some(w=>tRivs(w).length)?'<span><i class="sw loc-l"></i>Local</span><span><i class="sw vis-l"></i>Visitante</span>':''}</div>
     <div class="tp-scroll" data-keep-scroll><div class="tp-season" style="--n:${W.length}">${g}</div></div>${epChartsHTML(t)}</div>`}
 
 /* --- leer la hoja MACRO de un Excel --- */
