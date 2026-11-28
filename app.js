@@ -2531,8 +2531,17 @@ function tRivs(w){if(Array.isArray(w.partidos)&&w.partidos.length)return w.parti
 const tRivTxt=p=>(p.vis?'@ ':'vs ')+p.rival;
 /* nombre de los días: «Lunes…Viernes» o «Día 1…Día 5» (el entrenado los acomoda). w.dias ('sem'|'num') pisa a t.dias */
 const tNumD=(t,w)=>w&&w.dias?w.dias==='num':!!(t&&t.dias==='num');
-const tDiaNom=(t,w,k)=>tNumD(t,w)?'Día '+(k+1):T_DIAS[k];
 const T_DL=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+/* días por semana: predeterminado de la temporada (t.ndias, 5 si no hay) o el propio del mesociclo (t.mesoDias[meso]). Con nombres de la semana, n días caen en: */
+const T_WD={1:[2],2:[1,3],3:[0,2,4],4:[0,1,3,4],5:[0,1,2,3,4],6:[0,1,2,3,4,5],7:[0,1,2,3,4,5,6]};
+const tWd=n=>T_WD[Math.min(7,Math.max(1,n||5))];
+const tNdDef=t=>Math.min(7,Math.max(1,Number(t&&t.ndias)||5));
+const tNd=(t,w)=>{const m=t&&t.mesoDias&&w&&t.mesoDias[w.meso];return m?Math.min(7,Math.max(1,Number(m))):tNdDef(t)};
+const tDiaLleno=d=>d&&(d.q||(d.met||[]).length||(d.run||[]).length||(d.str||[]).length||d.test);
+/* deja la semana con n días; los que sobran y tienen algo quedan guardados en w.extra y vuelven si se suben los días */
+function tFit(w,n){const all=[...(w.days||[]),...(w.extra||[])],x={...w,days:all.slice(0,n)};while(x.days.length<n)x.days.push({q:'',met:[]});const r=all.slice(n);if(r.some(tDiaLleno))x.extra=r;else delete x.extra;return x}
+const tAjustar=t=>t.semanas.map(w=>tFit(w,tNd(t,w)));
+const tDiaNom=(t,w,k)=>tNumD(t,w)?'Día '+(k+1):T_DL[tWd((w.days||[]).length)[k]];
 /* partidos de la semana i con wd (0 = lunes … 6 = domingo); sin w.partidos usa el día de partido de la temporada */
 function tPartidos(t,i,w0){const w=w0||t.semanas[i];if(!w)return [];const R=tRivs(w);
   const cd=R.filter(p=>p.dia).map(p=>({...p,wd:(parse(p.dia).getDay()+6)%7})).sort((x,y)=>x.dia.localeCompare(y.dia));
@@ -2600,6 +2609,7 @@ function tpNewHTML(a){
   return `<form id="tpf" class="form pad">
     <label class="full">Nombre<input id="tp-n" value="${esc(a.n??String(today().getFullYear()))}" placeholder="Ej: 2027"></label>
     <label>Lunes de la semana 1<input id="tp-ini" type="date" required value="${esc(a.ini||lunesProx())}"></label>
+    <label>Días por semana<select id="tp-nd">${[1,2,3,4,5,6,7].map(n=>`<option ${n===(Number(a.nd)||5)?'selected':''}>${n}</option>`).join('')}</select></label>
     <label>Día de partido<select id="tp-par">${['Sábado','Domingo'].map(d=>`<option ${d===(a.par||'Sábado')?'selected':''}>${d}</option>`).join('')}</select></label>
     <fieldset class="full tf-rm"><legend>Punto de partida</legend>
       <label class="tp-opt"><input type="radio" name="tp-src" value="tp" ${a.src!=='xl'&&a.src!=='vac'?'checked':''}><span><b>Plantilla temporada promedio handball</b><small>42 semanas, 2 torneos de 15 fechas, con la dosis de las primeras 13 semanas</small></span></label>
@@ -2613,7 +2623,7 @@ function tpNewHTML(a){
     <p class="hint full" id="tp-msg" role="alert"></p>
     <div class="full actions"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Crear temporada</button></div></form>`}
 function bindTpNew(a){const ov=$('#overlay');
-  const leer=()=>{a.n=$('#tp-n').value;a.ini=$('#tp-ini').value;a.par=$('#tp-par').value;a.nsem=$('#tp-nsem')?$('#tp-nsem').value:(a.nsem||42);a.src=(ov.querySelector('[name=tp-src]:checked')||{}).value||'tp'};
+  const leer=()=>{a.n=$('#tp-n').value;a.ini=$('#tp-ini').value;a.par=$('#tp-par').value;a.nd=$('#tp-nd').value;a.nsem=$('#tp-nsem')?$('#tp-nsem').value:(a.nsem||42);a.src=(ov.querySelector('[name=tp-src]:checked')||{}).value||'tp'};
   ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]'))closeSheet()};
   ov.onchange=async ev=>{if(ev.target.name==='tp-src'){leer();renderSheet();return}
     if(ev.target.id==='tp-file'){leer();const f=ev.target.files[0];if(!f)return;a.arch=f.name;a.prev=null;a.err='';
@@ -2625,7 +2635,8 @@ function bindTpNew(a){const ov=$('#overlay');
     let W;if(a.src==='xl'){if(!a.prev){msg.textContent='Elegí el Excel con la hoja MACRO.';return}W=a.prev}
     else if(a.src==='vac'){const n=Math.min(60,Math.max(4,Number(a.nsem)||42));W=Array.from({length:n},(_,i)=>({per:'PREPARATORIO',meso:Math.floor(i/4)+1,tipo:'CARGA',rel:'2:3',comp:'',test:false,days:T_DIAS.map(()=>({q:'',met:[]}))}))}
     else W=tpSemanas();
-    const doc={equipoId:a.eq,nombre:(a.n||'').trim(),inicio:a.ini,partido:a.par||'Sábado',semanas:W,origen:a.src==='xl'?'Excel: '+a.arch:a.src==='vac'?'En blanco':'Plantilla temporada promedio handball',ts:Date.now()};
+    const nd=Math.min(7,Math.max(1,Number(a.nd)||5));W=W.map(w=>tFit(w,nd));
+    const doc={equipoId:a.eq,nombre:(a.n||'').trim(),inicio:a.ini,partido:a.par||'Sábado',ndias:nd,semanas:W,origen:a.src==='xl'?'Excel: '+a.arch:a.src==='vac'?'En blanco':'Plantilla temporada promedio handball',ts:Date.now()};
     const dj=a.src==='xl'&&$('#tp-dj')?$('#tp-dj').value:'';
     if(await write(()=>S.db.collection('temporadas').add(doc))){if(dj)await cargarDiag(dj,a.xl.diag);toast('Temporada creada'+(dj?' y diagnóstico cargado':''));closeSheet()}}}
 
@@ -2642,17 +2653,19 @@ function tpSemHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const w=a.w;c
       <label>Mesociclo<input id="ts-meso" type="number" min="1" step="1" value="${esc(w.meso)}"></label>
       <label class="av-g" style="align-self:end"><input type="checkbox" id="ts-test" ${w.test?'checked':''}> Semana de test</label>
       <label>Nombre de los días<select id="ts-dias"><option value="" ${!w.dias?'selected':''}>Como la temporada (${t.dias==='num'?'Día 1, Día 2…':'lunes a viernes'})</option><option value="sem" ${w.dias==='sem'?'selected':''}>Lunes a viernes</option><option value="num" ${w.dias==='num'?'selected':''}>Día 1, Día 2… (los acomoda el entrenado)</option></select></label>
-    </div>${w.test?`<div class="ts-tbar"><span class="hint">Semana de test: elegí qué días son de test y qué protocolos van. El jugador los ve paso a paso, antes de la dosis del día.</span><span class="actions"><button class="btn sm" type="button" data-tssug>Usar el orden sugerido</button><button class="btn sm" type="button" data-protsem>Editar protocolos</button></span></div>`:''}${epSemTopHTML(a)}
-    <div class="tp-days">${w.days.map((d,k)=>{const pk=tNumD(t,w)?[]:tPartidos(t,i,w).filter(p=>p.wd===k);return `<div class="tp-day${pk.length?' con-pt'+tPtCls(pk[0]):''}"><div class="tp-day-h"><b>${tDiaNom(t,w,k)}</b>${pk.length?'<span class="pt-tag">Partido</span>':''}${['R','F','V'].map(q=>`<button type="button" class="qt ${q}" data-tsq="${k}:${q}" aria-pressed="${d.q.includes(q)}">${T_Q[q]}</button>`).join('')}${w.test&&!d.test?`<button type="button" class="qt T" data-tston="${k}">+ Test</button>`:''}</div>${pk.map(p=>`<p class="pt-line">${esc(tPtTxt(p))}</p>`).join('')}${w.test&&d.test?tsTestHTML(d,k):''}
+      <label>Días por semana · mesociclo ${esc(w.meso)}<select id="ts-nd"><option value="">Como la temporada (${tNdDef(t)})</option>${[1,2,3,4,5,6,7].map(n=>`<option value="${n}" ${String(a.nd!==undefined?a.nd:((t.mesoDias||{})[w.meso]||''))===String(n)?'selected':''}>${n}</option>`).join('')}</select></label>
+    </div>${(w.extra||[]).length?`<p class="hint">Hay ${plural(w.extra.length,'día guardado','días guardados')} fuera de esta semana (con contenido). Vuelven si subís la cantidad de días.</p>`:''}${w.test?`<div class="ts-tbar"><span class="hint">Semana de test: elegí qué días son de test y qué protocolos van. El jugador los ve paso a paso, antes de la dosis del día.</span><span class="actions"><button class="btn sm" type="button" data-tssug>Usar el orden sugerido</button><button class="btn sm" type="button" data-protsem>Editar protocolos</button></span></div>`:''}${epSemTopHTML(a)}
+    <div class="tp-days">${w.days.map((d,k)=>{const pk=tNumD(t,w)?[]:tPartidos(t,i,w).filter(p=>p.wd===tWd(w.days.length)[k]);return `<div class="tp-day${pk.length?' con-pt'+tPtCls(pk[0]):''}"><div class="tp-day-h"><b>${tDiaNom(t,w,k)}</b>${pk.length?'<span class="pt-tag">Partido</span>':''}${['R','F','V'].map(q=>`<button type="button" class="qt ${q}" data-tsq="${k}:${q}" aria-pressed="${d.q.includes(q)}">${T_Q[q]}</button>`).join('')}${w.test&&!d.test?`<button type="button" class="qt T" data-tston="${k}">+ Test</button>`:''}</div>${pk.map(p=>`<p class="pt-line">${esc(tPtTxt(p))}</p>`).join('')}${w.test&&d.test?tsTestHTML(d,k):''}
       <div class="tp-mets">${d.met.map(m=>`<span class="mchip q${(T_MET[m]||[])[1]||''}" title="${esc((T_MET[m]||[m])[0]+' · '+((T_MET[m]||[])[2]||''))}">${esc(m)}<button type="button" data-tsdel="${k}:${esc(m)}" aria-label="Quitar ${esc(m)}">×</button></span>`).join('')||'<span class="hint">Sin métodos</span>'}
         <select class="mini" data-tsadd="${k}" aria-label="Agregar método el ${tDiaNom(t,w,k)}"><option value="">+ método</option>${['R','F','V'].map(q=>`<optgroup label="${T_Q[q]}">${metOpts(q).filter(([m])=>!d.met.includes(m)).map(([m,x])=>`<option value="${esc(m)}">${esc(m)} · ${esc(x[0])}</option>`).join('')}</optgroup>`).join('')}</select></div>
-      ${d.met.some(m=>T_MET[m]&&!d.q.includes(T_MET[m][1]))?'<p class="hint tp-warn">Hay métodos de una cualidad que el día no tiene marcada.</p>':''}${epDosisHTML(a,k)}</div>`}).join('')}${tPartidos(t,i,w).filter(p=>tNumD(t,w)||p.wd>4).map(p=>`<div class="tp-day tp-match${tPtCls(p)}"><div class="tp-day-h"><b>${tNumD(t,w)?esc(tCap(tPtDia(p))):T_DL[p.wd]+' '+fmtShort(p.dia)}</b><span class="pt-tag">Partido</span></div><p class="pt-line">${esc(tPtTxt(p)||'Partido')}</p></div>`).join('')}</div>
+      ${d.met.some(m=>T_MET[m]&&!d.q.includes(T_MET[m][1]))?'<p class="hint tp-warn">Hay métodos de una cualidad que el día no tiene marcada.</p>':''}${epDosisHTML(a,k)}</div>`}).join('')}${tPartidos(t,i,w).filter(p=>tNumD(t,w)||!tWd(w.days.length).includes(p.wd)).map(p=>`<div class="tp-day tp-match${tPtCls(p)}"><div class="tp-day-h"><b>${tNumD(t,w)?esc(tCap(tPtDia(p))):T_DL[p.wd]+' '+fmtShort(p.dia)}</b><span class="pt-tag">Partido</span></div><p class="pt-line">${esc(tPtTxt(p)||'Partido')}</p></div>`).join('')}</div>
     <p class="hint" id="ts-msg" role="alert"></p>
     <div class="actions" style="margin-top:10px"><span style="flex:1"></span><button class="btn" type="button" data-close>Cancelar</button><button class="btn pri" type="submit">Guardar semana</button></div></form>`}
 function bindTpSem(a){const ov=$('#overlay');
   const leer=()=>{const w=a.w;w.tipo=$('#ts-tipo').value;w.rel=$('#ts-rel').value;w.comp=$('#ts-comp').value.trim().toUpperCase();w.per=$('#ts-per').value;w.meso=Number($('#ts-meso').value)||w.meso;w.test=$('#ts-test').checked;{const dv=$('#ts-dias')?$('#ts-dias').value:'';if(dv)w.dias=dv;else delete w.dias}ov.querySelectorAll('[data-tsnota]').forEach(x=>{const d=w.days[+x.dataset.tsnota];if(d&&d.test)d.test.nota=x.value.trim()})};
   ov.onchange=ev=>{if(ev.target.dataset.ds){leer();epDsCambio(a,ev.target);a.dirty=true;renderSheet();return}
     if(ev.target.id==='ts-test'||ev.target.id==='ts-dias'){leer();a.dirty=true;renderSheet();return}
+    if(ev.target.id==='ts-nd'){leer();const t=(S.temps||[]).find(x=>x._id===a.tid);a.nd=Number(ev.target.value)||'';a.w=tFit(a.w,a.nd||tNdDef(t));a.dirty=true;renderSheet();return}
     if(ev.target.dataset.tspadd!=null&&ev.target.value){leer();const d=a.w.days[+ev.target.dataset.tspadd];d.test.p=[...(d.test.p||[]),ev.target.value];a.dirty=true;renderSheet();return}
     if(ev.target.dataset.tsnota!=null){leer();a.dirty=true;return}
     if(ev.target.dataset.tssolo!=null){leer();const d=a.w.days[+ev.target.dataset.tssolo];if(ev.target.checked)delete d.test.solo;else d.test.solo=false;a.dirty=true;return}if(ev.target.dataset.dspj!=null){leer();a.pj=ev.target.value;renderSheet();return}
@@ -2672,7 +2685,8 @@ function bindTpSem(a){const ov=$('#overlay');
   $('#tsf').onsubmit=async ev=>{ev.preventDefault();leer();if(await guardarSem(a)){toast('Semana '+(a.i+1)+' guardada');closeSheet()}}}
 const semArg=(t,i,pj)=>({tid:t._id,pj,i,w:JSON.parse(JSON.stringify(t.semanas[i])),orig:JSON.stringify(t.semanas[i])});
 async function guardarSem(a){const t=(S.temps||[]).find(x=>x._id===a.tid);if(!t)return false;const W=t.semanas.slice();W[a.i]=a.w;
-  const {_id,...doc}=t;return write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:W}))}
+  const {_id,...doc}=t;const nt={...doc,semanas:W};if(a.nd!==undefined){const md={...(t.mesoDias||{})};if(a.nd)md[a.w.meso]=a.nd;else delete md[a.w.meso];nt.mesoDias=md}
+  nt.semanas=tAjustar(nt);return write(()=>S.db.collection('temporadas').doc(a.tid).set(nt))}
 
 /* --- hoja: tabla de toda la temporada --- */
 function tpTabHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);const W=a.W;
@@ -2691,16 +2705,18 @@ function bindTpTab(a){const ov=$('#overlay');
   ov.onchange=ev=>{const x=ev.target.closest('[data-tt]');if(!x)return;const[i,k]=x.dataset.tt.split(':');const w=a.W[+i];
     w[k]=k==='test'?x.checked:k==='meso'?(Number(x.value)||w.meso):k==='comp'?x.value.trim().toUpperCase():x.value;if(k==='tipo')x.closest('tr').className='t-'+x.value};
   ov.onclick=ev=>{if(ev.target===ov||ev.target.closest('[data-close]')){closeSheet();return}
-    if(ev.target.closest('[data-ttadd]')){const l=a.W[a.W.length-1];a.W.push({per:l.per,meso:l.meso,tipo:'CARGA',rel:'2:3',comp:'',test:false,days:T_DIAS.map(()=>({q:'',met:[]}))});renderSheet();return}
+    if(ev.target.closest('[data-ttadd]')){const l=a.W[a.W.length-1];{const t=(S.temps||[]).find(x=>x._id===a.tid);a.W.push(tFit({per:l.per,meso:l.meso,tipo:'CARGA',rel:'2:3',comp:'',test:false,days:[]},tNd(t,l)))}renderSheet();return}
     if(ev.target.closest('[data-ttrm]')){a.W.pop();renderSheet()}};
   $('#ttf').onsubmit=async ev=>{ev.preventDefault();const t=(S.temps||[]).find(x=>x._id===a.tid);const {_id,...doc}=t;
-    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:a.W}))){toast('Temporada guardada');closeSheet()}}}
+    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:tAjustar({...doc,semanas:a.W})}))){toast('Temporada guardada');closeSheet()}}}
 
 /* --- hoja: ajustes de la temporada --- */
 function tpCfgHTML(a){const t=(S.temps||[]).find(x=>x._id===a.tid);
   return `<form id="tcf" class="form pad">
     <label class="full">Nombre<input id="tc-n" value="${esc(t.nombre||'')}"></label>
     <label>Lunes de la semana 1<input id="tc-ini" type="date" required value="${esc(t.inicio)}"></label>
+    <label>Días por semana (predeterminado)<select id="tc-nd">${[1,2,3,4,5,6,7].map(n=>`<option ${n===tNdDef(t)?'selected':''}>${n}</option>`).join('')}</select></label>
+    ${Object.keys(t.mesoDias||{}).length?`<label class="av-g full"><input type="checkbox" id="tc-ndr"> Volver al predeterminado los mesociclos con cantidad propia (${Object.entries(t.mesoDias).map(([m,n])=>'meso '+m+': '+n).join(', ')})</label>`:''}
     <label>Nombre de los días<select id="tc-dias"><option value="sem" ${t.dias!=='num'?'selected':''}>Lunes a viernes</option><option value="num" ${t.dias==='num'?'selected':''}>Día 1, Día 2… (los acomoda el entrenado)</option></select></label>
     <label>Día de partido<select id="tc-par">${['Sábado','Domingo'].map(d=>`<option ${d===(t.partido||'Sábado')?'selected':''}>${d}</option>`).join('')}</select></label>
     <p class="hint full">Origen: ${esc(t.origen||'—')}${t.actualizado?' · actualizada el '+fmtD(t.actualizado):''}. Si movés el inicio, todas las semanas se corren con él.</p>
@@ -2712,7 +2728,7 @@ function bindTpCfg(a){const ov=$('#overlay');
     if(ev.target.closest('[data-tcdel]')){if(S.tcArm!==a.tid){S.tcArm=a.tid;renderSheet();return}S.tcArm=null;if(await write(()=>S.db.collection('temporadas').doc(a.tid).delete())){toast('Temporada borrada');closeSheet()}}};
   $('#tcf').onsubmit=async ev=>{ev.preventDefault();const ini=$('#tc-ini').value;if(!ini||parse(ini).getDay()!==1){$('#tc-msg').textContent='La semana 1 tiene que empezar un lunes.';return}
     const t=(S.temps||[]).find(x=>x._id===a.tid);const {_id,...doc}=t;
-    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,nombre:$('#tc-n').value.trim(),inicio:ini,partido:$('#tc-par').value,dias:$('#tc-dias').value}))){toast('Temporada actualizada');closeSheet()}}}
+    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set((()=>{const nt={...doc,nombre:$('#tc-n').value.trim(),inicio:ini,partido:$('#tc-par').value,dias:$('#tc-dias').value,ndias:Number($('#tc-nd').value)||5};if($('#tc-ndr')&&$('#tc-ndr').checked)nt.mesoDias={};nt.semanas=tAjustar(nt);return nt})()))){toast('Temporada actualizada');closeSheet()}}}
 
 document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-tpnew],[data-tpsem],[data-tptab],[data-tpcfg]');if(!b)return;const D=b.dataset;
   if(D.tpnew!=null){openSheet('__tpnew','ver',{eq:D.tpnew});return}
@@ -2913,7 +2929,7 @@ function epRutina(t,q,e,a,b,opc){const P=epPerfil(e);const secs=[],dist=[];
       let cur=null;(d.str||[]).forEach(it=>{const L=EP_LIB[it.m]||{n:it.m};if(!cur||cur._m!==it.m||cur.series!==String(it.s)){cur={uid:ruid(),nombre:(L.n||it.m).toUpperCase(),series:String(it.s),items:[],_m:it.m};bl.push(cur)}
         cur.items.push({uid:ruid(),nombre:titleCase(it.e),reps:String(it.r),...(L.b==='none'?{}:{pct:String(it.p),rm:it.e}),...(it.pr?{notas:'Pausa '+it.pr+(it.ps?' · entre ejercicios '+it.ps:'')}:{})})});
       bl.forEach(x=>delete x._m);const tb=w.test&&d.test?protBloque(d,e):null;if(tb){if(d.test.solo!==false)bl.length=0;bl.unshift(tb)}
-      if(bl.length)dias.push({uid:ruid(),nombre:`Día ${dias.length+1}${tNumD(t,w)?'':' · '+T_DIAS[k]}${tb?' · Test':''}`,bloques:bl})});
+      if(bl.length)dias.push({uid:ruid(),nombre:`Día ${dias.length+1}${tNumD(t,w)?'':' · '+T_DL[tWd(w.days.length)[k]]}${tb?' · Test':''}`,bloques:bl})});
     secs.push({uid:ruid(),titulo:`Semana ${i+1} · ${T_TIPOS[w.tipo]||w.tipo} ${w.rel}${w.comp?' · '+tCompLong(w.comp):''}${tPartidos(t,i).map(p=>' · Partido '+tPtDia(p)+(p.hora?' '+p.hora:'')+(p.rival?' '+tRivTxt(p):'')).join('')}`,posicion:e.posicion||'',dias});dist.push(dias.map((_,j)=>j))}
   return {entrenadoId:e.id,nombre:`${q.nombre} · ${a===b?'Semana '+(a+1):'Semanas '+(a+1)+' a '+(b+1)}`,estado:'activa',fechaEntrega:iso(tLun(t,a)),duracionSemanas:b-a+1,secciones:secs,distribucion:dist,
     controlCarga:!!opc.carga,bienestar:!!opc.bien,equipo:{eq:q._id,tid:t._id,desde:a,hasta:b,ts:Date.now()},
@@ -3098,7 +3114,7 @@ function protBloque(d,e){const its=(d.test.p||[]).map(protDe).filter(Boolean).ma
 function tsTestHTML(d,k){const L=protos(),p=(d.test&&d.test.p)||[];
   return `<div class="ts-test"><div class="ts-th"><b>Día de test</b><button class="btn sm" type="button" data-tstoff="${k}">Quitar el test de este día</button></div>
     <ol class="ts-tl">${p.map((id,j)=>{const x=protDe(id);return `<li><span>${x?esc(x.n):'<i>Protocolo borrado</i>'}${x&&protMeta(x)?` <small>${esc(protMeta(x))}</small>`:''}</span><span class="pr-ac"><button class="x-sm" type="button" data-tsmv="${k}:${j}:-1" ${j?'':'disabled'} aria-label="Subir">↑</button><button class="x-sm" type="button" data-tsmv="${k}:${j}:1" ${j<p.length-1?'':'disabled'} aria-label="Bajar">↓</button><button class="x-sm" type="button" data-tsprm="${k}:${j}" aria-label="Quitar">✕</button></span></li>`}).join('')||'<li class="hint">Todavía no elegiste protocolos.</li>'}</ol>
-    <div class="ts-tf"><select class="mini" data-tspadd="${k}" aria-label="Agregar protocolo el ${T_DIAS[k]}"><option value="">+ protocolo</option>${L.filter(x=>!p.includes(x.id)).map(x=>`<option value="${esc(x.id)}">${esc(x.n)}</option>`).join('')}</select>
+    <div class="ts-tf"><select class="mini" data-tspadd="${k}" aria-label="Agregar protocolo, día ${k+1}"><option value="">+ protocolo</option>${L.filter(x=>!p.includes(x.id)).map(x=>`<option value="${esc(x.id)}">${esc(x.n)}</option>`).join('')}</select>
       <label class="ts-solo"><input type="checkbox" data-tssolo="${k}" ${d.test&&d.test.solo===false?'':'checked'}> Ese día solo test (no se entrega la dosis)</label>
       <input class="ts-nota" data-tsnota="${k}" maxlength="160" value="${esc((d.test&&d.test.nota)||'')}" placeholder="Nota del día (ej: sin pesas desde el sábado)" aria-label="Nota del día de test"></div></div>`}
 /* ---------- EQUIPO PRO · importar la planilla completa (MACRO + MICROCICLOS + PESAS + DIAGNÓSTICO) ---------- */
@@ -3155,7 +3171,7 @@ const xlResumen=x=>{const W=x.W,dos=W.filter(epConDosis).length,ej=W.reduce((a,w
 /* diferencias entre la temporada actual y lo que trae el Excel (para «Actualizar desde Excel») */
 function xlDiff(t,W,mantener){const res={plan:0,dosis:0,nuevas:Math.max(0,W.length-t.semanas.length),quitadas:Math.max(0,t.semanas.length-W.length),mant:0};
   const out=W.map((w,i)=>{const o=t.semanas[i];if(!o)return w;const pl=o.per!==w.per||o.meso!==w.meso||o.tipo!==w.tipo||o.rel!==w.rel||o.comp!==w.comp||!!o.test!==!!w.test||JSON.stringify(o.days.map(d=>[d.q,d.met]))!==JSON.stringify(w.days.map(d=>[d.q,d.met]));
-    let nw=w;if(mantener&&!epConDosis(w)&&epConDosis(o)){nw={...w,days:w.days.map((d,k)=>({...d,run:o.days[k].run||[],str:o.days[k].str||[]}))};res.mant++}
+    let nw=w;if(mantener&&!epConDosis(w)&&epConDosis(o)){nw={...w,days:w.days.map((d,k)=>({...d,run:(o.days[k]||{}).run||[],str:(o.days[k]||{}).str||[]}))};res.mant++}
     if(o.days.some(d=>d.test))nw={...nw,days:nw.days.map((d,k)=>o.days[k]&&o.days[k].test?{...d,test:o.days[k].test}:d)};
     const ds=JSON.stringify(o.days.map(d=>[d.run||[],d.str||[]]))!==JSON.stringify(nw.days.map(d=>[d.run||[],d.str||[]]));if(pl)res.plan++;if(ds)res.dosis++;return nw});
   return {out,res}}
@@ -3178,7 +3194,7 @@ function bindTpSync(a){const ov=$('#overlay');
     if(ev.target.id==='tsy-file'){const f=ev.target.files[0];if(!f)return;a.arch=f.name;a.x=null;a.err='';try{a.x=await leerPlanilla(await f.arrayBuffer())}catch(x){a.err=x.message||'No pude leer el Excel.'}renderSheet()}};
   $('#tsyf').onsubmit=async ev=>{ev.preventDefault();if(!a.x)return;const t=(S.temps||[]).find(x=>x._id===a.tid);const {out}=xlDiff(t,a.x.W,a.mant!==false);const {_id,...doc}=t;
     const dj=$('#tsy-dj')?.value;
-    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:out,origen:'Excel: '+a.arch,actualizado:iso(today())}))){if(dj)await cargarDiag(dj,a.x.diag);toast('Temporada actualizada desde el Excel');closeSheet()}}}
+    if(await write(()=>S.db.collection('temporadas').doc(a.tid).set({...doc,semanas:tAjustar({...doc,semanas:out}),origen:'Excel: '+a.arch,actualizado:iso(today())}))){if(dj)await cargarDiag(dj,a.x.diag);toast('Temporada actualizada desde el Excel');closeSheet()}}}
 document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-tpsync]');if(b){openSheet('__tpsync','ver',{tid:b.dataset.tpsync})}});
 /* ---------- GUÍA DEL ENTRENADOR (dentro de la app) ---------- */
 /* Secciones desplegables con buscador. Las tablas de referencia (métodos, fórmulas, umbrales) se arman con los datos reales de la app. */
