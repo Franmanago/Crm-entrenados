@@ -1449,6 +1449,7 @@ function fichaRutinasHTML(e){
     <select id="rep-mes" class="search" style="flex:0 1 170px">${ms.map(k=>`<option value="${k}" ${k===def?'selected':''}>${mesLbl(k)}</option>`).join('')}</select>
     <span id="rep-vsw" hidden style="display:flex;gap:6px;align-items:center">vs <select id="rep-vs" class="search" style="flex:0 1 170px">${ms.map(k=>`<option value="${k}" ${k===vs?'selected':''}>${mesLbl(k)}</option>`).join('')}</select></span>
     <button class="btn pri" type="button" id="rep-go">Descargar</button></div></div>`})()}
+  ${agendaFichaHTML(e)}
   ${testsFichaHTML(e)}
   <div class="card"><div class="pad" style="padding-bottom:4px"><b>Marcas (RM)</b><p class="hint">Los kg de los ejercicios con % se calculan con estas marcas, redondeando a ${S.cfg.redondeo||2.5} kg. Los grises se calculan solos.</p></div>
     <form id="rmf" class="pad form cols3" style="padding-top:6px">${(S.cfg.rmDefs||[]).map(d=>{const own=(e.rm||{})[d.mov];const der=!own&&rmValue(e,d.mov);return `<label>${esc(titleCase(d.mov))}<input data-rm="${esc(d.mov)}" type="number" min="0" step="0.5" value="${esc(own??'')}" placeholder="${der?String(+der.toFixed(1)):''}"></label>`}).join('')}
@@ -1563,6 +1564,7 @@ function bindFichaRutinas(e){
     rg.addEventListener('click',()=>descargarReportes([e.id],$('#rep-mes').value,tp.value==='comp'?$('#rep-vs').value:null))}
   const cp=$('#portal-copy');if(cp)cp.addEventListener('click',()=>{const u=$('#portal-url').value;const p=navigator.clipboard?.writeText(u);if(p)p.then(()=>toast('Link copiado'),()=>{$('#portal-url').select()});else $('#portal-url').select()});
   const gen=$('#portal-gen');if(gen)gen.addEventListener('click',async()=>{if(await ensureToken(e)){toast('Link creado');renderSheet()}});
+  const agc=$('#ag-card');if(agc)agc.addEventListener('click',ev=>agClick(e,ev));
   const rmf=$('#rmf');if(rmf)rmf.addEventListener('submit',async ev=>{ev.preventDefault();const rm={};rmf.querySelectorAll('[data-rm]').forEach(i=>{const v=Number(i.value);if(v>0)rm[i.dataset.rm]=v});
     if(await write(()=>S.db.collection('entrenados').doc(e.id).update({rm})))toast('Marcas guardadas')});
 }
@@ -2375,6 +2377,57 @@ function deltaTest(id,c,t){const ts=testsDe(id),i=ts.indexOf(t),p=ts.slice(i+1).
 const semanasDesde=f=>f?Math.floor(days(today(),parse(f))/7):null;
 const eqDe=id=>(S.equipos||[]).filter(q=>(q.jugadores||[]).includes(id));
 
+/* ----- semana del jugador: actividades del club + días propios, con carga planificada (minutos × esfuerzo) contra real por tipo ----- */
+const ACT={gym:['Complementario (vos)','var(--ok)'],gymclub:['Gimnasio del club','var(--online)'],pelota:['Pelota (club)','var(--ag-pel)'],partido:['Partido','var(--bad)'],otro:['Otra actividad','var(--muted)']};
+const ACT_K=Object.keys(ACT);
+const AG_DL=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+/* partidos de los equipos del jugador (los cargados en la temporada; si no hay, el día de partido de las semanas con fecha) */
+function partidosDe(eid){const out=[];eqDe(eid).forEach(q=>(S.temps||[]).filter(t=>t.equipoId===q._id).forEach(t=>t.semanas.forEach((w,i)=>tPartidos(t,i).forEach(p=>out.push(p)))));return out.sort((a,b)=>a.dia.localeCompare(b.dia))}
+const agU=a=>(Number(a.min)||0)*(Number(a.rpe)||0);
+function agPlan(e,ini,fin,P){const v=Object.fromEntries(ACT_K.map(k=>[k,0]));(e.agenda||[]).forEach(a=>{if(!ACT[a.tipo])return;
+  if(a.tipo==='partido'&&P.length)v.partido+=agU(a)*P.filter(p=>p.dia>=ini&&p.dia<=fin).length;else v[a.tipo]+=agU(a)});return v}
+function agActReg(r){let k=r.datos&&r.datos.act;if(ACT[k])return k;const it=String(r.item||'');if(it.startsWith('carga:ext-')){k=it.slice(10).split('-')[0];return ACT[k]?k:'otro'}
+  const ru=S.rutinas.find(x=>x._id===r.rutinaId);const d=ru&&(ru.secciones||[]).flatMap(s=>s.dias||[]).find(d=>'carga:'+d.uid===it);return d&&/club/i.test(d.nombre||'')?'gymclub':'gym'}
+function agReal(e,ini,fin){const v=Object.fromEntries(ACT_K.map(k=>[k,0]));S.regs.filter(r=>r.entrenadoId===e.id&&r.tipo==='carga'&&r.fecha>=ini&&r.fecha<=fin).forEach(r=>{v[agActReg(r)]+=(Number(r.datos?.min)||0)*(Number(r.datos?.rpe)||0)});return v}
+const agSum=v=>Math.round(Object.values(v).reduce((a,b)=>a+b,0));
+function agAvisos(e,P){const ag=e.agenda||[],out=[];
+  let pw=ag.find(a=>a.tipo==='partido');pw=pw?pw.wd:null;if(pw==null){const fut=P.filter(p=>p.dia>=iso(today())).slice(0,3);if(fut.length)pw=(parse(fut[0].dia).getDay()+6)%7}
+  if(pw!=null)ag.filter(a=>a.tipo==='gym'&&a.wd===(pw+6)%7).forEach(a=>out.push(`Tu complementario del ${AG_DL[a.wd].toLowerCase()} queda la víspera del partido: que sea de activación (poco volumen, potencia, sin carga pesada).`));
+  [0,1,2,3,4,5,6].forEach(d=>{if(ag.some(a=>a.wd===d&&a.tipo==='gym')&&ag.some(a=>a.wd===d&&a.tipo==='gymclub'))out.push(`El ${AG_DL[d].toLowerCase()} tiene tu gimnasio y el del club el mismo día.`)});
+  const pd=[0,1,2,3,4,5,6].map(d=>ag.filter(a=>a.wd===d).reduce((x,a)=>x+agU(a),0));for(let d=0;d<5;d++)if(pd[d]>=600&&pd[d+1]>=600&&pd[d+2]>=600)out.push(`${AG_DL[d]}, ${AG_DL[d+1].toLowerCase()} y ${AG_DL[d+2].toLowerCase()} quedan seguidos con carga alta (${pd[d]}, ${pd[d+1]} y ${pd[d+2]}).`);
+  if(P.length&&!ag.some(a=>a.tipo==='partido'))out.push('Hay partidos en el calendario pero la semana no tiene «Partido»: agregalo con los minutos y el esfuerzo estimados para que cuente en lo planificado.');
+  const [a0,b0]=semanasDe(new Date(today().getTime()-7*864e5),new Date(today().getTime()-7*864e5))[0];const pl=agSum(agPlan(e,iso(a0),iso(b0),P)),re=agSum(agReal(e,iso(a0),iso(b0)));
+  if(pl&&re>pl*1.15)out.push(`La semana pasada anotó ${re}, un ${Math.round((re/pl-1)*100)} % más de lo planificado (${pl}).`);
+  if(pl&&re&&re<pl*0.7)out.push(`La semana pasada anotó ${re} de ${pl} planificados: ¿faltan registros o entrenó menos?`);
+  return out}
+function agendaFichaHTML(e){const ed=S.agEd===e.id,P=partidosDe(e.id);
+  if(ed){const R=S.agDraft||[];
+    return `<div class="card" id="ag-card"><div class="pad"><b>Semana del jugador</b><p class="hint">Una fila por actividad. Minutos y esfuerzo (1 a 10) son lo que esperás que dure y cueste: con eso se calcula la carga planificada. «Complementario» son tus días; la rutina se arma aparte.${P.length?' El partido cuenta solo en las semanas con fecha del calendario.':''}</p>
+      <div class="ag-ed">${R.map((a,j)=>`<div class="ag-row" data-r="${j}"><select data-f="wd" aria-label="Día">${AG_DL.map((d,i)=>`<option value="${i}" ${+a.wd===i?'selected':''}>${d}</option>`).join('')}</select><select data-f="tipo" aria-label="Actividad">${ACT_K.map(k=>`<option value="${k}" ${a.tipo===k?'selected':''}>${ACT[k][0]}</option>`).join('')}</select><input data-f="hora" value="${esc(a.hora||'')}" placeholder="Hora" aria-label="Hora"><input data-f="min" type="number" min="0" max="300" value="${esc(a.min??'')}" placeholder="Min" aria-label="Minutos"><input data-f="rpe" type="number" min="1" max="10" value="${esc(a.rpe??'')}" placeholder="Esf." aria-label="Esfuerzo 1 a 10"><button class="btn" type="button" data-ag="del:${j}" aria-label="Quitar">✕</button></div>`).join('')}</div>
+      <div class="actions" style="margin-top:8px"><button class="btn" type="button" data-ag="add">+ Actividad</button><span style="flex:1"></span><button class="btn" type="button" data-ag="cancel">Cancelar</button><button class="btn pri" type="button" data-ag="save">Guardar semana</button></div></div></div>`}
+  const ag=(e.agenda||[]).slice().sort((a,b)=>a.wd-b.wd||String(a.hora||'').localeCompare(String(b.hora||'')));
+  if(!ag.length)return `<div class="card" id="ag-card"><div class="pad" style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><div><b>Semana del jugador</b><p class="hint">Para entrenados con club: cargá pelota, gimnasio del club, tus días y partido con minutos y esfuerzo estimado. Así ves la carga total, no solo la tuya.</p></div><button class="btn" type="button" data-ag="edit">Cargar semana</button></div></div>`;
+  const dia=d=>ag.filter(a=>a.wd===d),tot=[0,1,2,3,4,5,6].map(d=>dia(d).reduce((x,a)=>x+agU(a),0));
+  const grid=`<div class="ag-g">${AG_DL.map((n,d)=>`<div class="ag-d"><span class="ag-dn">${n.slice(0,3)}</span>${dia(d).map(a=>`<div class="ag-it" style="--c:${ACT[a.tipo]?ACT[a.tipo][1]:'var(--muted)'}"><b>${esc(ACT[a.tipo]?ACT[a.tipo][0]:a.tipo)}</b><span>${[a.hora,a.min?a.min+'′':'',a.rpe?'esf. '+a.rpe:''].filter(Boolean).map(esc).join(' · ')}</span></div>`).join('')||'<span class="hint">Libre</span>'}<span class="ag-tot">${tot[d]||''}</span></div>`).join('')}</div>`;
+  const ws=semanasDe(new Date(today().getTime()-28*864e5),new Date(today().getTime()+7*864e5)).map(([x,y])=>{const a=iso(x),b=iso(y);return {x,pl:agPlan(e,a,b,P),re:agReal(e,a,b),fut:a>iso(today())}});
+  const mx=Math.max(1,...ws.map(w=>Math.max(agSum(w.pl),agSum(w.re))));
+  const bars=`<div class="asis-row ag-bars">${ws.map(w=>{const pl=agSum(w.pl),re=agSum(w.re);return `<div class="asis-w" title="${esc(ACT_K.map(k=>ACT[k][0]+': real '+Math.round(w.re[k])+' / plan '+Math.round(w.pl[k])).join('\n'))}"><div class="asis-bar ag-st">${ACT_K.map(k=>w.re[k]?`<i style="height:${w.re[k]/mx*100}%;background:${ACT[k][1]}"></i>`:'').join('')}${pl?`<span class="ag-pl" style="bottom:${pl/mx*100}%"></span>`:''}</div><b>${w.fut?'—':re}</b><small>plan ${pl}</small><span>${fmtShort(iso(w.x))}</span></div>`}).join('')}</div>`;
+  const av=agAvisos(e,P);
+  return `<div class="card" id="ag-card"><div class="pad" style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap"><div><b>Semana del jugador</b><p class="hint">Carga planificada por día (minutos × esfuerzo). Total semanal: <b>${tot.reduce((a,b)=>a+b,0)}</b>${P.length?' · el partido suma solo en semanas con fecha':''}.</p></div><button class="btn" type="button" data-ag="edit">Editar semana</button></div>
+    <div class="pad" style="padding-top:0">${grid}</div>
+    <div class="pad" style="border-top:1px solid var(--line)"><div class="lbl" style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Carga real por actividad · la raya es lo planificado</div>${bars}
+      <div class="ag-ley">${ACT_K.map(k=>`<span><i style="background:${ACT[k][1]}"></i>${ACT[k][0]}</span>`).join('')}</div>
+      ${av.length?`<ul class="ag-av">${av.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</div></div>`}
+function agLeer(){const c=$('#ag-card');if(!c||!S.agDraft)return;c.querySelectorAll('.ag-row').forEach(r=>{const a=S.agDraft[+r.dataset.r];if(!a)return;r.querySelectorAll('[data-f]').forEach(i=>{const f=i.dataset.f;a[f]=f==='wd'||f==='min'||f==='rpe'?(i.value===''?'':Number(i.value)):i.value.trim()})})}
+async function agClick(e,ev){const b=ev.target.closest('[data-ag]');if(!b)return;const k=b.dataset.ag;
+  if(k==='edit'){S.agEd=e.id;S.agDraft=(e.agenda||[]).map(a=>({...a}));if(!S.agDraft.length)S.agDraft=[{wd:0,tipo:'pelota',hora:'',min:90,rpe:6}];renderSheet();return}
+  agLeer();
+  if(k==='add'){const l=S.agDraft[S.agDraft.length-1];S.agDraft.push({wd:l?l.wd:0,tipo:'pelota',hora:'',min:60,rpe:6});renderSheet();return}
+  if(k.startsWith('del:')){S.agDraft.splice(+k.slice(4),1);renderSheet();return}
+  if(k==='cancel'){S.agEd=null;S.agDraft=null;renderSheet();return}
+  if(k==='save'){const ag=S.agDraft.filter(a=>ACT[a.tipo]&&a.wd!==''&&a.wd>=0&&a.wd<=6).map(a=>({wd:+a.wd,tipo:a.tipo,hora:a.hora||'',min:Number(a.min)||0,rpe:Math.min(10,Math.max(0,Number(a.rpe)||0))}));
+    if(ag.some(a=>!a.min||!a.rpe)){toast('Completá minutos y esfuerzo en todas las filas');return}
+    if(await write(()=>S.db.collection('entrenados').doc(e.id).update({agenda:ag}))){if(S.ents[e.id])S.ents[e.id].agenda=ag;S.agEd=null;S.agDraft=null;toast('Semana guardada');renderSheet()}}}
 function testsFichaHTML(e){
   const ts=testsDe(e.id),u=ultimoTest(e.id),eqs=eqDe(e.id);
   const head=`<div class="pad" style="padding-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div><b>Tests físicos</b>${eqs.length?` ${eqs.map(q=>`<span class="pill p-mute">${esc(q.nombre)}</span>`).join(' ')}`:''}<p class="hint">VAM, saltos y sprint con su historial. La VAM y el sprint marcan los ritmos de carrera; el 1RM, los kilos.</p></div><button class="btn" type="button" data-tnew="${esc(e.id)}">Cargar test</button></div>`;

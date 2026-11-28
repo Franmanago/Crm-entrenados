@@ -486,6 +486,7 @@ body.mini-on .tmr-fab{display:none}
 .tst-inv{margin:8px 0 0;font-size:13.5px;color:var(--bad)}
 .tst-sh{margin:10px 0 4px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
 .tst-b .tst-sh:first-child{margin-top:0}
+  .ext-hoy{margin:10px 0}.ext-t{margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -534,7 +535,7 @@ function initRut(){if(!D||!D.rutina)return;
     const sem=D.rutina.fechaEntrega?Math.floor((today()-parse(D.rutina.fechaEntrega))/6048e5):0;
     const dist=D.rutina.distribucion&&D.rutina.distribucion[sem%D.rutina.distribucion.length];
     const k=D.rutina.id+':'+sem;
-    if(store.get(sk('rut'))!==k){store.set(sk('rut'),k);secI=D.rutina.equipo?Math.max(0,Math.min(sem,(D.rutina.secciones||[]).length-1)):0;diaI=dist?dist[0]:0;if(D.rutina.equipo){const wd=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][(today().getDay()+6)%7],ds=((D.rutina.secciones||[])[secI]||{}).dias||[],ix=ds.findIndex(d=>String(d.nombre||'').endsWith(wd));if(ix>=0)diaI=ix}store.set(sk('sec'),secI);store.set(sk('dia'),diaI)}
+    if(store.get(sk('rut'))!==k){store.set(sk('rut'),k);secI=D.rutina.equipo?Math.max(0,Math.min(sem,(D.rutina.secciones||[]).length-1)):0;diaI=dist?dist[0]:0;if(D.rutina.equipo||D.rutina.porDia){const wd=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][(today().getDay()+6)%7],ds=((D.rutina.secciones||[])[secI]||{}).dias||[],ix=ds.findIndex(d=>String(d.nombre||'').endsWith(wd));if(ix>=0)diaI=ix}store.set(sk('sec'),secI);store.set(sk('dia'),diaI)}
     else{secI=Number(store.get(sk('sec')))||0;diaI=Number(store.get(sk('dia')))||0}}
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 let D=null,sb=null,secI=0,diaI=0,open={},vista='rutina',progEj=null;
@@ -713,11 +714,14 @@ function bienHTML(gate){
     ${q.map(([k,t,a,b])=>`<div class="bq"><span>${t}</span><div class="rpe">${[1,2,3,4,5].map(n=>`<button type="button" data-bv="${k}" data-n="${n}" aria-pressed="${String(d[k])===String(n)}">${n}</button>`).join('')}</div><small>1 = ${a} · 5 = ${b}</small><input type="hidden" name="${k}" value="${esc(d[k]||'')}"></div>`).join('')}
     <div class="log-row"><button class="guardar" type="submit">${gate?'Guardar y ver mi rutina':'Guardar'}</button><span class="ok" data-ok></span></div></form>`;
 }
-function cargaHTML(dia){
+/* act: tipo de actividad para separar la carga (gym = días del entrenador, gymclub = gimnasio del club, pelota, partido, otro) */
+const ACT={gym:'Gimnasio',gymclub:'Gimnasio del club',pelota:'Pelota (club)',partido:'Partido',otro:'Otra actividad'};
+const actDia=dia=>/club/i.test(String(dia&&dia.nombre||''))?'gymclub':'gym';
+function cargaHTML(dia,tit,act){act=act||actDia(dia);
   const r=regHoy('carga:'+dia.uid);const d=r?.datos||{};
-  if(r&&!editC[dia.uid])return `<div class="card pad bien si"><span>Sesión: <b>${d.min} min</b> · esfuerzo <b>${d.rpe}/10</b></span><button class="link" data-editc="${esc(dia.uid)}">Cambiar</button></div>`;
-  return `<form class="card pad bien" data-carga="${esc(dia.uid)}"><b>¿Cuánto duró y qué tan dura fue la sesión?</b>
-    <div class="log-row"><label>Minutos<input name="min" inputmode="numeric" value="${esc(d.min||'')}" placeholder="60"></label></div>
+  if(r&&!editC[dia.uid])return `<div class="card pad bien si"><span>${tit?esc(tit)+': ':'Sesión: '}<b>${d.min} min</b> · esfuerzo <b>${d.rpe}/10</b></span><button class="link" data-editc="${esc(dia.uid)}">Cambiar</button></div>`;
+  return `<form class="card pad bien" data-carga="${esc(dia.uid)}" data-act="${esc(act)}"><b>${tit?esc(tit)+' · ¿cuánto duró y qué tan duro fue?':'¿Cuánto duró y qué tan dura fue la sesión?'}</b>
+    <div class="log-row"><label>${act==='partido'?'Minutos jugados':'Minutos'}<input name="min" inputmode="numeric" value="${esc(d.min||'')}" placeholder="60"></label></div>
     <label>Esfuerzo de toda la sesión (1 = muy fácil · 10 = máximo)<div class="rpe">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" data-rpe="${n}" aria-pressed="${String(d.rpe)===String(n)}">${n}</button>`).join('')}</div><input type="hidden" name="cansancio" value="${esc(d.rpe||'')}"></label>
     <div class="log-row"><button class="guardar" type="submit">Guardar</button><span class="ok" data-ok></span></div></form>`;
 }
@@ -825,6 +829,7 @@ function render0(){window.splashOff&&window.splashOff();
     else if(R.bienestar&&rb){const est=estadoDia(),aj=R.ajusteWellness&&est&&est.k!=='verde';
       h+=`<div class="strip bien-s ${est?'aj-'+est.k:''}"><span class="aj-dot" aria-hidden="true"></span><span>Wellness <b>${est?AJ[est.k].lbl.toLowerCase():'cargado'}</b>${aj?` · carga ${AJ[est.k].pct}%`:''}</span><button class="link" data-bopen="1">${bienOpen?'ocultar':'ver'}</button></div>`;
       if(bienOpen){h+=bienHTML();if(R.ajusteWellness&&est)h+=`<div class="card pad aj aj-${est.k}"><span class="aj-dot" aria-hidden="true"></span><div><b>Tu estado hoy: ${AJ[est.k].lbl}</b><span>${AJ[est.k].txt}</span>${est.k!=='verde'?'<small>Los kg ajustados ya están cargados en cada ejercicio.</small>':''}</div></div>`}}}
+  h+=extHoyHTML();
   if(!dia){h+='<div class="card msg"><p class="hint">Esta sección no tiene días cargados.</p></div>'}
   else if(!gate&&diaCerrado(dia)&&!diaOpen){const its=(dia.bloques||[]).flatMap(itemsReales),n=its.filter(i=>regHoy(i.uid)).length;
     h+=`<section class="card dia-fin cerrado"><div class="df-h"><span class="ok-ic big" aria-hidden="true">✓</span><div><b>${esc(dia.nombre)} terminado</b><span>${esc(cuando())} · ${n} de ${its.length} ejercicios tildados</span></div></div>
@@ -881,6 +886,14 @@ function render0(){window.splashOff&&window.splashOff();
   $('#main').innerHTML=h;
   miniH(dia?String(dia.nombre||''):'',secs.length>1?(S0.titulo||''):'',dia&&!gate&&!(diaCerrado(dia)&&!diaOpen)?dia:null);
 }
+/* actividades fuera de la rutina (agenda del club y partidos de la temporada) del día elegido: se anotan con minutos × esfuerzo */
+function extHoy(){const f=fSel(),wd=(parse(f).getDay()+6)%7,ag=D.entrenado.agenda||[],P=D.partidos||[],out=[];
+  ag.filter(a=>a.wd===wd&&(a.tipo==='pelota'||a.tipo==='otro')).forEach((a,j)=>out.push({uid:'ext-'+a.tipo+(j?'-'+j:''),act:a.tipo,tit:ACT[a.tipo]+(a.hora?' · '+a.hora:'')}));
+  if(P.length)P.filter(p=>p.dia===f).forEach((p,j)=>out.push({uid:'ext-partido'+(j?'-'+j:''),act:'partido',tit:'Partido'+(p.rival?(p.vis?' @ ':' vs ')+p.rival:'')+(p.hora?' · '+p.hora:'')}));
+  else ag.filter(a=>a.wd===wd&&a.tipo==='partido').forEach((a,j)=>out.push({uid:'ext-partido'+(j?'-'+j:''),act:'partido',tit:'Partido'+(a.hora?' · '+a.hora:'')}));
+  return out}
+function extHoyHTML(){if(!D.rutina||!D.rutina.controlCarga)return '';const L=extHoy();if(!L.length)return '';
+  return `<div class="ext-hoy"><p class="ext-t">${esHoy()?'Hoy':'Ese día'} también tenés</p>${L.map(x=>cargaHTML({uid:x.uid},x.tit,x.act)).join('')}</div>`}
 function miniH(t,s,dia){const nb=$('#mh-bl');if(nb){const bls=dia?(dia.bloques||[]).filter(b=>itemsReales(b).length):[];
     nb.innerHTML=bls.length>1?`<div class="wrap">${bls.map(b=>{const its=itemsReales(b),n=its.filter(i=>regHoy(i.uid)).length;return `<a href="#bl-${esc(b.uid)}" data-goto="${esc(b.uid)}" class="${n===its.length?'ok':n?'mid':''}">${n===its.length?'✓ ':''}${esc(b.nombre||'Bloque')}${n&&n<its.length?` <i>${n}/${its.length}</i>`:''}</a>`}).join('')}</div>`:'';nb.hidden=!nb.innerHTML}const hp=$('#h-pdf');if(hp){hp.innerHTML=IC.pdf;hp.hidden=!D.rutina}const b=$('#mini-h');b.querySelector('.h-ic').innerHTML=IC.tmr;$('#mh-t').textContent=t||(D.rutina&&D.rutina.nombre)||'';$('#mh-s').textContent=[s,esHoy()?'hoy '+fmt(fSel()):fLarga(fSel())].filter(Boolean).join(' · ');miniObs()}
 let mObs=null;function miniObs(){if(mObs||!('IntersectionObserver' in window))return;const hd=document.querySelector('header');mObs=new IntersectionObserver(es=>{const off=!es[0].isIntersecting&&vista==='rutina'&&!!D&&!!D.rutina;$('#mini-h').hidden=!off;document.body.classList.toggle('mini-on',off)},{threshold:0});mObs.observe(hd)}
@@ -1108,7 +1121,7 @@ document.addEventListener('submit',async ev=>{
   if(fb||fc){ev.preventDefault();const f=fb||fc,ok=f.querySelector('[data-ok]');let datos;
     if(fb){datos={};BK.forEach(k=>datos[k]=Number(f[k].value));if(BK.some(k=>!datos[k])){ok.textContent='Respondé las cinco preguntas';ok.style.color='var(--bad)';return}
       const est=bienEstado(datos,histBien(fSel()));datos.estado=est.k;datos.prom=est.m;if(est.base!=null)datos.base=est.base}
-    else{datos={min:Math.round(Number(String(f.min.value).replace(',','.'))),rpe:Number(f.cansancio.value)};if(!(datos.min>0&&datos.min<600)||!datos.rpe){ok.textContent='Completá minutos y esfuerzo';ok.style.color='var(--bad)';return}}
+    else{datos={min:Math.round(Number(String(f.min.value).replace(',','.'))),rpe:Number(f.cansancio.value)};if(f.dataset.act)datos.act=f.dataset.act;if(!(datos.min>0&&datos.min<600)||!datos.rpe){ok.textContent='Completá minutos y esfuerzo';ok.style.color='var(--bad)';return}}
     ok.textContent='Guardando…';
     try{await dato(fb?'bien':'carga',fb?'':fc.dataset.carga,datos);if(fb)editB=false;else editC[fc.dataset.carga]=false;render()}catch(e){ok.textContent=errTxt(e);ok.style.color='var(--bad)'}
     return}

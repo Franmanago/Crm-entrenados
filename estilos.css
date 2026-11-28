@@ -4,7 +4,7 @@
   --bg:#F3F4F1; --surface:#FFFFFF; --surface-2:#F0F2ED; --line:#DCE0D8;
   --ink:#0C0F0E; --muted:#5A635E; --accent:#0C0F0E; --accent-ink:#C8F23A; --accent-soft:#ECF5CC;
   --ok:#4D7A0C; --ok-soft:#F1F8DA; --ok-fill:#C8F23A; --ok-ink:#0C0F0E; --warn:#9A5B00; --warn-soft:#FBEBCF; --bad:#B23325; --bad-soft:#F9E0DC;
-  --online:#7A3FB0; --online-soft:#EEE3F8; --cf:#A33F18; --cf-soft:#FBE4D9;
+  --online:#7A3FB0; --online-soft:#EEE3F8; --cf:#A33F18; --cf-soft:#FBE4D9; --ag-pel:#1F6FB2;
   --lima:#C8F23A; --brand-dot:#6E8A12;
   --display:"Bebas Neue","Barlow Condensed","Arial Narrow",Arial,sans-serif;
   --body:"DM Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
@@ -14,12 +14,12 @@
   --bg:#0C0F0E; --surface:#151A18; --surface-2:#1B211F; --line:#2A322E;
   --ink:#F1F4EF; --muted:#9AA39F; --accent:#C8F23A; --accent-ink:#0C0F0E; --accent-soft:#232D14;
   --ok:#C8F23A; --ok-soft:#1C2412; --ok-fill:#C8F23A; --ok-ink:#0C0F0E; --warn:#EDB15A; --warn-soft:#3A2B12; --bad:#FF6B5E; --bad-soft:#3C1C1B;
-  --online:#C49AF0; --online-soft:#2E2140; --cf:#F29468; --cf-soft:#3D2217; --brand-dot:#C8F23A; color-scheme:dark}}
+  --online:#C49AF0; --online-soft:#2E2140; --cf:#F29468; --cf-soft:#3D2217; --ag-pel:#6FB3F0; --brand-dot:#C8F23A; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0C0F0E; --surface:#151A18; --surface-2:#1B211F; --line:#2A322E;
   --ink:#F1F4EF; --muted:#9AA39F; --accent:#C8F23A; --accent-ink:#0C0F0E; --accent-soft:#232D14;
   --ok:#C8F23A; --ok-soft:#1C2412; --ok-fill:#C8F23A; --ok-ink:#0C0F0E; --warn:#EDB15A; --warn-soft:#3A2B12; --bad:#FF6B5E; --bad-soft:#3C1C1B;
-  --online:#C49AF0; --online-soft:#2E2140; --cf:#F29468; --cf-soft:#3D2217; --brand-dot:#C8F23A; color-scheme:dark}
+  --online:#C49AF0; --online-soft:#2E2140; --cf:#F29468; --cf-soft:#3D2217; --ag-pel:#6FB3F0; --brand-dot:#C8F23A; color-scheme:dark}
 *{box-sizing:border-box}
 body{font-synthesis:none;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
@@ -919,3 +919,24 @@ td.g-ref{white-space:normal;min-width:140px}
 .tpk-o small{font-size:12px;color:var(--muted)}
 .tpk-n{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .tpk-n input{font:inherit;font-size:14px;font-weight:400;text-transform:none;letter-spacing:0;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+
+/* semana del jugador */
+.ag-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+@media (max-width:720px){.ag-g{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ag-d{display:flex;flex-direction:column;gap:5px;background:var(--surface-2);border-radius:8px;padding:8px;min-height:90px}
+.ag-dn{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ag-it{border-left:4px solid var(--c);background:var(--surface);border-radius:5px;padding:4px 6px;display:flex;flex-direction:column;font-size:12px;line-height:1.25}
+.ag-it b{font-size:12px}.ag-it span{color:var(--muted)}
+.ag-tot{margin-top:auto;font-weight:800;font-size:13px;text-align:right}
+.ag-st{display:flex;flex-direction:column-reverse;position:relative}
+.ag-st i{display:block;width:100%}
+.ag-pl{position:absolute;left:-3px;right:-3px;height:0;border-top:2px dashed var(--ink)}
+.ag-bars small{display:block;font-size:10.5px;color:var(--muted)}
+.ag-ley{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12px}
+.ag-ley span{display:inline-flex;align-items:center;gap:5px}.ag-ley i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.ag-av{margin:10px 0 0;padding-left:18px;color:var(--warn);font-size:13px;font-weight:600}
+.ag-ed{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.ag-row{display:grid;grid-template-columns:1.1fr 1.6fr .8fr .7fr .7fr auto;gap:6px}
+.ag-row select,.ag-row input{min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface)}
+@media (max-width:560px){.ag-row{grid-template-columns:1fr 1fr 1fr}}
+.ag-bars .asis-bar{height:90px}
